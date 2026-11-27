@@ -311,90 +311,13 @@ begin
  if p_operation='model_disclose' then
   if (select count(*) from jsonb_object_keys(b))<>11
    or not(b ?& array['scope','questionSha256','model','round','requestSha256','bodySha256','credentialSha256','requestBytes','maxOutputTokens','sourceIds','toolReceipts'])
-   or coalesce(b->>'questionSha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or coalesce(b->>'requestSha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or coalesce(b->>'bodySha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or coalesce(b->>'credentialSha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or coalesce(b->>'model','') !~ '^[A-Za-z0-9._:-]{3,100}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or jsonb_typeof(b->'round') is distinct from 'number' or coalesce(b->>'round','') !~ '^[1-5]
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-   or jsonb_typeof(b->'requestBytes') is distinct from 'number' or coalesce(b->>'requestBytes','') !~ '^[1-9][0-9]{0,6}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
+   or coalesce(b->>'questionSha256','') !~ '^[0-9a-f]{64}$'
+   or coalesce(b->>'requestSha256','') !~ '^[0-9a-f]{64}$'
+   or coalesce(b->>'bodySha256','') !~ '^[0-9a-f]{64}$'
+   or coalesce(b->>'credentialSha256','') !~ '^[0-9a-f]{64}$'
+   or coalesce(b->>'model','') !~ '^[A-Za-z0-9._:-]{3,100}$'
+   or jsonb_typeof(b->'round') is distinct from 'number' or coalesce(b->>'round','') !~ '^[1-5]$'
+   or jsonb_typeof(b->'requestBytes') is distinct from 'number' or coalesce(b->>'requestBytes','') !~ '^[1-9][0-9]{0,6}$'
    or b->'maxOutputTokens' is distinct from '2500'::jsonb
    or jsonb_typeof(b->'sourceIds') is distinct from 'array'
    or jsonb_typeof(b->'toolReceipts') is distinct from 'array' then return null;end if;
@@ -406,42 +329,9 @@ commit;
   for item in select value from jsonb_array_elements(b->'toolReceipts') loop
    if jsonb_typeof(item) is distinct from 'object' then return null;end if;
    if (select count(*) from jsonb_object_keys(item))<>3
-    or coalesce(item->>'receiptId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-    or coalesce(item->>'callSha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
-
-    or coalesce(item->>'resultSha256','') !~ '^[0-9a-f]{64}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- then return null;end if;
+    or coalesce(item->>'receiptId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+    or coalesce(item->>'callSha256','') !~ '^[0-9a-f]{64}$'
+    or coalesce(item->>'resultSha256','') !~ '^[0-9a-f]{64}$' then return null;end if;
    rid:=(item->>'receiptId')::uuid;
    if rid=any(receipt_ids) then return null;end if;
    select * into r from mizizi_private.desk_tool_receipts_v1 where id=rid;
@@ -455,18 +345,7 @@ commit;
    if r.source_id is not null then source_ids:=array_append(source_ids,r.source_id);end if;
   end loop;
   for item in select value from jsonb_array_elements(b->'sourceIds') loop
-   if jsonb_typeof(item) is distinct from 'string' or coalesce(item#>>'{}','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- then return null;end if;
+   if jsonb_typeof(item) is distinct from 'string' or coalesce(item#>>'{}','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' then return null;end if;
    sid:=(item#>>'{}')::uuid;
    if sid=any(seen_sources) or not(sid=any(source_ids)) then return null;end if;
    seen_sources:=array_append(seen_sources,sid);
@@ -484,18 +363,7 @@ commit;
     or length(btrim(i->>'query')) not between 3 and 300 then return null;end if;
    if o.revision is not null and not mizizi_private.desk_public_research_query_allowed_v1(c,i->>'query') then return null;end if;
   else
-   if coalesce(i->>'lead_id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- then return null;end if;
+   if coalesce(i->>'lead_id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' then return null;end if;
    select * into l from mizizi_private.desk_reference_leads_v1 where id=(i->>'lead_id')::uuid;
    if not found then return null;end if;
    if (op='read_page' and l.kind<>'reference') or (op='render_page' and l.kind<>'render')
@@ -508,44 +376,11 @@ commit;
    elsif op='read_document' then
     if (select count(*) from jsonb_object_keys(i))<>3
      or jsonb_typeof(i->'page_start') is distinct from 'number' or jsonb_typeof(i->'page_end') is distinct from 'number'
-     or coalesce(i->>'page_start','') !~ '^[1-9][0-9]{0,4}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- or coalesce(i->>'page_end','') !~ '^[1-9][0-9]{0,4}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- then return null;end if;
+     or coalesce(i->>'page_start','') !~ '^[1-9][0-9]{0,4}$' or coalesce(i->>'page_end','') !~ '^[1-9][0-9]{0,4}$' then return null;end if;
     if (i->>'page_end')::integer>10000 or (i->>'page_end')::integer-(i->>'page_start')::integer not between 0 and 9 then return null;end if;
    elsif op='inspect_visual' then
     if (select count(*) from jsonb_object_keys(i))<>2 or jsonb_typeof(i->'page') is distinct from 'number'
-     or coalesce(i->>'page','') !~ '^[1-9][0-9]{0,4}
- mizizi_private.desk_shared_auto_match_v1(jsonb,mizizi_private.desk_tool_receipts_v1),
- mizizi_private.desk_shared_search_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
- public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) from public,anon,authenticated,service_role,mizizi_executor;
-grant execute on function public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text) to service_role;
-do $acl$ begin
- if has_function_privilege('authenticated','public.mizizi_use_desk_shared_search_v1(text,text,uuid,uuid,text,text)','EXECUTE')
- or has_table_privilege('service_role','mizizi_private.desk_shared_attribution_versions_v1','INSERT')
- then raise exception 'STOP_MIZIZI_AUTO_SHARED_ACL';end if;
-end $acl$;
-commit;
- then return null;end if;
+     or coalesce(i->>'page','') !~ '^[1-9][0-9]{0,4}$' then return null;end if;
     if (i->>'page')::integer>10000 then return null;end if;
    elsif (select count(*) from jsonb_object_keys(i))<>1 then return null;end if;
    select * into r from mizizi_private.desk_tool_receipts_v1 where id=l.receipt_id;
