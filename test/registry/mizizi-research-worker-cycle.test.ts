@@ -320,7 +320,9 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
  }))};
  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
   preflight:async()=>true,readOriginal:async()=>bytes.slice(),registryClient};
- const exactRow={...row,input_payload:{...row.input_payload,
+ // Match the hosted PostgreSQL/PostgREST precision, not an ISO Date mock.
+ const exactLease=row.lease_expires_at.replace(/\.\d{3}Z$/, ".278834+00:00");
+ const exactRow={...row,lease_expires_at:exactLease,input_payload:{...row.input_payload,
   reason:"Investigate receipt-bound chart recording identity."}};
  const sha=createHash("sha256").update(bytes).digest("hex");
  const position={source_key:"youtube_ke",receipt_id:EVENT,original_sha256:sha,
@@ -330,7 +332,7 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   original_byte_length:123,original_content_type:"text/csv"};
  const context={contract:"mizizi.charts.research_context.v1",
   jobId:JOB,receiptId:RECEIPT,caseId:CASE,workspaceId:WORKSPACE,
-  expectedRevision:2,leaseExpiresAt:row.lease_expires_at,
+  expectedRevision:2,leaseExpiresAt:exactLease,
   membershipSha256:sha,observationSha256:"b".repeat(64),
   positions:[position],publicSourceSearchApproved:false,externalModelProcessingAllowed:false};
  function scoped(overrides:{claim?:unknown;contexts?:unknown[];recovery?:unknown;
@@ -362,6 +364,8 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
   const h=scoped();
   const result=await h.run(async(job)=>{
    expect(job.chartContext).toEqual(context);
+   expect(job.leaseExpiresAt).toBe(exactLease);
+   expect(job.leaseExpiresAt).toMatch(/\.278834\+00:00$/);
    expect(job.chartRegistryDiscovery).toMatchObject({contract:"charts2-registry-discovery/v1",
     candidate_only:true,can_publish:false,unmatched_positions:1,groups:[],catalogue_scanned:0});
    expect(job.publicSourceSearchApproved).toBe(false);
@@ -422,6 +426,7 @@ describe("Exact Charts research lease transport (existing worker lifecycle)",()=
  it("rejects stale or forged context without executing research or a failure mutation",async()=>{
   for(const damaged of [
    {...context,caseId:EVENT},{...context,expectedRevision:3},
+   {...context,leaseExpiresAt:exactLease.replace(".278834",".278835")},
    {...context,publicSourceSearchApproved:true},{...context,externalModelProcessingAllowed:true},
    {...context,positions:[position,position]},
    {...context,positions:[{...position,original_object_key:"../other/private-file"}]},

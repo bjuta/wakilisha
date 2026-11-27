@@ -91,6 +91,17 @@ function confirmed(result:WorkerRpcResult,operation:string):unknown{
  if(!result||result.error)throw new Error("MIZIZI_WORKER_"+operation+"_RPC_UNCONFIRMED");
  return result.data;
 }
+// PostgreSQL authorizes the complete timestamp (microseconds), not JS Date's
+// millisecond projection. Preserve its original representation for RPC scope;
+// compare instants with the remaining fractional digits, even across offsets.
+function exactLeaseInstant(value:unknown):string|null{
+ if(typeof value!=="string")return null;
+ const match=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+ if(!match)return null;
+ const millis=Date.parse(value);
+ if(!Number.isFinite(millis))return null;
+ return String(millis)+":"+(match[1]??"").padEnd(6,"0").slice(3);
+}
 function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  const row=record(raw),payload=record(row.input_payload);
  const jobId=uuid(row.job_id),receiptId=uuid(row.command_receipt_id);
@@ -111,11 +122,12 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
     researchQuestion.length<12||researchQuestion.length>500||
     /[\u0000-\u001f]/.test(researchQuestion)))
    throw new TypeError('MIZIZI_WORKER_UNSAFE_PUBLIC_RESEARCH_QUESTION');
- const expires=Date.parse(String(row.lease_expires_at));
- if(!Number.isFinite(expires)||expires<=nowMs)
+ const leaseExpiresAt=row.lease_expires_at;
+ if(typeof leaseExpiresAt!=="string"||exactLeaseInstant(leaseExpiresAt)===null||
+    Date.parse(leaseExpiresAt)<=nowMs)
    throw new TypeError("MIZIZI_WORKER_STALE_LEASE");
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
-   attempt,maxAttempts,leaseExpiresAt:new Date(expires).toISOString(),
+   attempt,maxAttempts,leaseExpiresAt,
    researchQuestion,publicSourceSearchApproved});
 }
 const CHART_REASON="Investigate receipt-bound chart recording identity.";
@@ -170,7 +182,7 @@ function validateChartContext(raw:unknown,job:ResearchJobV1,nowMs:number):Leased
     uuid(c.jobId)!==job.jobId||uuid(c.receiptId)!==job.receiptId||
     uuid(c.caseId)!==job.caseId||uuid(c.workspaceId)!==job.workspaceId||
     c.expectedRevision!==job.expectedRevision||
-    Date.parse(String(c.leaseExpiresAt))!==Date.parse(job.leaseExpiresAt)||
+    exactLeaseInstant(c.leaseExpiresAt)!==exactLeaseInstant(job.leaseExpiresAt)||
     Date.parse(job.leaseExpiresAt)<=nowMs||
     typeof c.membershipSha256!=="string"||!CHART_SHA.test(c.membershipSha256)||
     typeof c.observationSha256!=="string"||!CHART_SHA.test(c.observationSha256)||
