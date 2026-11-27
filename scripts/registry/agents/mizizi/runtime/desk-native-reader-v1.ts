@@ -260,11 +260,15 @@ type BrowserResourceReadOptionsV1=Readonly<{
  * Query is derived from the already authorized public chart request. No key,
  * arbitrary headers, user-specified endpoint, redirects or automatic retry. */
 export function createDeskTavilyDiscoveryReaderV1(options:BrowserResourceReadOptionsV1,query:string,count:number,operation:"search_web"|"search_news"){
- if(typeof query!=="string"||query.length<3||query.length>300||query.trim()!==query||/[\\p{Cc}\\p{Cf}]/u.test(query)||
+ if(typeof query!=="string"||query.length<3||query.length>300||query.trim()!==query||/[\p{Cc}\p{Cf}]/u.test(query)||
   !Number.isSafeInteger(count)||count<1||count>10||!["search_web","search_news"].includes(operation))fail("DISCOVERY_POST_DENIED");
  const body=JSON.stringify({query,topic:operation==="search_news"?"news":"general",search_depth:"basic",max_results:count,
   include_answer:false,include_raw_content:false,include_images:false,auto_parameters:false});
- return createDeskBrowserResourceReaderV1({...options,readPinned:options.readPinned??((target,signal,kind)=>readNative(target,signal,kind,body))});
+ const read=createDeskBrowserResourceReaderV1({...options,readPinned:options.readPinned??((target,signal,kind)=>readNative(target,signal,kind,body))});
+ return async(binding:DeskBrowserResourceBindingV1,requestSha256:string,signal:AbortSignal)=>{
+  if(binding?.url!=="https://api.tavily.com/search"||binding.topLevelUrl!==binding.url||binding.resourceType!=="fetch")fail("DISCOVERY_POST_DENIED");
+  return read(binding,requestSha256,signal);
+ };
 }
 /** One authorized browser resource hop, not a generic proxy. Shared native
  * TLS/DNS/byte boundary; no Chromium headers, credentials or direct network.
