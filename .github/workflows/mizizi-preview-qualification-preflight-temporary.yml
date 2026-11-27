@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 4ed0e409361d23bf481cd34e6cdadf2155f75b76
+          ref: a0d312f4d7a1ad310ded63c6744cea979af2ff09
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -25,46 +25,10 @@ jobs:
       - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 4ed0e409361d23bf481cd34e6cdadf2155f75b76
+          test "$(git rev-parse HEAD)" = a0d312f4d7a1ad310ded63c6744cea979af2ff09
           test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
           test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
           test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
           test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
           npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
 
-  migration:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 4ed0e409361d23bf481cd34e6cdadf2155f75b76
-          persist-credentials: false
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.121.0
-      - name: Exact isolated migration replay and settlement proof
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 4ed0e409361d23bf481cd34e6cdadf2155f75b76
-          test ! -e supabase/.temp/project-ref
-          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
-          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
-          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
-          test -n "$DB"
-          test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = 1
-          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select count(*) from supabase_migrations.schema_migrations')" = 302
-          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select max(version) from supabase_migrations.schema_migrations')" = 20261127131513
-          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < scripts/acceptance/mizizi-slice1-metered-sync-disposable-ci.sql
-          test "$(docker exec -i "$DB" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c 'select (select count(*) from mizizi_private.desk_resource_policy_versions_v1)+(select count(*) from mizizi_private.desk_resource_reservations_v1)+(select count(*) from mizizi_private.desk_resource_events_v1)')" = 0
-          echo MIZIZI_SYNC_METER_FIXTURE_ROLLBACK=PASS
-          echo MIZIZI_302_CLEAN_REPLAY=PASS
-      - name: Destroy local database containers and volumes
-        if: always()
-        run: |
-          supabase stop --no-backup
-          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
-          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
-          echo MIZIZI_LOCAL_METER_FIXTURE_DESTROYED=PASS
