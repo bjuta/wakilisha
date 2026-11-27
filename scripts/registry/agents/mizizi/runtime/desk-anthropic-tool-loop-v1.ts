@@ -15,6 +15,10 @@ import type {DeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const TOOL_ID=/^[A-Za-z0-9_-]{1,128}$/;
+// Haiku 5.5 enables adaptive thinking by default. The ordinary-transcript
+// adapter must disable it explicitly; never silently replay thinking blocks.
+const ordinaryThinking=(model:unknown)=>model==="claude-haiku-5-5"?{thinking:{type:"disabled" as const}}:{};
+
 const MAX_CALLS=5,MAX_TOOLS=8,MAX_OUTPUT=2500,MAX_ENVELOPE=3_200_000;
 const MAX_SOURCES=12,MAX_LEADS=40,MAX_RESPONSE=150000,MAX_DURATION=180000;
 const PROMPT=[
@@ -212,7 +216,9 @@ export type DeskAnthropicOptionsV1=Readonly<{
 async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string):Promise<boolean>{
  try{
   const parsed=record(JSON.parse(body));
-  if(JSON.stringify(parsed)!==body||Object.keys(parsed).length!==7||parsed.model!==b.model||
+  const thinking=ordinaryThinking(b.model);
+  if(JSON.stringify(parsed)!==body||Object.keys(parsed).length!==7+Object.keys(thinking).length||parsed.model!==b.model||
+   JSON.stringify(parsed.thinking)!==JSON.stringify("thinking" in thinking?thinking.thinking:undefined)||
    parsed.max_tokens!==MAX_OUTPUT||parsed.system!==PROMPT||
    JSON.stringify(parsed.tool_choice)!==JSON.stringify({type:"auto",disable_parallel_tool_use:true})||
    JSON.stringify(parsed.output_config)!==JSON.stringify({format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}})||
@@ -420,7 +426,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   }
   for(let round=1;round<=MAX_CALLS;round++){
    live();await checkSources();live();
-   const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system:PROMPT,
+   const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system:PROMPT,...ordinaryThinking(model),
     tools,tool_choice:{type:"auto",disable_parallel_tool_use:true},
     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});
    const requestBytes=Buffer.byteLength(body,"utf8");
@@ -523,9 +529,12 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    // This path deliberately uses ordinary Messages tool calls, not adaptive
    // thinking blocks; a model that emits unexpected blocks fails closed.
    const calls=blocks.filter(b=>b.type==="tool_use");
-   if(calls.length!==1||blocks.some(b=>!["text","tool_use"].includes(String(b.type)))||
-    typeof calls[0].id!=="string"||!TOOL_ID.test(calls[0].id)||toolIds.has(calls[0].id)||
-    receipts.length>=MAX_TOOLS)fail("TOOL_RESPONSE_INVALID");
+   // Bounded diagnostic codes carry no provider content or secrets.
+   if(blocks.some(b=>!["text","tool_use"].includes(String(b.type))))fail("TOOL_RESPONSE_BLOCK_TYPE");
+   if(calls.length!==1)fail("TOOL_RESPONSE_CARDINALITY");
+   if(typeof calls[0].id!=="string"||!TOOL_ID.test(calls[0].id))fail("TOOL_RESPONSE_ID");
+   if(toolIds.has(calls[0].id))fail("TOOL_RESPONSE_REPLAY");
+   if(receipts.length>=MAX_TOOLS)fail("TOOL_RESPONSE_LIMIT");
    const block=calls[0],call=canonicalTool(block.name,block.input,enabled,leads);
    const callSha256=hash(JSON.stringify({scope:boundScope,call}));
    if(callHashes.has(callSha256))fail("DUPLICATE_TOOL_CALL");

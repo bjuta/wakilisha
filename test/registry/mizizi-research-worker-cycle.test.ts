@@ -1824,6 +1824,38 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   };
   await execute(false);await execute(true);
  });
+ it("explicitly selects Haiku 5.5 ordinary tool mode and rejects unexpected blocks without executing a tool",async()=>{
+  const h=fixture(),model="claude-haiku-5-5";
+  const readModelInventory=async()=>[{...models[2],model}];
+  const observed:unknown[]=[];
+  h.send.mockImplementation(async(_url,req)=>{
+   const body=JSON.parse(String(req.body));observed.push(body.thinking);
+   const reply=h.replies.shift()!;
+   return providerResponse({...reply,model});
+  });
+  const rpc:WorkerRpc=async(fn,args)=>{
+   if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{operation:args.p_operation,
+    bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
+   expect(fn).toBe("mizizi_read_desk_tool_receipt_v1");
+   for(let i=0;i<h.executeTool.mock.results.length;i++){
+    const raw=await h.executeTool.mock.results[i].value;
+    if(raw.receiptId!==args.p_receipt_id)continue;
+    const resultText=JSON.stringify({receiptId:raw.receiptId,leads:raw.leads,sources:raw.sources,visual:null});
+    return {data:{receiptId:raw.receiptId,callSha256:createHash("sha256").update(JSON.stringify({scope,call:h.executeTool.mock.calls[i][1]})).digest("hex"),
+     resultSha256:createHash("sha256").update(resultText).digest("hex"),resultText},error:null};
+   }
+   return {data:null,error:null};
+  };
+  const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+  await createCostRoutedDeskAnthropicPassV1({...h.config,readModelInventory,...authority})(identity,question,[]);
+  expect(observed).toEqual(Array(3).fill({type:"disabled"}));
+  const bad=fixture();
+  bad.send.mockImplementationOnce(async()=>providerResponse({...nextTool("search_web",{query:"Nairobi recording archive"},"toolu_search"),model,
+   content:[{type:"thinking",thinking:"not admissible",signature:"fixture"},{type:"tool_use",id:"toolu_search",name:"search_web",input:{query:"Nairobi recording archive"}}]}));
+  await expect(createCostRoutedDeskAnthropicPassV1({...bad.config,readModelInventory})(identity,question,[])).rejects.toThrow("TOOL_RESPONSE_BLOCK_TYPE");
+  expect(bad.executeTool).not.toHaveBeenCalled();
+  expect(bad.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["send_pending","response_metered"]);
+ });
  it("denies envelope authority, underquoted prices, cumulative pass overspend and unaffordable selection before the next call",async()=>{
   const denied=fixture();denied.authorizeEnvelope.mockResolvedValueOnce(null as never);
   await expect(createCostRoutedDeskAnthropicPassV1(denied.config)(identity,question,[])).rejects.toThrow("ENVELOPE_DISCLOSURE_DENIED");
