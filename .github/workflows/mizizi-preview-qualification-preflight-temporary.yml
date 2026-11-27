@@ -1,4 +1,4 @@
-name: MIZIZI Same Case Recall Regression
+name: MIZIZI Native Recall Disposable JWT Preflight
 on:
   push:
     branches:
@@ -9,26 +9,78 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  worker:
+  disposable-operator-jwt:
+    name: disposable-operator-jwt
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
         with:
-          ref: 2ca6ac016c99979b2cd42d3ade7b9872a84e6f6e
+          ref: 990ad514c3b91f427c0bc4d0f7636ce44eec2105
           persist-credentials: false
-      - uses: actions/setup-node@v4
+          fetch-depth: 0
+
+      - name: Prove no remote Supabase target can be used
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = 990ad514c3b91f427c0bc4d0f7636ce44eec2105
+          test ! -e supabase/.temp/project-ref
+          node --check scripts/acceptance/charts2-real-jwt-registry-ci.mjs
+          test -z "$(printenv SUPABASE_PROJECT_REF || true)"
+          test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
+          test -f supabase/config.toml
+          node --check scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+          node --check scripts/acceptance/mizizi-slice1-real-browser-ci.mjs
+          node --check scripts/acceptance/mizizi-slice1-h38-real-grant-ci.mjs
+          echo "WK_CI_AUTH_NO_REMOTE_TARGET=PASS"
+
+      - name: Install pinned local Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Install Node dependencies for genuine HTTP Supabase Auth client
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Exact offline runtime and worker checks
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 2ca6ac016c99979b2cd42d3ade7b9872a84e6f6e
-          test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
-          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
 
+      - name: Install exact package-lock dependencies
+        shell: bash
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install local headless Chromium browser for genuine operator UI
+        shell: bash
+        run: npx playwright install --with-deps chromium
+
+      - name: Start disposable local database, Auth and REST gateway
+        shell: bash
+        run: |
+          supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo "WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS"
+
+      - name: Verify exact HTTP 409 operator RPC and sealed ACLs
+        shell: bash
+        run: |
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-headquarters-stale-http409-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db05-posthold-grant-fence-v1.sql
+          docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres \
+            < scripts/control-plane/verify-mizizi-db02-observation-completion-v1.sql
+
+      - name: Exercise genuine JWT operator bootstrap, case and competing hold RPCs
+        shell: bash
+        run: node scripts/acceptance/mizizi-slice1-real-jwt-operator-ci.mjs
+
+      - name: Destroy all disposable local Auth and database volumes
+        if: always()
+        shell: bash
+        run: |
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo "WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS"
