@@ -39,6 +39,12 @@ export type PassDecisionV1=Readonly<{
 export type InvestigationIdentityV1=Readonly<{
  caseId:string;workspaceId:string;openingQuestion:string;
 }>;
+/** A trusted event reader must independently bind this exact event to the
+ * case, paused predecessor, question and current authority. An opaque UUID
+ * and digest alone confer no permission or ability to dispatch a new job. */
+export type InvestigationReopenAuthorityV1=Readonly<{
+ sourceEventRef:string;eventSha256:string;predecessorFingerprint:string;question:string;
+}>;
 export type DeskBatchReceiptV1=Readonly<{reservationId:string;bodySha256:string;resultSha256:string}>;
 // Only bounded availability failures from the trusted native transport.
 // Permission, custody, finance, identity and ambiguous model errors are not
@@ -62,6 +68,8 @@ export type InvestigationPassV1=Readonly<{
  }>[];
  deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
  deskBatchReceipt?:DeskBatchReceiptV1;
+ /** First pass after a separately verified new event; no event payload. */
+ reopenEvent?:Readonly<Pick<InvestigationReopenAuthorityV1,"sourceEventRef"|"eventSha256"|"predecessorFingerprint">>;
  /** Trustworthy runtime diagnostic, not model analysis or source evidence. */
  interruptionCode?:DeskAvailabilityFailureV1;
  findings:readonly VerifiedClaimV1[];
@@ -119,6 +127,7 @@ function digest(v:unknown):string{
 function questionKey(s:string):string{return s.normalize("NFKC").toLowerCase().replace(/\s+/g," ").trim();}
 export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:readonly InvestigationPassV1[]){
  let prior:string|null=null;
+ const reopenEvents=new Set<string>();
  for(let i=0;i<history.length;i++){
   const pass=history[i];
   if(pass.contract!==ADAPTIVE_INVESTIGATION_CONTRACT||pass.caseId!==id.caseId||
@@ -126,6 +135,15 @@ export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:
      pass.predecessorFingerprint!==prior||!SHA.test(pass.fingerprint)||
      digest({...pass,fingerprint:undefined})!==pass.fingerprint)
    throw new Error("MIZIZI_RESEARCH_HISTORY_CORRUPT_OR_CONFLICTED");
+  const event=pass.reopenEvent;
+  if(event!==undefined){
+   if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,sourceEventRef"||
+    !UUID.test(event.sourceEventRef)||event.sourceEventRef!==event.sourceEventRef.toLowerCase()||
+    !SHA.test(event.eventSha256)||event.predecessorFingerprint!==prior||
+    history[i-1]?.decision.action!=="pause"||reopenEvents.has(event.sourceEventRef))
+    throw Error("MIZIZI_RESEARCH_REOPEN_HISTORY_INVALID");
+   reopenEvents.add(event.sourceEventRef);
+  }
   prior=pass.fingerprint;
  }
 }
@@ -172,8 +190,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  /** Trusted, read-only restart gate. False defers without a fabricated pass. */
  canPrepareDeskPass?:(...args:Parameters<DeskPassResearcherV1>)=>Promise<boolean>;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
- reopen?:Readonly<{sourceEventRef:string;question:string}>;
- verifyReopen?:(sourceEventRef:string,identity:InvestigationIdentityV1,
+ reopen?:InvestigationReopenAuthorityV1;
+ verifyReopen?:(event:InvestigationReopenAuthorityV1,identity:InvestigationIdentityV1,
    previous:InvestigationPassV1)=>Promise<boolean>;
  /** Trusted runtime metering, never model-generated estimated usage. */
  measureCostUnits?:()=>number;now?:()=>number;
@@ -205,6 +223,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  const history=[...await store.read(identity)];
  verifyInvestigationHistoryV1(identity,history);
  let latest=history.at(-1);
+ const reopen=input.reopen===undefined?undefined:Object.freeze({...input.reopen});
+ if(reopen&&latest?.decision.action!=="pause")throw Error("MIZIZI_RESEARCH_REOPEN_NOT_PAUSED");
  if(latest?.decision.action==="conclude")return {
   caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
   totalPasses:history.length,disposition:"concluded",nextQuestion:null,
@@ -214,13 +234,16 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
    totalPasses:history.length,disposition:"paused",nextQuestion:null,
    lastFingerprint:latest.fingerprint};
-  requireText(input.reopen.sourceEventRef,"REOPEN_REF",500);
-  requireText(input.reopen.question,"REOPEN_QUESTION",500);
-  if(typeof input.verifyReopen!=="function"||
-     await input.verifyReopen(input.reopen.sourceEventRef,identity,latest)!==true)
-   throw new Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_UNVERIFIED");
+  if(!reopen||Object.keys(reopen).sort().join(",")!=="eventSha256,predecessorFingerprint,question,sourceEventRef"||
+   !UUID.test(reopen.sourceEventRef)||reopen.sourceEventRef!==reopen.sourceEventRef.toLowerCase()||
+   !SHA.test(reopen.eventSha256)||reopen.predecessorFingerprint!==latest.fingerprint||
+   history.some(p=>p.reopenEvent?.sourceEventRef===reopen.sourceEventRef)||
+   typeof input.verifyReopen!=="function")
+   throw Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_UNVERIFIED");
+  requireText(reopen.question,"REOPEN_QUESTION",500);
  }
- let question=(latest?.decision.action==="pause"?input.reopen?.question:null)||
+ const reopenPrevious=latest?.decision.action==="pause"?latest:undefined;
+ let question=(reopenPrevious?reopen?.question:null)||
      latest?.decision.nextQuestion||identity.openingQuestion;
  // Desk token units are a cumulative investigation budget across leases.
  // The monetary ledger independently precharges actual and uncertain calls.
@@ -230,11 +253,14 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   return total+pass.costUnits;
  },0):0;
  let remainingCost=Math.max(0,input.costBudgetUnits-historicCost),added=0;
- let disposition:InvestigationResultV1["disposition"]="continue";
+ let disposition:InvestigationResultV1["disposition"]=reopenPrevious?"paused":"continue";
  while(added<input.maxNewPasses&&history.length<input.maxTotalPasses){
   // Do not enter an externally metered desk pass with an exhausted budget.
   if(input.prepareDeskPass&&remainingCost<=0)break;
   const snapshot=Object.freeze([...history]);
+  const activeReopen=added===0&&reopenPrevious?reopen:undefined;
+  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,reopenPrevious!)!==true)
+   throw Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_UNVERIFIED");
   if(input.canPrepareDeskPass&&await input.canPrepareDeskPass(identity,question,snapshot)!==true)break;
   const prepared=input.prepareDeskPass?
    await input.prepareDeskPass(identity,question,snapshot):null;
@@ -288,7 +314,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // could quote a privately retained witness or artifact.
   const analystHistory=history.map(p=>Object.freeze({...p,
    question:"Prior research question withheld from external processing.",
-   sourceReceipts:[],findings:[],proposedLeads:[],
+   sourceReceipts:[],findings:[],proposedLeads:[],reopenEvent:undefined,
    passFinding:"Unverified prior analysis withheld from external processing.",
    decision:{...p.decision,nextQuestion:null,
     rationale:"Prior method decision; previous claims are not evidence.",
@@ -431,6 +457,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
    ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
+   ...(activeReopen?{reopenEvent:{sourceEventRef:activeReopen.sourceEventRef,eventSha256:activeReopen.eventSha256,
+    predecessorFingerprint:activeReopen.predecessorFingerprint}}:{}),
    ...(interrupted?{interruptionCode:prepared!.interruptionCode}:{}),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
@@ -441,6 +469,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    throw new Error('MIZIZI_RESEARCH_EVIDENCE_SNAPSHOT_BUDGET');
   const pass:InvestigationPassV1=Object.freeze({...body,
    fingerprint:digest({...body,fingerprint:undefined})});
+  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,reopenPrevious!)!==true)
+   throw Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_CHANGED");
   await store.append(identity,pass.ordinal,previous,pass);
   history.push(pass);added++;
   // Do not label an interrupted worker as succeeded merely because the

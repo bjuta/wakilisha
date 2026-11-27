@@ -617,6 +617,31 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   expect(analyst).not.toHaveBeenCalled();
   expect(verifier).not.toHaveBeenCalled();
  });
+ it("reopens only an independently verified exact event and question, binds the new pass and prevents event replay",async()=>{
+  const store=memory(),reader=vi.fn(async()=>[]),analyst=vi.fn(async()=>answer([],"pause"));
+  const deps={identity,store,maxNewPasses:1,maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW,
+   readSources:reader,analyze:analyst,verifyFinding:async()=>({verified:false,verificationRef:null})};
+  await runAdaptiveInvestigationV1(deps);
+  const prior=store.rows[0],question="What does the independently available new archive establish?";
+  const event={sourceEventRef:EVENT,eventSha256:"c".repeat(64),predecessorFingerprint:prior.fingerprint,question};
+  const verify=vi.fn(async (candidate:typeof event,id:typeof identity,previous:InvestigationPassV1)=>
+   JSON.stringify(candidate)===JSON.stringify(event)&&id.caseId===CASE&&previous.fingerprint===prior.fingerprint);
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:{...event,question:"What about an unrelated recording instead?"},verifyReopen:verify}))
+   .rejects.toThrow("REOPEN_AUTHORITY_UNVERIFIED");
+  expect(reader).toHaveBeenCalledTimes(1);
+  const denied=vi.fn(async()=>false);
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:event,verifyReopen:denied})).rejects.toThrow("REOPEN_AUTHORITY_UNVERIFIED");
+  expect(store.rows).toHaveLength(1);
+  const revoked=vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:event,verifyReopen:revoked})).rejects.toThrow("REOPEN_AUTHORITY_CHANGED");
+  expect(store.rows).toHaveLength(1);
+  expect(await runAdaptiveInvestigationV1({...deps,reopen:event,verifyReopen:verify})).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(store.rows[1]).toMatchObject({question,predecessorFingerprint:prior.fingerprint,
+   reopenEvent:{sourceEventRef:EVENT,eventSha256:event.eventSha256,predecessorFingerprint:prior.fingerprint}});
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:{...event,predecessorFingerprint:store.rows[1].fingerprint},verifyReopen:async()=>true}))
+   .rejects.toThrow("REOPEN_AUTHORITY_UNVERIFIED");
+  expect(store.rows).toHaveLength(2);expect(analyst).not.toHaveBeenCalled();
+ });
  it("requires independent model-use consent for a claimed first-party source",async()=>{
   const store=memory(),model=vi.fn(async()=>answer([],"conclude"));
   const declared={...source,source:{...authority,
@@ -3066,5 +3091,28 @@ describe("MIZIZI independent recording-field adjudication",()=>{
   expect(()=>score({...review,lastFingerprint:h("other")})).toThrow("SCOPE");
   expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,evidence:[{...span,spanSha256:h("forged")}]}:f)})).toThrow("EVIDENCE_BINDING");
   expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,finding:{...f.finding,statementSha256:h("different claim")}}:f)})).toThrow("CLAIM_BINDING");
+ });
+});
+
+describe("MIZIZI frozen representative cohort accounting",()=>{
+ it("preserves all 1000 cohort entries, failed costs and unknown spend without manufacturing target attainment",async()=>{
+  const {scoreFrozenRecordingCohortV1}=await import("../../scripts/registry/agents/mizizi/runtime/research-field-adjudication-v1");
+  const h=(s:string)=>createHash("sha256").update(s).digest("hex");
+  const id=(n:number)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
+  const recordings=Array.from({length:1000},(_,i)=>({caseId:id(i+1),subjectVersionSha256:h("version:"+i),stratum:i%2?"historical records":"modern releases"}));
+  const manifestText=JSON.stringify({contract:"mizizi.recording_cohort_manifest.v1",workspaceId:WORKSPACE,rubricSha256:h("rubric"),frozenAt:new Date(0).toISOString(),recordings});
+  const manifestSha256=h(manifestText),outcomes=recordings.map(({stratum,...r},i)=>({...r,
+   disposition:i<2?"attempted" as const:i===2?"excluded" as const:"not_attempted" as const,
+   jobIds:i<2?[id(i+2001)]:[],resolutionSubmitted:i===0,...(i===2?{exclusionReason:"Evaluator documented duplicate source identity."}:{})}));
+  const entries=[{caseId:recordings[0].caseId,jobIds:[id(2001)],inferenceMicrousd:1800,allInMicrousd:2000,humanReviewMinutes:5,reconciliationRef:"ledger:attempt-one"},
+   {caseId:recordings[1].caseId,jobIds:[id(2002)],inferenceMicrousd:null,allInMicrousd:null,humanReviewMinutes:2,reconciliationRef:"ledger:attempt-two"}];
+  const score=(rows=outcomes,fin=entries)=>{const financeText=JSON.stringify({contract:"mizizi.recording_cohort_finance.v1",manifestSha256,entries:fin});
+   return scoreFrozenRecordingCohortV1({manifestText,manifestSha256,financeText,financeSha256:h(financeText),outcomes:rows,now:3000});};
+  expect(score()).toMatchObject({counts:{frozen:1000,attempted:2,notAttempted:997,excluded:1,acceptedUnreviewed:1,unresolved:1},
+   knownInferenceMicrousd:1800,inferenceUnknown:1,averageInferenceMicrousd:null,precision:null,complete:false,precisionTargetMet:false,inferenceTargetMet:false});
+  expect(score(outcomes,[entries[0],{...entries[1],inferenceMicrousd:400,allInMicrousd:500}])).toMatchObject({knownInferenceMicrousd:2200,averageInferenceMicrousd:1100,inferenceUnknown:0,complete:false});
+  expect(()=>score(outcomes.slice(0,-1))).toThrow("COHORT_SCOPE");
+  expect(()=>score(outcomes.map((r,i)=>i===999?{...r,caseId:outcomes[0].caseId}:r))).toThrow("COHORT_OUTCOME");
+  expect(()=>score(outcomes,[entries[0],{...entries[1],jobIds:[id(2001)]}])).toThrow("COHORT_FINANCE_SCOPE");
  });
 });

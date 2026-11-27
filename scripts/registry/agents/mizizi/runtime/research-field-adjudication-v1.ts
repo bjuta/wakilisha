@@ -89,6 +89,119 @@ export function adjudicateRecordingFieldsV1(input:Readonly<{
   journalCostUnits:history.reduce((sum,p)=>{if(!Number.isSafeInteger(p.costUnits)||p.costUnits<0)fail("COST");return sum+p.costUnits;},0)});
 }
 
+
+/** Frozen-cohort evaluation, isolated from the research runner. The caller
+ * supplies evaluator-approved manifest and separately reconciled finance
+ * packets via trusted digests. No internal claim of reviewer authentication,
+ * representativeness, source rights or ledger completeness is manufactured.
+ * Exclusions and missing outcomes remain visible; unknown costs never become zero.
+ */
+export type RecordingCohortManifestV1=Readonly<{
+ contract:"mizizi.recording_cohort_manifest.v1";workspaceId:string;rubricSha256:string;frozenAt:string;
+ recordings:readonly Readonly<{caseId:string;subjectVersionSha256:string;stratum:string}>[];
+}>;
+type CohortAttemptV1=Readonly<{
+ caseId:string;subjectVersionSha256:string;disposition:"attempted"|"not_attempted"|"excluded";
+ jobIds:readonly string[];resolutionSubmitted:boolean;review?:Readonly<{
+  identity:InvestigationIdentityV1;history:readonly InvestigationPassV1[];reviewText:string;reviewSha256:string;
+ }>;exclusionReason?:string;
+}>;
+type CohortFinanceV1=Readonly<{
+ contract:"mizizi.recording_cohort_finance.v1";manifestSha256:string;
+ entries:readonly Readonly<{caseId:string;jobIds:readonly string[];
+  inferenceMicrousd:number|null;allInMicrousd:number|null;humanReviewMinutes:number|null;reconciliationRef:string}>[];
+}>;
+export function scoreFrozenRecordingCohortV1(input:Readonly<{
+ manifestText:string;manifestSha256:string;financeText:string;financeSha256:string;
+ outcomes:readonly CohortAttemptV1[];now?:number;
+}>){
+ const {manifestText,manifestSha256,financeText,financeSha256,outcomes}=input;
+ if(!SHA.test(manifestSha256)||!SHA.test(financeSha256)||typeof manifestText!=="string"||typeof financeText!=="string"||
+  Buffer.byteLength(manifestText)>500000||Buffer.byteLength(financeText)>1000000||
+  hash(manifestText)!==manifestSha256||hash(financeText)!==financeSha256)fail("COHORT_DIGEST");
+ let manifest:RecordingCohortManifestV1,finance:CohortFinanceV1;
+ try{manifest=JSON.parse(manifestText);finance=JSON.parse(financeText);}catch{fail("COHORT_JSON");}
+ const frozenAt=Date.parse(manifest.frozenAt),now=input.now??Date.now();
+ if(!shape(manifest,["contract","workspaceId","rubricSha256","frozenAt","recordings"])||
+  manifest.contract!=="mizizi.recording_cohort_manifest.v1"||!UUID.test(manifest.workspaceId)||!SHA.test(manifest.rubricSha256)||
+  !Number.isFinite(frozenAt)||frozenAt>now||!Array.isArray(manifest.recordings)||manifest.recordings.length!==1000||
+  !Array.isArray(outcomes)||outcomes.length!==1000||
+  !shape(finance,["contract","manifestSha256","entries"])||finance.contract!=="mizizi.recording_cohort_finance.v1"||
+  finance.manifestSha256!==manifestSha256||!Array.isArray(finance.entries)||finance.entries.length>1000)fail("COHORT_SCOPE");
+ const records=new Map<string,RecordingCohortManifestV1["recordings"][number]>(),versions=new Set<string>();
+ for(const item of manifest.recordings){
+  if(!shape(item,["caseId","subjectVersionSha256","stratum"])||!UUID.test(item.caseId)||!SHA.test(item.subjectVersionSha256)||
+   !text(item.stratum,100)||records.has(item.caseId)||versions.has(item.subjectVersionSha256))fail("COHORT_MEMBERSHIP");
+  records.set(item.caseId,item);versions.add(item.subjectVersionSha256);
+ }
+ const safeUnits=(n:unknown)=>n===null||typeof n==="number"&&Number.isSafeInteger(n)&&n>=0&&n<=Number.MAX_SAFE_INTEGER/1000;
+ const fin=new Map<string,CohortFinanceV1["entries"][number]>();
+ for(const row of finance.entries){
+  if(!shape(row,["caseId","jobIds","inferenceMicrousd","allInMicrousd","humanReviewMinutes","reconciliationRef"])||
+   !records.has(row.caseId)||fin.has(row.caseId)||!Array.isArray(row.jobIds)||
+   row.jobIds.some(id=>!UUID.test(id))||new Set(row.jobIds).size!==row.jobIds.length||
+   !safeUnits(row.inferenceMicrousd)||!safeUnits(row.allInMicrousd)||!safeUnits(row.humanReviewMinutes)||
+   row.inferenceMicrousd!==null&&row.allInMicrousd!==null&&row.allInMicrousd<row.inferenceMicrousd||
+   !text(row.reconciliationRef,500))fail("COHORT_FINANCE");
+  fin.set(row.caseId,row);
+ }
+ const blank=()=>({frozen:0,attempted:0,notAttempted:0,excluded:0,reviewed:0,acceptedCorrect:0,acceptedIncorrect:0,
+  acceptedUnreviewable:0,acceptedUnreviewed:0,unresolved:0,unreviewable:0,fieldCorrect:0,fieldIncorrect:0,fieldUnresolved:0,fieldUnreviewable:0});
+ const total=blank(),strata=new Map<string,ReturnType<typeof blank>>(),seenCases=new Set<string>(),seenJobs=new Set<string>();
+ let inference=0,allIn=0,human=0,inferenceUnknown=0,allInUnknown=0,humanUnknown=0;
+ for(const row of outcomes){
+  if(!shape(row,["caseId","subjectVersionSha256","disposition","jobIds","resolutionSubmitted",
+   ...(row?.review===undefined?[]:["review"]),...(row?.exclusionReason===undefined?[]:["exclusionReason"])])||
+   !records.has(row.caseId)||seenCases.has(row.caseId)||records.get(row.caseId)!.subjectVersionSha256!==row.subjectVersionSha256||
+   !["attempted","not_attempted","excluded"].includes(row.disposition)||typeof row.resolutionSubmitted!=="boolean"||
+   !Array.isArray(row.jobIds)||row.jobIds.length>100||row.jobIds.some(id=>!UUID.test(id)||seenJobs.has(id))||
+   new Set(row.jobIds).size!==row.jobIds.length)fail("COHORT_OUTCOME");
+  const attempted=row.disposition==="attempted";
+  if(attempted!==!!row.jobIds.length||!attempted&&(row.resolutionSubmitted||row.review!==undefined)||
+   (row.disposition==="excluded"? !text(row.exclusionReason,500):row.exclusionReason!==undefined))fail("COHORT_DISPOSITION");
+  seenCases.add(row.caseId);for(const job of row.jobIds)seenJobs.add(job);
+  const f=fin.get(row.caseId);
+  if(f&&JSON.stringify([...f.jobIds].sort())!==JSON.stringify([...row.jobIds].sort())||
+   !attempted&&f&&(f.inferenceMicrousd!==null&&f.inferenceMicrousd!==0))fail("COHORT_FINANCE_SCOPE");
+  const stratum=records.get(row.caseId)!.stratum,sub=strata.get(stratum)??blank();strata.set(stratum,sub);
+  const inc=(key:keyof ReturnType<typeof blank>,n=1)=>{total[key]+=n;sub[key]+=n;};
+  inc("frozen");inc(attempted?"attempted":row.disposition==="excluded"?"excluded":"notAttempted");
+  if(attempted){
+   if(f?.inferenceMicrousd==null)inferenceUnknown++;else inference+=f.inferenceMicrousd;
+   if(f?.allInMicrousd==null)allInUnknown++;else allIn+=f.allInMicrousd;
+  }else if(f){if(f.allInMicrousd==null)allInUnknown++;else allIn+=f.allInMicrousd;}
+  if(f?.humanReviewMinutes==null){if(attempted||row.review!==undefined)humanUnknown++;}else human+=f.humanReviewMinutes;
+  if(!attempted)continue;
+  if(!row.review){inc(row.resolutionSubmitted?"acceptedUnreviewed":"unresolved");continue;}
+  const review=row.review;
+  if(!shape(review,["identity","history","reviewText","reviewSha256"])||
+   review.identity.caseId!==row.caseId||review.identity.workspaceId!==manifest.workspaceId||
+   !Array.isArray(review.history)||review.history.some(p=>!Number.isFinite(Date.parse(p.recordedAt))||Date.parse(p.recordedAt)<frozenAt))fail("COHORT_REVIEW_SCOPE");
+  const score=adjudicateRecordingFieldsV1({...review,subjectVersionSha256:row.subjectVersionSha256,rubricSha256:manifest.rubricSha256,now});
+  inc("reviewed");inc("fieldCorrect",score.correct);inc("fieldIncorrect",score.incorrect);
+  inc("fieldUnresolved",score.unresolved);inc("fieldUnreviewable",score.unreviewable);
+  if(row.resolutionSubmitted){
+   if(score.recordingFullyCorrect)inc("acceptedCorrect");
+   else if(score.incorrect)inc("acceptedIncorrect");
+   else inc("acceptedUnreviewable");
+  }else{inc(score.unreviewable?"unreviewable":"unresolved");}
+ }
+ const accepted=total.acceptedCorrect+total.acceptedIncorrect+total.acceptedUnreviewable+total.acceptedUnreviewed;
+ const reviewedAccepted=total.acceptedCorrect+total.acceptedIncorrect;
+ const precision=reviewedAccepted?total.acceptedCorrect/reviewedAccepted:null;
+ const averageInferenceMicrousd=total.attempted&&!inferenceUnknown?inference/total.attempted:null;
+ const allReviewed=total.attempted>0&&total.reviewed===total.attempted;
+ const incompleteAccepted=total.acceptedUnreviewable+total.acceptedUnreviewed;
+ const complete=total.attempted===1000&&allReviewed&&!incompleteAccepted&&!inferenceUnknown&&!allInUnknown&&!humanUnknown;
+ return Object.freeze({contract:"mizizi.recording_cohort_score.v1" as const,manifestSha256,financeSha256,
+  rubricSha256:manifest.rubricSha256,counts:Object.freeze(total),strata:Object.freeze([...strata].sort(([a],[b])=>a.localeCompare(b)).map(([stratum,counts])=>Object.freeze({stratum,...counts}))),
+  accepted,reviewedAccepted,precision,coverage:accepted/1000,correctCoverage:total.acceptedCorrect/1000,
+  averageInferenceMicrousd,knownInferenceMicrousd:inference,knownAllInMicrousd:allIn,knownHumanReviewMinutes:human,
+  inferenceUnknown,allInUnknown,humanUnknown,costPerConfirmedCorrectMicrousd:total.acceptedCorrect&&!allInUnknown?allIn/total.acceptedCorrect:null,
+  complete,precisionTargetMet:complete&&precision!==null&&precision>=.99,
+  inferenceTargetMet:complete&&averageInferenceMicrousd!==null&&averageInferenceMicrousd<=1000});
+}
+
 /** Separately run evaluator executable. Never invoked by the research
  * runner; no credentials, network or model. The caller supplies independently
  * authorized private journal export and independently reviewed packet digests.
