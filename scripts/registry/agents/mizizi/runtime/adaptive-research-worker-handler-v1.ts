@@ -257,7 +257,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     // after a policy change. The SQL opt-in is default false.
     asyncOpeningBatch:batch,readModelInventory,
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
-    verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
+    verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,discoveryHosts:dispatcher.discoveryHosts,now:input.now});
    const labels=job.chartContext.positions,first=labels[0];
    const query=first?.artist&&labels.every(p=>p.title===first.title&&p.artist===first.artist)?first.title+" "+first.artist:null;
    const compact=batch?createDeskRetainedBatchPassV1({rpc:input.rpc,scope,credential:anthropic,batch,dispatcher,

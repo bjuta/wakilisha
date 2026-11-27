@@ -1895,6 +1895,44 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   expect(bad.executeTool).not.toHaveBeenCalled();
   expect(bad.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["send_pending","response_metered"]);
  });
+ it("continues through a distinct authorized discovery avenue after an exact unavailable receipt, but defers without another avenue",async()=>{
+  for(const alternate of [false,true]){
+   const h=fixture(),code="MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429" as const;
+   const unavailable={code,host:"api.tavily.com"};
+   const initial=h.executeTool.getMockImplementation()!;
+   h.executeTool.mockImplementation(async(s,c)=>c.name==="search_web"?
+    {receiptId:RECEIPT,leads:[],sources:[],unavailable}:c.name==="search_news"?
+    {receiptId:CASE,leads:[{id:leadId,kind:"reference" as const,label:"Independent archive"}],sources:[]}:
+    initial(s,c));
+   h.replies.splice(1,2,nextTool("search_news",{query:"Nairobi archive reporting"},"toolu_news"),nextTool("read_page",{lead_id:leadId},"toolu_read"),final());
+   const options={...h.config,enabledTools:alternate?["search_web","search_news","read_page"] as const:["search_web","read_page"] as const,
+    discoveryHosts:alternate?{search_web:"api.tavily.com",search_news:"api.gdeltproject.org"}:{search_web:"api.tavily.com"},
+    assessRequirement:async()=>({...requirement,maximumCostMicrousd:10000})};
+   const rpc:WorkerRpc=async(fn,args)=>{
+    if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
+    expect(fn).toBe("mizizi_read_desk_tool_receipt_v1");
+    for(let i=0;i<h.executeTool.mock.results.length;i++){
+     const raw=await h.executeTool.mock.results[i].value;
+     if(raw.receiptId!==args.p_receipt_id)continue;
+     const resultText=JSON.stringify({receiptId:raw.receiptId,leads:raw.leads,sources:raw.sources,visual:null,...("unavailable" in raw?{unavailable:raw.unavailable}:{})});
+     return {data:{receiptId:raw.receiptId,callSha256:createHash("sha256").update(JSON.stringify({scope,call:h.executeTool.mock.calls[i][1]})).digest("hex"),
+      resultSha256:createHash("sha256").update(resultText).digest("hex"),resultText},error:null};
+    }
+    return {data:null,error:null};
+   };
+   const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+   const out=await createCostRoutedDeskAnthropicPassV1({...options,...authority})(identity,question,[]);
+   if(alternate){
+    expect(out.sources).toHaveLength(1);expect(out.deskToolReceipts).toHaveLength(3);
+    expect(h.send).toHaveBeenCalledTimes(4);
+    expect(JSON.stringify(JSON.parse(String(h.send.mock.calls[1][1].body)).messages)).toContain(code);
+    expect(h.executeTool.mock.calls.map(c=>c[1].name)).toEqual(["search_web","search_news","read_page"]);
+   }else{
+    expect(out).toMatchObject({method:"interrupted",interruptionCode:code,costUnits:1,analysis:{hypotheses:[],requestedDisposition:"pause"}});
+    expect(out.deskToolReceipts).toHaveLength(1);expect(h.send).toHaveBeenCalledTimes(1);
+   }
+  }
+ });
  it("denies envelope authority, underquoted prices, cumulative pass overspend and unaffordable selection before the next call",async()=>{
   const denied=fixture();denied.authorizeEnvelope.mockResolvedValueOnce(null as never);
   await expect(createCostRoutedDeskAnthropicPassV1(denied.config)(identity,question,[])).rejects.toThrow("ENVELOPE_DISCLOSURE_DENIED");
@@ -2213,6 +2251,20 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(base.append).toHaveBeenCalledTimes(1);
  },20000);
+ it("preserves a consumed unavailable discovery result, denies same-host replay, and does not confuse failure with absence",async()=>{
+  const h=fixture(textBytes,"text/plain",{},true),query="Nairobi recording archive";
+  h.tavily.mockResolvedValueOnce({status:429,contentType:"application/json",body:new Uint8Array(),headers:{}});
+  const search=call("search_web",{query}),first=await h.execute(search);
+  expect(first).toMatchObject({leads:[],sources:[],unavailable:{code:"MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429",host:"api.tavily.com"}});
+  const stored=h.receipts.get(first.receiptId)!;
+  expect(JSON.parse(String(stored.resultText))).toMatchObject({unavailable:first.unavailable});
+  expect(stored.resultSha256).toBe(hash(String(stored.resultText)));
+  expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:first.receiptId,callSha256:hash(JSON.stringify({scope,call:search})),resultSha256:String(stored.resultSha256)},first)).toBe(true);
+  await expect(h.execute(call("search_web",{query:query+" other"}))).rejects.toThrow("DISCOVERY_AVENUE_UNAVAILABLE");
+  expect(h.tavily).toHaveBeenCalledTimes(1);
+  expect(h.calls.filter(c=>c.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+  expect(h.native).not.toHaveBeenCalled();
+ });
  it("composes one Tavily-only investigation across open-web discovery, two independent native sources, model authority, finance and guarded journal",async()=>{
   const h=fixture(textBytes,"text/plain",{},true),question="Which recording credits are supported by the original archival sources?";
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
@@ -2732,12 +2784,14 @@ describe("MIZIZI keyless provider discovery through existing durable search budg
   await expect(createDurableDeskPublicDiscoveryGatewayV1(error.options)(request)).rejects.toThrow("SEARCH_PROVIDER_UNCONFIRMED");
   expect(error.readPinned).toHaveBeenCalledTimes(1);
   // A real HTTP error is not a successful empty search. It remains
-  // precharged, terminal, and distinguishable without retaining a body.
+  // precharged and distinguishable without retaining a body. A permission denial remains terminal.
   for(const status of [403,429,503]){
    const unavailable=fixture({provider:"gdelt",host:"api.gdeltproject.org",allocationRef:"fixture:gdelt-allocation"});
    unavailable.readPinned.mockResolvedValueOnce({status,contentType:"application/json",body:new Uint8Array(),headers:{}});
-   await expect(createDurableDeskPublicDiscoveryGatewayV1(unavailable.options)({...request,operation:"search_news"}))
-    .rejects.toThrow("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_"+status);
+   const response=createDurableDeskPublicDiscoveryGatewayV1(unavailable.options)({...request,operation:"search_news"});
+   if(status===403)await expect(response).rejects.toThrow("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_403");
+   else await expect(response).resolves.toMatchObject({leads:[],identityVerified:false,unavailable:{
+    code:"MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_"+status,host:"api.gdeltproject.org"}});
    expect(unavailable.calls.filter(x=>x.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
    expect(unavailable.readPinned).toHaveBeenCalledTimes(1);
   }

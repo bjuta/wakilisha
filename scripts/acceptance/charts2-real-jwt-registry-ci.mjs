@@ -1806,6 +1806,31 @@ export async function verifyCharts2RealJwtRegistryV1({
  const appendArgs={p_call_text:callText,p_call_sha256:hash(callText),p_result_text:resultText,p_result_sha256:hash(resultText),
   p_host:providerHost,p_policy_revision:1,p_provenance:{reservationId:charge.reservationId,
    requestSha256:req.p_request_sha256,requestText},p_lead_bindings:[{id:leadId,url}]};
+ // Same actual database, rollback-only failure-outcome proof. Reuse the
+ // consumed reservation, do not issue a provider request or alter the success fixture.
+ const q=v=>"'"+String(v).replaceAll("'","''")+"'",j=v=>q(JSON.stringify(v))+"::jsonb";
+ const failure={receiptId,leads:[],sources:[],visual:null,unavailable:{code:"MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429",host:providerHost}};
+ const failureText=JSON.stringify(failure);
+ const appendFailure=(value,provenance=appendArgs.p_provenance,leads=[])=>{
+  const result=JSON.stringify(value);
+  return "public.mizizi_record_desk_tool_receipt_v1("+[q(callText),q(hash(callText)),q(result),q(hash(result)),q(providerHost),1,j(provenance),j(leads)].join(",")+")";
+ };
+ const alternate=JSON.stringify({...JSON.parse(requestText),count:5});
+ sql(`begin; set local role service_role;
+ select set_config('request.jwt.claims','{"role":"service_role"}',true);
+ do $failure$ begin
+ if ${appendFailure({...failure,unavailable:{...failure.unavailable,host:"en.wikipedia.org"}})} is not null
+ or ${appendFailure({...failure,leads:[{id:leadId,kind:"reference",label:"Forged lead"}]},appendArgs.p_provenance,[{id:leadId,url}])} is not null
+ or ${appendFailure(failure,{...appendArgs.p_provenance,reservationId:second.reservationId})} is not null then
+ raise exception 'STOP_UNAVAILABLE_FORGED_PROOF';end if;
+ if (${appendFailure(failure)})->>'outcome' is distinct from 'created' then raise exception 'STOP_UNAVAILABLE_APPEND';end if;
+ if public.mizizi_read_desk_tool_receipt_v1(${j(scope)},${q(receiptId)}::uuid)->>'resultText' is distinct from ${q(failureText)}
+ or public.mizizi_resolve_desk_reference_lead_v1(${j(scope)},${q(leadId)}::uuid) is not null then raise exception 'STOP_UNAVAILABLE_READBACK';end if;
+ if public.mizizi_authorize_desk_search_v1(${q(alternate)},${q(hash(alternate))},${q(account)}) is not null
+ or public.mizizi_consume_desk_search_v1(${q(second.reservationId)}::uuid,${q(second.requestSha256)},${q(account)}) then
+ raise exception 'STOP_UNAVAILABLE_REPLAY';end if;
+ end $failure$; rollback;`);
+ console.log("WK_AUTH_MIZIZI_UNAVAILABLE_DISCOVERY_RECEIPT_NO_REPLAY=PASS");
  fail(await call("mizizi_record_desk_tool_receipt_v1",{...appendArgs,p_host:"en.wikipedia.org"})===null,
   "STOP_KEYLESS_HOST_SWAP");
  fail((await call("mizizi_record_desk_tool_receipt_v1",appendArgs))?.outcome==="created"&&

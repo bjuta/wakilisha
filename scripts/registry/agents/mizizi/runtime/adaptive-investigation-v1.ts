@@ -246,7 +246,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    prepared.analysis.hypotheses.length!==0||prepared.analysis.leads.length!==0||
    prepared.analysis.requestedDisposition!=="pause"))
    throw Error("MIZIZI_DESK_DISCOVERY_ONLY_INVALID");
-  if(prepared)bounded(prepared.costUnits,"DESK_MEASURED_COST",discoveryOnly?0:1,1000000);
+  if(interrupted&&prepared!.costUnits===0&&(prepared!.sources.length||prepared!.deskToolReceipts!.length!==1))throw Error("MIZIZI_DESK_INTERRUPTION_INVALID");
+  if(prepared)bounded(prepared.costUnits,"DESK_MEASURED_COST",discoveryOnly||interrupted?0:1,1000000);
   const sources=prepared?[...prepared.sources]:[...await readSources(identity,question,Object.freeze([...history]))];
   if(sources.length>30)throw new Error("MIZIZI_RESEARCH_SOURCE_BUDGET_EXCEEDED");
   const known=new Set<string>();

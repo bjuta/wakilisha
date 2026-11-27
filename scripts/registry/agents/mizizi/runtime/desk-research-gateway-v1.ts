@@ -4,6 +4,7 @@
  * native model search, automatic retry, refund, or paid fallback exists.
  */
 import {createHash} from "node:crypto";
+import {isDeskAvailabilityFailureV1,type DeskAvailabilityFailureV1} from "./adaptive-investigation-v1.ts";
 import {createDeskBrowserResourceReaderV1,createDeskTavilyDiscoveryReaderV1} from "./desk-native-reader-v1.ts";
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const SHA=/^[0-9a-f]{64}$/;
@@ -225,6 +226,7 @@ type PublicDiscoveryRequestV1=DeskSearchRequestV1&Readonly<{
 }>;
 type PublicDiscoveryResultV1=Readonly<Omit<DeskSearchResultV1,"provider">&{
  provider:DeskPublicDiscoveryProviderV1["provider"];providerHost:string;requestText:string;
+ unavailable?:Readonly<{code:DeskAvailabilityFailureV1;host:string}>;
 }>;
 const publicDiscoveryHost=(host:string)=>typeof host==="string"&&
  /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(host)&&
@@ -337,6 +339,7 @@ export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
   const bindingSha256=createHash("sha256").update(JSON.stringify(binding)).digest("hex");
   const sameBinding=(candidate:Parameters<ReturnType<typeof createDeskBrowserResourceReaderV1>>[0],sha:string)=>
    sha===bindingSha256&&JSON.stringify(candidate)===JSON.stringify(binding);
+  let consumed=false;
   const readerOptions:Parameters<typeof createDeskBrowserResourceReaderV1>[0]={
    ...options.resourceTestSeams,now,
    authorize:async(candidate,sha)=>{
@@ -346,14 +349,28 @@ export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
     return {policyRef:fresh.policyRef,validUntil:new Date(Math.min(Date.parse(fresh.validUntil),
      Date.parse(reservation.validUntil))).toISOString(),acquisitionAllowed:true,zeroIncrementalSpendAllowed:true};
    },
-   precharge:async(candidate,target,_grant,sha)=>sameBinding(candidate,sha)&&
-    target.url===url&&target.hostname===config.host&&expiry(reservation.validUntil,now(),lease)&&
-    await rpc("mizizi_consume_desk_search_v1",{p_reservation_id:reservation.reservationId,
-     p_request_sha256:requestSha256})===true
+   precharge:async(candidate,target,_grant,sha)=>{
+    if(consumed||!sameBinding(candidate,sha)||target.url!==url||target.hostname!==config.host||
+     !expiry(reservation.validUntil,now(),lease))return false;
+    consumed=await rpc("mizizi_consume_desk_search_v1",{p_reservation_id:reservation.reservationId,
+     p_request_sha256:requestSha256})===true;
+    return consumed;
+   }
   };
   const read=config.provider==="tavily_keyless"?createDeskTavilyDiscoveryReaderV1(readerOptions,request.query,request.count,request.operation):
    createDeskBrowserResourceReaderV1(readerOptions);
-  const response=await read(binding,bindingSha256,AbortSignal.timeout(Math.min(20000,Math.max(1,lease-now()))));
+  let response:Awaited<ReturnType<typeof read>>;
+  try{response=await read(binding,bindingSha256,AbortSignal.timeout(Math.min(20000,Math.max(1,lease-now()))));}
+  catch(error){
+   const code=error instanceof Error?error.message:null;
+   if(!consumed||!isDeskAvailabilityFailureV1(code)||now()>=lease)throw error;
+   // No upstream response body is retained or disclosed. The exact consumed
+   // reservation and the bounded transport diagnostic must enter custody.
+   return Object.freeze({contract:"mizizi.desk_search.v1",requestSha256,reservationId:reservation.reservationId,
+    provider:config.provider,providerHost:config.host,requestText,operation:base.operation,
+    retrievedAt:new Date(now()).toISOString(),leads:[],identityVerified:false,sourceRetentionAuthorized:false,
+    externalModelProcessingAuthorized:false,unavailable:Object.freeze({code,host:config.host})});
+  }
   if(response.requestSha256!==bindingSha256||response.status!==200||
    !("body" in response)||!/^application\/json\b/i.test(response.contentType??"")||
    !response.body||createHash("sha256").update(response.body).digest("hex")!==response.sha256)

@@ -14,7 +14,7 @@ import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
-import type {DeskAnthropicOptionsV1,DeskToolCallV1,DeskToolLeadV1,DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
+import {serializeDeskToolResultV1,isDeskUnavailableOutcomeV1,type DeskAnthropicOptionsV1,type DeskToolCallV1,type DeskToolLeadV1,type DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -90,11 +90,7 @@ function text(v:unknown,max:number,min=1):v is string{
 function boundedLabel(v:unknown){
  return typeof v==="string"?v.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,500).trim():"";
 }
-function bodyOf(result:DeskToolResultV1){
- const v=result.visual;
- return JSON.stringify({receiptId:result.receiptId,leads:result.leads,sources:result.sources,
-  visual:v?{sourceId:v.sourceId,sha256:v.sha256,contentType:v.contentType}:null});
-}
+const bodyOf=serializeDeskToolResultV1;
 type NativeReceipt=Awaited<ReturnType<ReturnType<typeof createDeskNativeReaderV1>>>;
 type BrowserReceipt=Awaited<ReturnType<ReturnType<typeof createDeskBrowserReaderV1>>>;
 type TransientSource=Readonly<{receipt:NativeReceipt|BrowserReceipt;provenance:Record<string,unknown>}>;
@@ -182,6 +178,8 @@ export function createDeskResearchDispatcherV1(options:Options){
   }else if(brave)discovery.set(operation,{host:SEARCH_HOST,provider:"brave",run:brave});
  }
  if(!discovery.size)fail("DISCOVERY_CONFIGURATION_REQUIRED");
+ const discoveryHosts=Object.freeze(Object.fromEntries([...discovery].map(([op,value])=>[op,value.host])));
+ const unavailableHosts=new Set<string>();
  if(options.localBrowser&&(options.browser||typeof options.authorizeInteractiveCall!=="function"||
   typeof options.localBrowser.authorizeAccess!=="function"||typeof options.localBrowser.authorizeQuery!=="function"))
   fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
@@ -258,6 +256,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   let parsed;try{parsed=JSON.parse(row.resultText);}catch{fail("CUSTODY_READBACK_UNCONFIRMED");}
   if(parsed?.receiptId!==id||!Array.isArray(parsed.leads)||!Array.isArray(parsed.sources)||
    (parsed.visual!==null&&(!parsed.visual||!UUID.test(parsed.visual.sourceId)||!SHA.test(parsed.visual.sha256)||parsed.visual.contentType!=="image/png"))||
+   (parsed.unavailable!==undefined&&(!isDeskUnavailableOutcomeV1(parsed.unavailable)||parsed.leads.length||parsed.sources.length||parsed.visual!==null))||
    bodyOf(parsed)!==row.resultText)fail("CUSTODY_READBACK_UNCONFIRMED");
   return {row,result:parsed};
  }
@@ -454,6 +453,7 @@ export function createDeskResearchDispatcherV1(options:Options){
    if(retainedOnly)return null;
    const selected=discovery.get(call.name);
    if(!selected)fail("DISCOVERY_CONFIGURATION_DENIED");
+   if(unavailableHosts.has(selected.host))fail("DISCOVERY_AVENUE_UNAVAILABLE");
    const p=await policy(selected.host);
    if(!p||p.sourceFamily!==(selected.provider==="brave"?"brave_discovery":"public_web"))fail("SEARCH_CUSTODY_DENIED");
    const request={scope:{jobId:scope.jobId,caseId:scope.caseId,workspaceId:scope.workspaceId,
@@ -466,9 +466,14 @@ export function createDeskResearchDispatcherV1(options:Options){
     ("providerHost" in reply&&reply.providerHost!==selected.host)||
     ("requestText" in reply&&reply.requestText!==requestText)||
     !UUID.test(reply.reservationId)||reply.identityVerified!==false)fail("SEARCH_RECEIPT_DENIED");
+   const unavailable="unavailable" in reply?reply.unavailable:undefined;
+   if(unavailable!==undefined&&(!isDeskUnavailableOutcomeV1(unavailable)||unavailable.host!==selected.host||reply.leads.length||
+    selected.provider==="brave"))fail("UNAVAILABLE_OUTCOME_DENIED");
    const {leads,bindings}=leadsFrom(reply.leads.map(l=>({url:l.url,label:l.title})));
-   return append(callText,callSha256,{receiptId:randomUUID(),leads,sources:[]},p,
+   const result=await append(callText,callSha256,{receiptId:randomUUID(),leads,sources:[],...(unavailable?{unavailable}:{})},p,
     {reservationId:reply.reservationId,requestSha256:reply.requestSha256,requestText},bindings);
+   if(unavailable)unavailableHosts.add(unavailable.host);
+   return result;
   }
   const id=call.input.lead_id;
   if(typeof id!=="string"||!UUID.test(id))fail("LEAD_ID_DENIED");
@@ -650,7 +655,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   const sources:SourceExcerptV1[]=[];
   for(const ref of dependencies){
    const read=await readReceipt(ref.receiptId);
-   if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256||read.result.visual)
+   if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256||(read.result.visual||read.result.unavailable))
     fail("BATCH_DEPENDENCY_CUSTODY_DENIED");
    sources.push(...read!.result.sources);
   }
@@ -747,7 +752,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   return verified;
  };
- return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,
+ return Object.freeze({enabledTools:TOOLS,discoveryHosts,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,
   tryRetainedBatch,readBatchDependencies,
   closeInteractive:async()=>{if(local)await local.close();}});
 }
