@@ -18,6 +18,7 @@ import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOption
  from "./anthropic-investigation-analyst-v1.ts";
 import {createCostRoutedDeskAnthropicPassV1,createDurableDeskModelAuthorityV1} from "./desk-anthropic-tool-loop-v1.ts";
 import {createDeskResearchDispatcherV1,type DeskLocalBrowserHostV1} from "./desk-research-dispatcher-v1.ts";
+import {readDeskFactualNotesV1,type DeskFactualNoteReadbackV1} from "./desk-factual-note-readback-v1.ts";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {createDeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 import {createDeskRetainedBatchPassV1} from "./desk-retained-batch-pass-v1.ts";
@@ -239,10 +240,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    if(operational&&config.browser)throw Error("MIZIZI_DESK_OPERATIONAL_BROWSER_UNQUALIFIED");
    if(config.localBrowser&&(!operational||!operational.toolNames.includes("browse_page")))
     throw Error("MIZIZI_DESK_LOCAL_BROWSER_POLICY_REQUIRED");
-   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,
+   const factualNoteSubject=operational?{membershipSha256:job.chartContext.membershipSha256,observationSha256:job.chartContext.observationSha256}:undefined;
+   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,factualNoteSubject,
     authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const dispatcher=createDeskResearchDispatcherV1({
-    rpc:input.rpc,scope,braveApiKey:config.braveApiKey,discovery:config.discovery,
+    rpc:input.rpc,scope,factualNoteSubject,braveApiKey:config.braveApiKey,discovery:config.discovery,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
@@ -271,11 +273,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     }
     return true;
    };
-   const createDeskPass=()=>createCostRoutedDeskAnthropicPassV1({
+   const createDeskPass=(factualNoteReadback?:DeskFactualNoteReadbackV1)=>createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:eligibleTools,
     // Always consult existing async intent in operational mode, including
     // after a policy change. The SQL opt-in is default false.
-    asyncOpeningBatch:batch,readModelInventory,
+    asyncOpeningBatch:factualNoteReadback?undefined:batch,factualNoteReadback,readModelInventory,
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,discoveryHosts:dispatcher.discoveryHosts,now:input.now});
    const labels=job.chartContext.positions,first=labels[0];
@@ -296,6 +298,15 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
       return await runDeskDiscoveryOnlyPassV1({scope,query,operation:tool,
        authorizeTool:modelAuthority.authorizeTool,executeTool:dispatcher.executeTool,
        verifyToolReceipt:dispatcher.verifyToolReceipt,now:input.now});
+     }
+     // Never replace an existing paid or uncertain batch intent with a new
+     // note-bearing synchronous request. Existing recovery retains priority.
+     if(factualNoteSubject&&batch){
+      const plan=await batch.plan(scope,question);
+      if(plan.state==="disabled"||plan.state==="available"){
+       const packet=await readDeskFactualNotesV1(input.rpc,scope,factualNoteSubject,input.now??Date.now);
+       if(packet.notes.length)return await createDeskPass(packet)(id,question,history);
+      }
      }
      return (compact?await compact(id,question,history):null)??await createDeskPass()(id,question,history);
     }finally{await dispatcher.closeInteractive();}

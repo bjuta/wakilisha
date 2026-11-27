@@ -11,6 +11,7 @@ import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptions
  from "./anthropic-investigation-analyst-v1.ts";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
+import {readDeskFactualNotesV1,factualNoteContextV1,factualNoteReferencesV1,type DeskFactualNoteReadbackV1,type DeskFactualNoteSubjectV1} from "./desk-factual-note-readback-v1.ts";
 import type {DeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -30,6 +31,7 @@ const PROMPT=[
  "Never invent citations, independence, identities or rights. Separate Recording, Work, Artist and Person.",
  "Write original factual research notes in your own words; do not reproduce source articles, transcripts, or catalogue descriptions.",
  "Separate directly observed facts, attributed source claims, and your own inferences; preserve recording version, citation, uncertainty and contradictions.",
+ "Any factualNotes are unverified human research context, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.",
  "An unavailable discovery outcome is not an empty result or evidence. Do not repeat the failed discovery operation or evade its host restriction. Use another independently available authorized avenue, or preserve uncertainty and pause.",
  "When evidence is insufficient, propose meaningful follow-up questions or pause. Do not perform writes.",
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
@@ -100,7 +102,7 @@ export function serializeDeskToolResultV1(result:DeskToolResultV1):string{
 type ToolReceiptBinding=Readonly<{callSha256:string;resultSha256:string;receiptId:string}>;
 type EnvelopeBinding=Readonly<{scope:DeskSearchScopeV1;question:string;model:string;round:number;
  requestSha256:string;bodySha256:string;credentialSha256:string;requestBytes:number;maxOutputTokens:number;
- sourceIds:readonly string[];toolReceipts:readonly ToolReceiptBinding[]}>;
+ sourceIds:readonly string[];toolReceipts:readonly ToolReceiptBinding[];factualNoteReadbackSha256?:string}>;
 type Grant=Readonly<{requestSha256:string;policyRef:string;validUntil:string;modelDisclosureAllowed:true}>;
 type Quote=Readonly<{requestSha256:string;pricingRef:string;maxInputTokens:number;
  maxOutputTokens:number;maximumCostMicrousd:number;validUntil:string}>;
@@ -227,6 +229,8 @@ export type DeskAnthropicOptionsV1=Readonly<{
  enabledTools:readonly DeskToolNameV1[];
  /** Operational-only opt-in, source-free first opening round. */
  asyncOpeningBatch?:DeskAsyncOpeningBatchV1;
+ /** Independently read current, reviewed note context; never a source receipt. */
+ factualNoteReadback?:DeskFactualNoteReadbackV1;
  admitRecoveredBatchCost?:(microusd:number)=>boolean;
  /** Trusted, independent policy must inspect actual serialized payload,
   * question, exact sources, tool receipt bindings and current lease. */
@@ -252,7 +256,7 @@ export type DeskAnthropicOptionsV1=Readonly<{
 /** Independently reconstruct the allowed serialized transcript from durable
  * custody readback. The model cannot introduce arbitrary free text, image
  * bytes, schemas, source claims or prior private analysis into the envelope. */
-async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string):Promise<boolean>{
+async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string,subject:DeskFactualNoteSubjectV1|undefined,now:()=>number):Promise<boolean>{
  try{
   const parsed=record(JSON.parse(body));
   const thinking=ordinaryThinking(b.model);
@@ -268,11 +272,18 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
   const first=record(parsed.messages[0]);
   if(Object.keys(first).length!==2||first.role!=="user"||typeof first.content!=="string")return false;
   const question=record(JSON.parse(first.content));
-  if(Object.keys(question).length!==2||question.question!==b.question||!Array.isArray(question.history)||question.history.length>12||
+  const withNotes=b.factualNoteReadbackSha256!==undefined;
+  if(Object.keys(question).length!==(withNotes?3:2)||question.question!==b.question||!Array.isArray(question.history)||question.history.length>12||
    JSON.stringify(question)!==first.content||question.history.some(h=>{
     const v=record(h);return Object.keys(v).length!==2||!Number.isSafeInteger(v.ordinal)||Number(v.ordinal)<1||
      !["continue","pause","conclude"].includes(String(v.decision));
    }))return false;
+  if(withNotes){
+   if(!subject||!SHA.test(b.factualNoteReadbackSha256!)||!Array.isArray(question.factualNotes))return false;
+   const packet=await readDeskFactualNotesV1(rpc,b.scope,subject,now);
+   if(!packet.notes.length||packet.bodySha256!==b.factualNoteReadbackSha256||
+    JSON.stringify(question.factualNotes)!==JSON.stringify(factualNoteContextV1(packet)))return false;
+  }else if(Object.hasOwn(question,"factualNotes"))return false;
   const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>();
   for(let i=0;i<b.toolReceipts.length;i++){
    const binding=b.toolReceipts[i];
@@ -330,7 +341,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
 export function createDurableDeskModelAuthorityV1(options:Readonly<{
  rpc:WorkerRpc;scope:DeskSearchScopeV1;
  authorizeEnvelope:DeskAnthropicOptionsV1["authorizeEnvelope"];
- authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];now?:()=>number;
+ authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];factualNoteSubject?:DeskFactualNoteSubjectV1;now?:()=>number;
 }>):Pick<DeskAnthropicOptionsV1,"authorizeEnvelope"|"authorizeTool">{
  const now=options.now??Date.now,scope=options.scope;
  const sameScope=(s:DeskSearchScopeV1)=>JSON.stringify(s)===JSON.stringify(scope);
@@ -353,7 +364,7 @@ export function createDurableDeskModelAuthorityV1(options:Readonly<{
   authorizeEnvelope:async(binding,body)=>{
    if(!sameScope(binding.scope)||hash(body)!==binding.bodySha256||Buffer.byteLength(body,"utf8")!==binding.requestBytes||
     hash(JSON.stringify({scope:binding.scope,round:binding.round,credentialSha256:binding.credentialSha256,bodySha256:binding.bodySha256}))!==binding.requestSha256)return null;
-   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body))return null;
+   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body,options.factualNoteSubject,now))return null;
    const external=await options.authorizeEnvelope(binding,body);
    if(!external||external.requestSha256!==binding.requestSha256||external.modelDisclosureAllowed!==true||
     !text(external.policyRef,200,8)||!Number.isFinite(Date.parse(external.validUntil))||Date.parse(external.validUntil)<=now()||
@@ -452,6 +463,9 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
  return async(identity,question,history)=>{
   if(identity.caseId!==boundScope.caseId||identity.workspaceId!==boundScope.workspaceId||!text(question,1000,8))
    fail("CASE_OR_QUESTION_DENIED");
+  const notePacket=options.factualNoteReadback;
+  if(notePacket&&(!notePacket.notes.length||options.asyncOpeningBatch))fail("FACTUAL_NOTE_BATCH_OR_EMPTY_DENIED");
+  const noteRefs=notePacket?factualNoteReferencesV1(notePacket):undefined;
   const lease=Date.parse(boundScope.leaseExpiresAt),deadline=Math.min(lease,now()+MAX_DURATION);
   const live=()=>{if(now()>=deadline)fail("DEADLINE");};
   const expires=(v:unknown)=>typeof v==="string"&&Date.parse(v)>now()&&Date.parse(v)<=lease;
@@ -463,7 +477,8 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   // Never transfer private prior narratives or findings. The current
   // question itself is subject to exact independent disclosure authority.
   const messages:Array<{role:"user"|"assistant";content:unknown}>=[{role:"user",content:JSON.stringify({
-   question,history:history.slice(-12).map(p=>({ordinal:p.ordinal,decision:p.decision.action}))
+   question,history:history.slice(-12).map(p=>({ordinal:p.ordinal,decision:p.decision.action})),
+   ...(notePacket?{factualNotes:factualNoteContextV1(notePacket)}:{})
   })}];
   async function checkSources(){
    for(let i=0;i<receipts.length;i++){
@@ -478,7 +493,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   const interrupted=async(code:DeskAvailabilityFailureV1):Promise<PreparedDeskPassV1>=>{
    live();await checkSources();live();
    return {method:"interrupted",interruptionCode:code,
-    sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),
+    sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
     analysis:{hypotheses:[],leads:[],passFinding:"Research interrupted by "+code+"; confirmed tool and source receipts preserved. Unresolved fields remain unresolved.",
      requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
     costUnits:totalUnits};
@@ -499,7 +514,8 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    const binding:EnvelopeBinding=Object.freeze({scope:boundScope,question,model,round,
     requestSha256:hash(JSON.stringify({scope:boundScope,round,credentialSha256,bodySha256})),
     bodySha256,credentialSha256,requestBytes,maxOutputTokens:MAX_OUTPUT,
-    sourceIds:Object.freeze([...sources.keys()]),toolReceipts:Object.freeze([...receipts])});
+    sourceIds:Object.freeze([...sources.keys()]),toolReceipts:Object.freeze([...receipts]),
+    ...(notePacket?{factualNoteReadbackSha256:notePacket.bodySha256}:{})});
    const approved=(g:Grant|null):g is Grant=>!!g&&g.requestSha256===binding.requestSha256&&
     text(g.policyRef,200,8)&&g.modelDisclosureAllowed===true&&expires(g.validUntil);
    const grant=await options.authorizeEnvelope(binding,body);live();
@@ -590,7 +606,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();
-    return {sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
+    return {sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
    }
    if(payload.stop_reason!=="tool_use"||round===MAX_CALLS)fail("TOOL_ROUND_BOUND_OR_REFUSAL");
    // No hidden thinking replay, provider-server tools or parallel execution.
@@ -629,7 +645,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     live();await checkSources();live();
     if(await options.authorizeTool(boundScope,call,callSha256)!==true)fail("TOOL_AUTHORITY_CHANGED");
     return {method:"interrupted",interruptionCode:code,
-     sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),
+     sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
      analysis:{hypotheses:[],leads:[],passFinding:"Research interrupted by "+code+"; prior confirmed tool and source receipts preserved. Unresolved fields remain unresolved.",
       requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
      costUnits:totalUnits};

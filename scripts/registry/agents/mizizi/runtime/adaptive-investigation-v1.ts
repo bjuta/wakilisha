@@ -3,6 +3,7 @@
  * No canonical writes, grants, source licences or model trust are created here.
  */
 import {createHash} from "node:crypto";
+import {validFactualNoteReferencesV1,type DeskFactualNoteReferenceV1} from "./desk-factual-note-readback-v1.ts";
 export const ADAPTIVE_INVESTIGATION_CONTRACT="mizizi.adaptive_investigation.v1" as const;
 const UUID=/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/i;
@@ -67,6 +68,8 @@ export type InvestigationPassV1=Readonly<{
   custodyFingerprint?:string;
  }>[];
  deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
+ /** Original human-note context, never a source excerpt or verified finding. */
+ factualNoteReferences?:readonly DeskFactualNoteReferenceV1[];
  deskBatchReceipt?:DeskBatchReceiptV1;
  /** First pass after a separately verified new event; no event payload. */
  reopenEvent?:Readonly<Pick<InvestigationReopenAuthorityV1,"sourceEventRef"|"eventSha256"|"predecessorFingerprint">>;
@@ -99,6 +102,7 @@ export type PreparedDeskPassV1=Readonly<{
  method?:"discovery_only"|"interrupted";
  interruptionCode?:DeskAvailabilityFailureV1;
  deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
+ factualNoteReferences?:InvestigationPassV1["factualNoteReferences"];
  deskBatchReceipt?:DeskBatchReceiptV1;
 }>;
 export type DeskPassResearcherV1=(identity:InvestigationIdentityV1,question:string,
@@ -135,6 +139,8 @@ export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:
      pass.predecessorFingerprint!==prior||!SHA.test(pass.fingerprint)||
      digest({...pass,fingerprint:undefined})!==pass.fingerprint)
    throw new Error("MIZIZI_RESEARCH_HISTORY_CORRUPT_OR_CONFLICTED");
+  if(pass.factualNoteReferences!==undefined&&!validFactualNoteReferencesV1(pass.factualNoteReferences))
+   throw Error("MIZIZI_RESEARCH_NOTE_HISTORY_INVALID");
   const event=pass.reopenEvent;
   if(event!==undefined){
    if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,sourceEventRef"||
@@ -264,6 +270,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   if(input.canPrepareDeskPass&&await input.canPrepareDeskPass(identity,question,snapshot)!==true)break;
   const prepared=input.prepareDeskPass?
    await input.prepareDeskPass(identity,question,snapshot):null;
+  if(prepared?.factualNoteReferences!==undefined&&(!validFactualNoteReferencesV1(prepared.factualNoteReferences)||
+   prepared.deskBatchReceipt!==undefined||prepared.method==="discovery_only"))throw Error("MIZIZI_RESEARCH_NOTE_CONTEXT_INVALID");
   const discoveryOnly=prepared?.method==="discovery_only";
   const interrupted=prepared?.method==="interrupted";
   if(interrupted?(!prepared||!isDeskAvailabilityFailureV1(prepared.interruptionCode)||
@@ -314,7 +322,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // could quote a privately retained witness or artifact.
   const analystHistory=history.map(p=>Object.freeze({...p,
    question:"Prior research question withheld from external processing.",
-   sourceReceipts:[],findings:[],proposedLeads:[],reopenEvent:undefined,
+   sourceReceipts:[],findings:[],proposedLeads:[],reopenEvent:undefined,factualNoteReferences:undefined,
    passFinding:"Unverified prior analysis withheld from external processing.",
    decision:{...p.decision,nextQuestion:null,
     rationale:"Prior method decision; previous claims are not evidence.",
@@ -456,6 +464,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
+   ...(prepared?.factualNoteReferences!==undefined?{factualNoteReferences:prepared.factualNoteReferences}:{}),
    ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
    ...(activeReopen?{reopenEvent:{sourceEventRef:activeReopen.sourceEventRef,eventSha256:activeReopen.eventSha256,
     predecessorFingerprint:activeReopen.predecessorFingerprint}}:{}),
