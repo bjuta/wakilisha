@@ -872,6 +872,12 @@ export async function verifyCharts2RealJwtRegistryV1({
  const read=id=>"public.mizizi_read_desk_tool_receipt_v1("+j(scope)+","+q(id)+"::uuid)";
  const question="Fixture exact public research question",questionHash=hash(question),credential="d".repeat(64);
  const nextQuestion="Which original release establishes the recording credits?",nextQuestionHash=hash(nextQuestion);
+ const recallCandidateName="mizizi_read_desk_same_case_recall_candidate_v1",recallAdmitName="mizizi_admit_desk_same_case_recall_v1";
+ for(const actor of [first.user,subscriber]){
+  denied(await actor.rpc(recallCandidateName,{p_scope:scope}),"42501","STOP_RECALL_BROWSER_ACL");
+  denied(await actor.rpc(recallAdmitName,{p_call_text:"{}",p_call_sha256:hash("{}"),p_receipt_id:randomUUID(),p_origin_id:randomUUID(),p_result_text:"{}",p_result_sha256:hash("{}")}),"42501","STOP_RECALL_ADMIT_BROWSER_ACL");
+ }
+ fail(await call(recallCandidateName,{p_scope:scope})===null,"STOP_RECALL_DEFAULT_DENY");
  const continuationName="mizizi_continue_desk_research_job_v1";
  const continuationArgs={p_scope:scope,p_fingerprint:"f".repeat(64)};
  for(const actor of [first.user,subscriber])denied(await actor.rpc(continuationName,continuationArgs),"42501","STOP_CONTINUATION_BROWSER_ACL");
@@ -1013,7 +1019,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms,shared_native_auto_allowed,public_retained_batch_allowed)
  values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
  'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
- array['search_web','read_page','browse_page','inspect_visual'],5,10000,${j(rules)},now()+interval '2 days',true,array['recording credits'],true,true);
+ array['search_web','read_page','browse_page','inspect_visual','recall_evidence'],5,10000,${j(rules)},now()+interval '2 days',true,array['recording credits'],true,true);
  insert into mizizi_private.desk_resource_policy_versions_v1(
  resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
  exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
@@ -1128,6 +1134,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  -- Roll back the successful yield/reclaim only, preserving the subsequent
  -- existing independent revocation fixture.
  declare yielded jsonb; resumed record; fresh_context jsonb; fresh_scope jsonb; bound jsonb; raw text;
+  offered jsonb;recall_id uuid:=gen_random_uuid();recall_call text;recall_hash text;recall_text text;recall_hash_result text;recall_reply jsonb;forged text;
  begin
   yielded:=${continuationSql(j(scope),continuationFingerprint)};
   if yielded->>'job_status' is distinct from 'retry_wait' or yielded->>'pass_fingerprint' is distinct from ${q(continuationFingerprint)}
@@ -1135,7 +1142,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   begin perform public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(activeWorker)});
    raise exception 'STOP_CONTINUATION_OLD_LEASE';exception when sqlstate '55000' then null;end;
   select * into strict resumed from public.mizizi_claim_exact_chart_research_job_v1(
-   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},300);
+   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},301);
   if resumed.command_receipt_id::text is distinct from ${q(job.command_receipt_id)}
    or resumed.attempt_count<>2 then raise exception 'STOP_CONTINUATION_RECLAIM';end if;
   fresh_context:=public.mizizi_read_leased_chart_research_context_v1(${q(job.job_id)}::uuid,${q(losingWorker)});
@@ -1148,6 +1155,30 @@ export async function verifyCharts2RealJwtRegistryV1({
   if (public.mizizi_authorize_desk_model_operation_v1(fresh_scope,'model_disclose',raw,
    encode(sha256(convert_to(raw,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
    then raise exception 'STOP_CONTINUATION_FOLLOWUP_AUTHORITY';end if;
+  offered:=public.mizizi_read_desk_same_case_recall_candidate_v1(fresh_scope);
+  if offered->>'sourceReceiptId' is distinct from ${q(standingPageId)} or offered->>'sourceResultSha256' is distinct from ${q(standingPage.p_result_sha256)}
+   or public.mizizi_read_desk_same_case_recall_candidate_v1(current_setting('wk.shared_scope')::jsonb) is not null
+   then raise exception 'STOP_RECALL_ORIGIN_SCOPE';end if;
+  recall_call:=jsonb_build_object('scope',fresh_scope,'call',jsonb_build_object('name','recall_evidence','input',jsonb_build_object('query','case evidence')))::text;
+  recall_hash:=encode(sha256(convert_to(recall_call,'UTF8')),'hex');
+  recall_text:=jsonb_build_object('receiptId',recall_id,'leads','[]'::jsonb,'sources',jsonb_build_array(
+   ${j(standingExcerpt)}||jsonb_build_object('source',${j(standingSource)}||jsonb_build_object('sourceId',recall_id))),'visual',null)::text;
+  recall_hash_result:=encode(sha256(convert_to(recall_text,'UTF8')),'hex');
+  forged:=jsonb_set(recall_text::jsonb,'{sources,0,excerpt}','"Forged excerpt"'::jsonb)::text;
+  if public.mizizi_admit_desk_same_case_recall_v1(recall_call,recall_hash,recall_id,${q(standingPageId)}::uuid,forged,encode(sha256(convert_to(forged,'UTF8')),'hex')) is not null
+   then raise exception 'STOP_RECALL_FORGED_PROJECTION';end if;
+  recall_reply:=public.mizizi_admit_desk_same_case_recall_v1(recall_call,recall_hash,recall_id,${q(standingPageId)}::uuid,recall_text,recall_hash_result);
+  if recall_reply->>'outcome' is distinct from 'created'
+   or public.mizizi_read_desk_tool_receipt_v1(fresh_scope,recall_id)->>'resultSha256' is distinct from recall_hash_result
+   or public.mizizi_read_desk_same_case_recall_candidate_v1(fresh_scope) is not null
+   or public.mizizi_admit_desk_same_case_recall_v1(recall_call,recall_hash,recall_id,${q(standingPageId)}::uuid,recall_text,recall_hash_result) is not null
+   then raise exception 'STOP_RECALL_ADMISSION_REPLAY';end if;
+  bound:=${j(envelope(2,[],[],{questionSha256:nextQuestionHash}))}||jsonb_build_object('scope',fresh_scope,
+   'sourceIds',jsonb_build_array(recall_id),'toolReceipts',jsonb_build_array(jsonb_build_object('receiptId',recall_id,'callSha256',recall_hash,'resultSha256',recall_hash_result)));
+  raw:=bound::text;
+  if (public.mizizi_authorize_desk_model_operation_v1(fresh_scope,'model_disclose',raw,encode(sha256(convert_to(raw,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_RECALL_FRESH_MODEL_AUTHORITY';end if;
+  raise notice 'WK_AUTH_MIZIZI_SAME_CASE_RECALL_CURRENT_LEASE=PASS';
   raise exception 'ROLLBACK_CONTINUATION_FIXTURE' using errcode='P0002';
  exception when sqlstate 'P0002' then
   if sqlerrm<>'ROLLBACK_CONTINUATION_FIXTURE' then raise;end if;

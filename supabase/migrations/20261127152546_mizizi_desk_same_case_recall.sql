@@ -329,17 +329,17 @@ begin
  select * into j from platform_private.jobs where id=(c->>'jobId')::uuid;
  if not found or j.status<>'running' or j.locked_at is null then return null;end if;
  if not exists(select 1 from mizizi_private.research_passes p where p.case_id=o.case_id and p.workspace_id=o.workspace_id
-  and p.job_id=j.id and p.recorded_at<j.locked_at) then return null;end if;
+  and p.job_id=j.id) then return null;end if;
  perform mizizi_private.assert_desk_journal_current_v1(j.id,j.locked_by,o.case_id,null);
  if (select count(*) from mizizi_private.desk_tool_receipts_v1 d where d.case_id=o.case_id)>=200 then return null;end if;
  for r in select d.* from mizizi_private.desk_tool_receipts_v1 d
   where d.case_id=o.case_id and d.workspace_id=o.workspace_id and d.job_id=j.id
    and d.expected_revision=o.expected_revision and d.operational_revision=o.revision and d.operation='read_page'
-   and d.source_id=d.id and d.lease_expires_at is distinct from j.lease_expires_at and d.recorded_at<j.locked_at
+   and d.source_id=d.id and d.lease_expires_at is distinct from j.lease_expires_at
    and not exists(select 1 from mizizi_private.desk_tool_receipts_v1 q where q.case_id=d.case_id
     and q.operation='recall_evidence' and q.parent_receipt_id=d.id)
    and exists(select 1 from mizizi_private.research_passes p where p.case_id=d.case_id and p.workspace_id=d.workspace_id
-    and p.job_id=j.id and p.recorded_at<j.locked_at
+    and p.job_id=j.id
     and p.body_text::jsonb->'sourceReceipts' @> jsonb_build_array(jsonb_build_object('sourceId',d.id,'modelDisclosed',true))
     and p.body_text::jsonb->'deskToolReceipts' @> jsonb_build_array(jsonb_build_object('receiptId',d.id,
      'callSha256',d.call_sha256,'resultSha256',d.result_sha256)))
