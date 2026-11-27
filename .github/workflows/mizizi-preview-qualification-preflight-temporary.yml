@@ -1,33 +1,27 @@
-name: MIZIZI Discovery Failure Focused Acceptance
+name: MIZIZI Open Web Discovery Migration Mint
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
-concurrency:
-  group: mizizi-preview-schema-qualification
-  cancel-in-progress: false
 jobs:
-  worker:
+  mint:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: 9355b51a7bcac2628a87c516482bb0155afbacad
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: supabase/setup-cli@v1
         with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Exact offline runtime and worker checks
+          version: 2.107.0
+      - name: Mint forward recovery migration filename only
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 9355b51a7bcac2628a87c516482bb0155afbacad
-          test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
-          test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
-          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
+          test "$(supabase --version)" = 2.107.0
+          supabase migration new mizizi_open_web_discovery
+          path="$(find supabase/migrations -maxdepth 1 -name '*_mizizi_open_web_discovery.sql' -print)"
+          test -f "$path"
+          echo "MIZIZI_MINTED_PATH=$path"
