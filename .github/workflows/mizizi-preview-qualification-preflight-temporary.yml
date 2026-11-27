@@ -28,7 +28,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('.github/workflows/mizizi-preview-qualification-preflight-temporary.yml').read_text().splitlines()
-          start=next(i for i,l in enumerate(s) if "cat > .mizizi-integrated-run.mjs <<'MIZIZI_RUNNER'" in l)
+          start=next(i for i,l in enumerate(s) if l.strip()=="cat > .mizizi-integrated-run.mjs <<'MIZIZI_RUNNER'")
           end=next(i for i in range(start+1,len(s)) if s[i].strip()=='MIZIZI_RUNNER')
           Path('/tmp/mizizi-runner-syntax.mjs').write_text('\n'.join(l[10:] for l in s[start+1:end])+'\n')
           PY
