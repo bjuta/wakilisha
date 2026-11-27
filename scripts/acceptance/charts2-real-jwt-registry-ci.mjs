@@ -1529,6 +1529,22 @@ export async function verifyCharts2RealJwtRegistryV1({
  if exists(select 1 from mizizi_private.desk_resource_reservations_v1 where case_id=${q(sharedTarget)}::uuid and resource='native_https')
   then raise exception 'STOP_SHARED_DUPLICATE_ACQUISITION';end if;
  end $shared_cost$;
+ -- Active recall without adaptive authority must still fail. A disabled
+ -- revision with identical tool names must always be able to revoke it.
+ do $recall_revoke_guard$
+ begin
+  begin
+ insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
+ membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
+ max_rounds,max_request_bytes,access_rules,valid_until)
+ select workspace_id,case_id,2,expected_revision,membership_sha256,observation_sha256,true,authority_ref,credential_sha256,
+ model_ids,question_sha256s,tool_names,max_rounds,max_request_bytes,access_rules,valid_until
+ from mizizi_private.desk_operational_policy_versions_v1 where case_id=${q(pairedId)} and revision=1;
+   raise exception 'STOP_RECALL_ENABLED_WITHOUT_ADAPTIVE';
+  exception when sqlstate '22023' then
+   if sqlerrm<>'Recall requires explicit adaptive native research authority' then raise;end if;
+  end;
+ end $recall_revoke_guard$;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
  max_rounds,max_request_bytes,access_rules,valid_until)
@@ -1539,6 +1555,10 @@ export async function verifyCharts2RealJwtRegistryV1({
  do $standing$ begin
  if ${read(searchId)} is not null or ${read(standingPageId)} is not null
  or ${authority("model_disclose",envelope(1,[],[]))} is not null then raise exception 'STOP_STANDING_REVOKED_USE';end if;
+ if public.mizizi_read_desk_same_case_recall_candidate_v1(${j(scope)}) is not null
+ or ${authority("tool_execute",{scope,call:{name:"recall_evidence",input:{query:"case evidence"}}})} is not null
+ then raise exception 'STOP_RECALL_REVOKED_AUTHORITY';end if;
+ raise notice 'WK_AUTH_MIZIZI_RECALL_REVOCATION=PASS';
  if ${sharedRead()} is not null then raise exception 'STOP_SHARED_ORIGIN_REVOKED';end if;
  if public.mizizi_read_desk_tool_receipt_v1(${sharedScopeSql},${q(sharedResultId)}::uuid) is not null
  or public.mizizi_authorize_desk_model_operation_v1(${sharedScopeSql},'model_disclose',current_setting('wk.shared_model_envelope'),

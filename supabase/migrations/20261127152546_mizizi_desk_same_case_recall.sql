@@ -99,7 +99,9 @@ begin
   if v is null or length(v) not between 1 and 80 or btrim(v)<>v or v ~ '[[:cntrl:]]'
   then raise exception 'Invalid public query term' using errcode='22023';end if;
  end loop;
- if 'recall_evidence'=any(new.tool_names) and (not new.adaptive_followups_allowed or not('read_page'=any(new.tool_names))
+ -- A disabled revision must remain issuable to revoke existing authority.
+ -- Every live recall still requires an explicitly adaptive native policy.
+ if new.enabled and 'recall_evidence'=any(new.tool_names) and (not new.adaptive_followups_allowed or not('read_page'=any(new.tool_names))
   or not('search_web'=any(new.tool_names) or 'search_news'=any(new.tool_names))) then
   raise exception 'Recall requires explicit adaptive native research authority' using errcode='22023';end if;
  foreach v in array new.tool_names loop
