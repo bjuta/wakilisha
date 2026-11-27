@@ -1,151 +1,34 @@
-name: MIZIZI Preview Integrated Live Research
+name: MIZIZI Interrupted Research Regression
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
 concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  integrated:
-    if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
+  worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f4e48c7d70051c3c6118dbcc1b909af2f7afc1f1
+          ref: b5b280d63467eac152d9aa4b6ff71a9e5bcc7830
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.107.0
-          github-token: ${{ github.token }}
       - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Check pinned host and current protected candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = f4e48c7d70051c3c6118dbcc1b909af2f7afc1f1
-          gh api repos/bjuta/wakilisha/pulls/1442 --jq '.head.sha+" "+(.draft|tostring)+" "+(.merged|tostring)' | grep -Fx 'f4e48c7d70051c3c6118dbcc1b909af2f7afc1f1 false false'
-          for run in 46014744979 46014745149; do
-            gh api repos/bjuta/wakilisha/actions/runs/$run --jq '.head_sha+" "+.conclusion' | grep -Fx 'f4e48c7d70051c3c6118dbcc1b909af2f7afc1f1 success'
-          done
-          image=mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-          docker pull "$image"
-          echo "MIZIZI_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$image")" >> "$GITHUB_ENV"
-      - name: Preview-only integrated execution and credential cleanup
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          test -n "$SUPABASE_ACCESS_TOKEN"
-          test -n "$MIZIZI_PREVIEW_ANTHROPIC_API_KEY"
-          scratch="$(mktemp -d)"
-          trap 'rm -rf "$scratch" .mizizi-integrated-run.mjs; rm -rf supabase/.temp' EXIT
-          if ! supabase link --project-ref ehkmjrjjhzyjkxdfsqdc >"$scratch/link" 2>&1; then echo MIZIZI_PREVIEW_LINK=STOP; exit 1; fi
-          test "$(cat supabase/.temp/project-ref)" = ehkmjrjjhzyjkxdfsqdc
-          # Same production trust anchor bundled in the pinned Supabase CLI 2.107.0.
-          curl --fail --silent --show-error --proto '=https' --max-time 30 'https://raw.githubusercontent.com/supabase/cli/v2.107.0/apps/cli-go/internal/gen/types/templates/prod-ca-2021.crt' -o "$scratch/prod-ca-2021.crt"
-          test "$(git hash-object "$scratch/prod-ca-2021.crt")" = 3d693669b23c340c57a3457bdc8b6fefe1806cc5
-          openssl x509 -in "$scratch/prod-ca-2021.crt" -noout -checkend 3600
-          pooler_host="$(node -e 'const u=new URL(require("fs").readFileSync("supabase/.temp/pooler-url","utf8").trim());if(!/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(u.hostname)||!u.username.endsWith(".ehkmjrjjhzyjkxdfsqdc"))process.exit(1);process.stdout.write(u.hostname)')" || { echo MIZIZI_POOLER_HOST_VALIDATION=STOP; exit 1; }
-          echo MIZIZI_POOLER_HOST_VALIDATION=PASS
-          if ! timeout 30 openssl s_client -starttls postgres -connect "$pooler_host:5432" -servername "$pooler_host" -verify_hostname "$pooler_host" -CAfile "$scratch/prod-ca-2021.crt" -verify_return_error </dev/null >"$scratch/tls-check" 2>&1; then
-            echo MIZIZI_PINNED_POOLER_TLS=STOP
-            grep -E "verify error:num=|Verify return code:|Verification error:" "$scratch/tls-check" || true
-            exit 1
-          fi
-          grep -Fq 'Verify return code: 0 (ok)' "$scratch/tls-check"
-          echo MIZIZI_PINNED_POOLER_TLS=PASS
-          export NODE_EXTRA_CA_CERTS="$scratch/prod-ca-2021.crt"
-          cat > .mizizi-integrated-run.mjs <<'MIZIZI_RUNNER'
-          import {createHash,createHmac,pbkdf2Sync,randomBytes,randomUUID} from "node:crypto";
-          import {readFileSync,writeFileSync,mkdtempSync,rmSync} from "node:fs";
-          import {createClient} from "@supabase/supabase-js";
-          import pg from "pg";
-          import {prepareChartCalibrationV1,admitChartCalibrationV1} from "./scripts/registry/agents/mizizi/runtime/chart-calibration-flow-v1.ts";
-          import {runPreviewCalibrationCommandV1,validatePreviewCalibrationJitUrlV1} from "./scripts/registry/agents/mizizi/runtime/run-preview-chart-calibration-v1.ts";
-          import {discoverAnthropicResearchModelV1} from "./scripts/registry/agents/mizizi/runtime/anthropic-investigation-analyst-v1.ts";
-          import {deskPublicDiscoveryFingerprintV1} from "./scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1.ts";
-          const ref="ehkmjrjjhzyjkxdfsqdc", root="https://"+ref+".supabase.co",api="https://api.supabase.com/v1/projects/"+ref;
-          const cid="71a57ee7-477c-4601-8282-d925429c0f52",ws="70555b3d-07b6-41a2-b1b9-7d88f9a5a3ea",membership="73f23fdf77807d0dd2025c73a187cc58a4354d2440f10f80e48f2dbc2947e779",input="176c64929132e6335890a3b3a1b839a00a952440693c73eadc80fd934976489d";
-          const question="Investigate the receipt-bound recording Calm Down by Rema & Selena Gomez. Distinguish the original recording from the collaboration/remix, release dates, performer, songwriter and producer credits, label/distributor and independent source lineage. For this bounded integration run, search_web using the exact label Calm Down Rema & Selena Gomez followed by site:www.wipo.int or site:en.wikipedia.org. Examine relevant WIPO context with read_page and the Wikipedia recording article with browse_page (query empty). Execute authorized tools rather than planning them; no third-party images; leave unsupported fields unresolved.";
-          const model="claude-haiku-5-5",anthropicWorkspace="wrkspc_01HcEs7qPApMFiBvMA5wt1dn",credential="1e3d775fdfd5e8ab00bc48acedf48aa56207a1957c5e25c24e753f996d2a6380",discovery={provider:"tavily_keyless",host:"api.tavily.com",allocationRef:"pr1442:preview:integrated:tavily:20261127"};
-          const hash=x=>createHash("sha256").update(x).digest("hex"),fail=()=>{throw Error("STOP")},check=x=>{if(!x)fail()},note=x=>console.log("MIZIZI_"+x+"=PASS");
-          const token=process.env.SUPABASE_ACCESS_TOKEN,key=process.env.MIZIZI_PREVIEW_ANTHROPIC_API_KEY,imageId=process.env.MIZIZI_IMAGE_ID;
-          const dir=mkdtempSync(process.cwd()+"/.mizizi-private-");const opts={auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
-          const mask=x=>{if(x)console.log("::add-mask::"+x)};
-          let stage="PREFLIGHT",uid=null,issued=null,operator=null,admin=null,email=null,expiry=null,failed=false;
-          const request=async(url,headers,body,method)=>{
-           const res=await fetch(url,{headers,method:method??(body===undefined?"GET":"POST"),...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:"error",signal:AbortSignal.timeout(30000)});
-           if(!res.ok)throw Object.assign(Error("HTTP"),{httpStatus:res.status});
-           const b=await res.text();check(b.length<=4000000);return b?JSON.parse(b):null;
-          };
-          const mgmt={Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"};
-          const sql=async q=>{const r=await request(api+"/database/query",mgmt,{query:q});check(Array.isArray(r));return r};
-          const one=async q=>{const a=await sql(q);check(a.length===1);return a[0]};
-          const roleGuard="select current_user='postgres' and exists(select 1 from pg_roles where rolname=current_user and rolcreaterole) and exists(select 1 from pg_auth_members m join pg_roles r on r.oid=m.roleid join pg_roles p on p.oid=m.member where r.rolname='mizizi_executor' and p.rolname=current_user and m.admin_option) and exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolcanlogin and not rolsuper and not rolcreaterole and not rolcreatedb and not rolbypassrls and not rolreplication and not rolinherit and (rolvaliduntil is null or rolvaliduntil<=clock_timestamp())) and not exists(select 1 from pg_stat_activity where usename='mizizi_executor') and not exists(select 1 from pg_auth_members m join pg_roles r on r.oid=m.member where r.rolname='mizizi_executor') and exists(select 1 from platform_private.system_actor_executor_bindings where actor_key='mizizi' and executor_kind='database_role' and executor_key='mizizi_executor' and status='active') and exists(select 1 from platform_private.system_actor_executor_bindings where actor_key='mizizi' and executor_kind='database_role' and executor_key='postgres' and status='disabled') and not has_schema_privilege('mizizi_executor','platform_private','USAGE') and not has_table_privilege('mizizi_executor','public.registry_tracks','UPDATE') and not has_table_privilege('mizizi_executor','public.registry_releases','UPDATE') and not has_table_privilege('mizizi_executor','public.registry_artists','UPDATE') and not has_table_privilege('mizizi_executor','public.wk_chart_entries_v2','UPDATE') as allowed";
-          const rpcOf=client=>async(fn,args)=>{const r=await client.rpc(fn,args);return {data:r.data,error:r.error?{message:"RPC_REJECTED"}:null}};
-          const preimage="select (select count(*) from supabase_migrations.schema_migrations)=302 and (select max(version) from supabase_migrations.schema_migrations)='20261127131513' and (select count(*) from mizizi_private.cases)=497 and (select count(*) from platform_private.jobs where job_type='mizizi.case_research_v1')=5 and exists(select 1 from mizizi_private.cases c join mizizi_private.chart_candidate_subjects_v1 s on s.case_id=c.id where c.id='"+cid+"' and c.workspace_id='"+ws+"' and c.revision=1 and c.case_state='open' and c.current_stage='triage' and s.membership_sha256='"+membership+"' and s.admission_input_sha256='"+input+"') and not exists(select 1 from platform_private.jobs where resource_id='"+cid+"') and exists(select 1 from mizizi_private.desk_operational_policy_versions_v1 where case_id='"+cid+"' and revision=2 and enabled and expected_revision=2 and question_sha256s=array['"+hash(question)+"'] and valid_until>clock_timestamp()+interval '45 minutes') and exists(select 1 from mizizi_private.desk_search_policy_versions_v1 where revision=2 and provider='tavily_keyless' and enabled and account_limit=4 and account_fingerprint='"+deskPublicDiscoveryFingerprintV1(discovery)+"') and (select count(*) from mizizi_private.desk_resource_policy_versions_v1 where enabled and valid_until>clock_timestamp())=3 and (select sum(mizizi_private.desk_resource_encumbered_units_v1(r)) from mizizi_private.desk_resource_reservations_v1 r where resource='anthropic')=4636 and (select count(*) from mizizi_private.desk_search_reservations_v1)=1 and (select array_agg(capability_key order by capability_key) from public.role_capabilities where role_key='mizizi_preview_calibration')=array['manage_charts','manage_registry'] as ok";
-          try{
-           stage="PREFLIGHT_ENV";check(token&&key&&/^sha256:[a-f0-9]{64}$/.test(imageId??"")&&Date.now()+5*60000<Date.parse('2026-11-27T14:45:07Z'));note("PREFLIGHT_ENV");
-           stage="PREFLIGHT_CREDENTIAL_BINDING";check(hash(JSON.stringify(["mizizi:anthropic:credential:v1",anthropicWorkspace,key]))===credential);note("PREFLIGHT_CREDENTIAL_BINDING");
-           stage="PREFLIGHT_QUESTION_BINDING";check(hash(question)==="ff1dc15760a31fbb50452c157c312b599fc2a426675de85eb31efbcad55712fc");note("PREFLIGHT_QUESTION_BINDING");
-           stage="PREFLIGHT_DATABASE";check((await one(preimage)).ok===true);note("PREFLIGHT_DATABASE");stage="PREFLIGHT_ROLE";check((await one(roleGuard)).allowed===true);note("PREFLIGHT_ROLE");
-           stage="PREFLIGHT_LINK";check(readFileSync("supabase/.temp/project-ref","utf8").trim()===ref);note("PREFLIGHT_LINK");stage="PREFLIGHT_POOLER";
-           const url=new URL(readFileSync("supabase/.temp/pooler-url","utf8").trim());check(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.pooler\.supabase\.com$/.test(url.hostname)&&url.pathname==="/postgres"&&url.username.endsWith("."+ref));
-           note("PREFLIGHT_POOLER");stage="PREFLIGHT_MODEL";const inv=await discoverAnthropicResearchModelV1({apiKey:key,workspaceId:anthropicWorkspace,model});check(inv.ok&&inv.preferenceMatched&&inv.model===model);note("EXACT_PREFLIGHT");
-           stage="KEY_SCOPE";
-           const keys=await request(api+"/api-keys?reveal=true",mgmt);
-           const scoped=role=>{const a=keys.filter(x=>x.name===role);check(a.length===1);const k=a[0].api_key;mask(k);const p=k.split(".");check(p.length===3);const c=JSON.parse(Buffer.from(p[1],"base64url").toString());check(c.ref===ref&&c.role===role);return k};
-           const service=scoped("service_role"),anon=scoped("anon");admin={apikey:service,Authorization:"Bearer "+service,"Content-Type":"application/json"};
-           const serviceClient=createClient(root,service,opts),plan=await prepareChartCalibrationV1({serviceRpc:rpcOf(serviceClient),expectedInputSha256:input,targets:[{title:"Calm Down",artist:"Rema & Selena Gomez"}]});
-           check(plan.groups.length===497&&plan.selectedGroupIndices.length===1);
-           stage="STEWARD_CREATE";email="mizizi-preview-integrated-"+randomUUID().replaceAll("-","")+"@example.test";const pass=randomBytes(36).toString("base64url")+"aA7!";mask(pass);check(pass.length>=48&&/[a-z]/.test(pass)&&/[A-Z]/.test(pass)&&/[0-9]/.test(pass)&&/[!]/.test(pass));
-           const user=await request(root+"/auth/v1/admin/users",admin,{email,password:pass,email_confirm:true});uid=user.id;check(/^[a-f0-9-]{36}$/.test(uid)&&user.email===email);
-           stage="STEWARD_GRANT";
-           await sql("begin; do $g$ begin if not (select ok from ("+preimage+") q) or not exists(select 1 from auth.users where id='"+uid+"' and email='"+email+"') then raise exception 'STOP_INTEGRATED_PREIMAGE';end if;end $g$; insert into public.user_role_assignments(user_id,role_key,status,expires_at,notes) values('"+uid+"','mizizi_preview_calibration','active','2026-11-27 14:45:07+00'::timestamptz,'Founder approved integrated Preview technical steward, 27 November 2026'); insert into mizizi_private.workspace_memberships(workspace_id,user_id,member_role,grant_source,valid_from,valid_until,granted_by,last_changed_by,change_reason) values('"+ws+"','"+uid+"','steward','operator_review',transaction_timestamp(),'2026-11-27 14:45:07+00'::timestamptz,'"+uid+"','"+uid+"','Founder approved integrated Preview technical steward');commit;");
-           const grant=await one("select m.valid_until as expires_at,(a.expires_at=m.valid_until and m.valid_until>clock_timestamp() and m.valid_until<=clock_timestamp()+interval '40 minutes') as bounded from mizizi_private.workspace_memberships m join public.user_role_assignments a on a.user_id=m.user_id and a.role_key='mizizi_preview_calibration' where m.user_id='"+uid+"' and m.revoked_at is null and a.status='active'");check(grant.bounded===true);expiry=new Date(grant.expires_at).toISOString();note("STEWARD_GRANT");
-           stage="GENUINE_OPERATOR";operator=createClient(root,anon,opts);const login=await operator.auth.signInWithPassword({email,password:pass});check(!login.error&&login.data.user?.id===uid&&login.data.session?.access_token);const jwt=login.data.session.access_token;mask(jwt);mask(login.data.session.refresh_token);
-           for(const [cap,expected] of [["manage_registry",true],["manage_charts",true],["manage_users",false],["publish_charts",false]]){const v=await operator.rpc("current_user_has_capability",{required_capability:cap});check(!v.error&&v.data===expected)}note("GENUINE_STEWARD_JWT");
-           stage="ADMISSION_REPLAY";const admission=await admitChartCalibrationV1(rpcOf(operator),plan);const candidate=admission.cases[plan.selectedGroupIndices[0]];check(admission.created===0&&admission.replayed===497&&candidate.caseId===cid&&candidate.membershipSha256===membership&&candidate.revision===1&&candidate.state==="open"&&candidate.stage==="triage");const admissionBytes=Buffer.from(JSON.stringify(admission)+"\n");const admissionPath=dir+"/admission.json";writeFileSync(admissionPath,admissionBytes,{mode:0o600,flag:"wx"});note("ADMISSION_REPLAY");
-           stage="NARROW_EXECUTOR";const password=randomBytes(32).toString("base64url");mask(password);const salt=randomBytes(16),salted=pbkdf2Sync(password,salt,4096,32,"sha256"),stored=createHash("sha256").update(createHmac("sha256",salted).update("Client Key").digest()).digest("base64"),server=createHmac("sha256",salted).update("Server Key").digest("base64");const verifier="SCRAM-SHA-256$4096:"+salt.toString("base64")+"$"+stored+":"+server;mask(verifier);issued={verifier,expiry};
-           await sql("do $g$ begin if not (select allowed from ("+roleGuard+") q) then raise exception 'STOP_ROLE_PREIMAGE';end if; alter role mizizi_executor password '"+verifier+"' valid until '"+expiry+"';end $g$;");
-           check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword='"+verifier+"' and rolvaliduntil='"+expiry+"'::timestamptz) as ok")).ok===true);
-           url.username="mizizi_executor."+ref;url.password=password;url.port="5432";url.search="";url.searchParams.set("options","-c jit=true");url.hash="";mask(url.href);validatePreviewCalibrationJitUrlV1(url.href,url.hostname,5432);
-           stage="EXECUTOR_TLS";for(let n=0;n<2;n++){const pool=new pg.Pool({connectionString:url.href,ssl:{rejectUnauthorized:true},max:1,connectionTimeoutMillis:10000,query_timeout:30000,statement_timeout:30000});try{const l=await pool.query("select session_user::text as role,current_database() as db");check(l.rowCount===1&&l.rows[0].role==="mizizi_executor"&&l.rows[0].db==="postgres");await pool.query("select mizizi_private.assert_executor_v1()");break}catch(e){if(n!==0||e.code!=="28P01")throw e;await new Promise(r=>setTimeout(r,15000))}finally{await pool.end()}}note("NARROW_EXECUTOR_TLS");
-           const validUntil=new Date(Math.min(Date.parse(expiry),Date.now()+25*60000)).toISOString();check(Date.parse(validUntil)>Date.now()+300000);
-           const manifest={contract:"mizizi-preview-calibration-runtime/v1",projectRef:ref,inputSha256:input,operatorUserId:uid,workspaceId:ws,validUntil,targets:[{title:"Calm Down",artist:"Rema & Selena Gomez"}],case:{caseId:cid,membershipSha256:membership,admissionSha256:hash(admissionBytes),question,policyReviewRef:"pr1442:preview:integrated-case-rev2",sourceReviewRef:"pr1442:wipo-wikipedia-text-only",financeReviewRef:"pr1442:calibration-remaining-595364",runtimeReviewRef:"pr1442:linux-connected-host-45956504760",model:{model,family:"haiku",active:true,toolUse:true,structuredOutput:true,vision:false,ordinaryToolTranscript:true,qualityGateRef:"pr1442:protocol-not-quality-benchmark",pricingRef:"anthropic:haiku-5-5:20261127:full-context",maxInputTokens:1000000,maxOutputTokens:2500,worstCaseInputMicrousdPerMillion:500000,worstCaseOutputMicrousdPerMillion:2500000,batchEligible:false,validUntil},credentialSha256:credential,nativeAccountFingerprint:"50cb1ff79e36c30217cd110398afc21a99cab00bea9d1a68724e9aad52cd5b93",maximumCostMicrousd:595364,costBudgetUnits:1000,maxTotalPasses:1,executorHost:url.hostname,executorPort:5432,discovery:{search_web:discovery},browser:{imageId,accountFingerprint:"408d72171a061d39160c374f1d2900034c3f77c6e45f5ff619c82b0784510205",qualificationRef:"pr1442:connected-browser-45956504760",validUntil,captureVisual:false}}};
-           const b=Buffer.from(JSON.stringify(manifest)+"\n"),file=dir+"/manifest.json";writeFileSync(file,b,{mode:0o600,flag:"wx"});
-           Object.assign(process.env,{MIZIZI_PREVIEW_ANON_KEY:anon,MIZIZI_PREVIEW_SERVICE_ROLE_KEY:service,MIZIZI_PREVIEW_OPERATOR_JWT:jwt,MIZIZI_PREVIEW_ANTHROPIC_WORKSPACE_ID:anthropicWorkspace,MIZIZI_PREVIEW_JIT_DATABASE_URL:url.href});
-           stage="INTEGRATED_WORKER";check((await one(preimage)).ok===true);const result=await runPreviewCalibrationCommandV1(["execute",file,hash(b),dir+"/run",admissionPath]);console.log("MIZIZI_WORKER_RESULT="+JSON.stringify({stage:result.stage,succeeded:result.result?.succeeded,failed:result.result?.failed}));check(result.stage==="worker_returned"&&result.result?.succeeded===1&&result.result?.failed===0);note("INTEGRATED_WORKER");
-           stage="DURABLE_RESEARCH_ACCEPTANCE";
-           const evidence=await one("select (select count(*) from mizizi_private.desk_tool_receipts_v1 where case_id='"+cid+"' and operation='search_web') as searches,(select count(*) from mizizi_private.desk_tool_receipts_v1 where case_id='"+cid+"' and operation='read_page' and source_id is not null) as native_sources,(select count(*) from mizizi_private.desk_tool_receipts_v1 where case_id='"+cid+"' and operation='browse_page' and source_id is not null) as browser_sources,(select count(*) from mizizi_private.research_passes where case_id='"+cid+"') as passes,(select count(*) from mizizi_private.desk_tool_receipts_v1 where case_id='"+cid+"' and source_id is not null) as sources");
-           console.log("MIZIZI_DURABLE_RESEARCH_COUNTS="+JSON.stringify(evidence));
-           check(evidence.searches>=1&&evidence.native_sources>=1&&evidence.browser_sources>=1&&evidence.passes>=1&&evidence.sources>=2);note("DURABLE_RESEARCH_ACCEPTANCE");
-          }catch(e){failed=true;const code=String(e?.message??"");console.log("MIZIZI_STOP_STAGE="+stage);if(/^MIZIZI_[A-Z0-9_]+$/.test(code))console.log("MIZIZI_STOP_CODE="+code);if(Number.isInteger(e?.httpStatus))console.log("MIZIZI_STOP_HTTP="+e.httpStatus);if(/^[A-Z0-9_]{3,40}$/.test(String(e?.code??"")))console.log("MIZIZI_STOP_LAYER_CODE="+e.code)}
-          finally{
-           if(issued){try{await sql("do $g$ begin if exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolvaliduntil='"+issued.expiry+"'::timestamptz and (rolpassword='"+issued.verifier+"' or rolpassword is null)) then alter role mizizi_executor password null valid until '1970-01-01 00:00:00+00'; elsif not exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) then raise exception 'STOP_CREDENTIAL_CHANGED';end if;end $g$;");check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) as ok")).ok===true);note("EXECUTOR_REVOKED")}catch{failed=true;console.log("MIZIZI_EXECUTOR_REVOKED=UNCONFIRMED")}}
-           if(uid&&/^[a-f0-9-]{36}$/.test(uid)){try{await sql("begin; update public.user_role_assignments set status='revoked' where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active'; update mizizi_private.workspace_memberships set revoked_at=clock_timestamp(),revision=revision+1,last_changed_by='"+uid+"',change_reason='Integrated technical run ended; revoke temporary steward' where user_id='"+uid+"' and workspace_id='"+ws+"' and revoked_at is null;commit;");check((await one("select not exists(select 1 from public.user_role_assignments where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active') and not exists(select 1 from mizizi_private.workspace_memberships where user_id='"+uid+"' and revoked_at is null) as ok")).ok===true);note("STEWARD_REVOKED")}catch{failed=true;console.log("MIZIZI_STEWARD_REVOKED=UNCONFIRMED")}}
-           if(operator){try{const out=await operator.auth.signOut({scope:"global"});check(!out.error);note("SESSION_SIGNED_OUT")}catch{failed=true;console.log("MIZIZI_SESSION_SIGNED_OUT=UNCONFIRMED")}}
-           for(const k of ["MIZIZI_PREVIEW_ANON_KEY","MIZIZI_PREVIEW_SERVICE_ROLE_KEY","MIZIZI_PREVIEW_OPERATOR_JWT","MIZIZI_PREVIEW_JIT_DATABASE_URL","MIZIZI_PREVIEW_ANTHROPIC_API_KEY","SUPABASE_ACCESS_TOKEN"])delete process.env[k];rmSync(dir,{recursive:true,force:true});
-          }
-          if(failed)process.exitCode=1;
-          
-          MIZIZI_RUNNER
-          node --check .mizizi-integrated-run.mjs
-          node_modules/.bin/tsx .mizizi-integrated-run.mjs
-      - name: Verify browser cleanup
-        if: always()
-        run: test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
+          test "$(git rev-parse HEAD)" = b5b280d63467eac152d9aa4b6ff71a9e5bcc7830
+          test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
+          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
+
