@@ -78,6 +78,8 @@ export type InvestigationAnalystV1=(
  * verifies source rights, citations, findings and journal CAS. */
 export type PreparedDeskPassV1=Readonly<{
  sources:readonly SourceExcerptV1[];analysis:ResearchAnalysisV1;costUnits:number;
+ /** Explicit zero-inference discovery pass, not an unmetered model response. */
+ method?:"discovery_only";
  deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
  deskBatchReceipt?:DeskBatchReceiptV1;
 }>;
@@ -220,7 +222,14 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   if(input.prepareDeskPass&&remainingCost<=0)break;
   const prepared=input.prepareDeskPass?
    await input.prepareDeskPass(identity,question,Object.freeze([...history])):null;
-  if(prepared)bounded(prepared.costUnits,"DESK_MEASURED_COST",1,1000000);
+  const discoveryOnly=prepared?.method==="discovery_only";
+  if(discoveryOnly&&(!prepared||prepared.costUnits!==0||prepared.sources.length!==0||
+   prepared.deskBatchReceipt!==undefined||prepared.deskToolReceipts?.length!==1||
+   prepared.analysis.modelVersion!=="mizizi.deterministic_discovery_only.v1"||
+   prepared.analysis.hypotheses.length!==0||prepared.analysis.leads.length!==0||
+   prepared.analysis.requestedDisposition!=="pause"))
+   throw Error("MIZIZI_DESK_DISCOVERY_ONLY_INVALID");
+  if(prepared)bounded(prepared.costUnits,"DESK_MEASURED_COST",discoveryOnly?0:1,1000000);
   const sources=prepared?[...prepared.sources]:[...await readSources(identity,question,Object.freeze([...history]))];
   if(sources.length>30)throw new Error("MIZIZI_RESEARCH_SOURCE_BUDGET_EXCEEDED");
   const known=new Set<string>();
@@ -299,7 +308,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    "mizizi.exhausted_evidence_method.v1";
   const analysis:ResearchAnalysisV1=prepared?{
    ...prepared.analysis,
-   ...(noEvidence?{hypotheses:[],passFinding:"No authorized evidence was located; absence cannot establish that a cultural claim is false.",
+   ...(noEvidence&&!discoveryOnly?{hypotheses:[],passFinding:"No authorized evidence was located; absence cannot establish that a cultural claim is false.",
     requestedDisposition:"pause" as const}:{}),
    ...(evidenceExhausted?{hypotheses:[],leads:[],passFinding:"No new independent source evidence; further interpretation paused.",
     requestedDisposition:"pause" as const}:{})

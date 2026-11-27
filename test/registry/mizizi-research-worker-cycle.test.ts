@@ -1,4 +1,5 @@
 import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-core-cohort-v1.mjs";
+import {runDeskDiscoveryOnlyPassV1} from "../../scripts/registry/agents/mizizi/runtime/desk-discovery-only-pass-v1";
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
@@ -2687,5 +2688,48 @@ describe("MIZIZI retained compact batch recovery",()=>{
   await expect(resume(identity,question,[])).rejects.toThrow("SOURCE_AUTHORITY_CHANGED");
   forged=true;await expect(resume(identity,question,[])).rejects.toThrow("RESULT_CHANGED");
   expect(submitted).toBe(1);
+ });
+});
+
+describe("MIZIZI source-first discovery-only pass",()=>{
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
+  workerId:"scoped-worker",leaseExpiresAt:new Date(NOW+300000).toISOString()};
+ const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"What is the original release date of this recording?"};
+ const create=()=>{
+  const authorizeTool=vi.fn(async()=>true);
+  const executeTool=vi.fn(async()=>({receiptId:RECEIPT,leads:[{id:EVENT,kind:"reference" as const,label:"Unverified news lead"}],sources:[]}));
+  const verifyToolReceipt=vi.fn(async()=>true);
+  return {scope,query:"Recording Artist",operation:"search_news" as const,authorizeTool,executeTool,verifyToolReceipt,now:()=>NOW};
+ };
+ it("authorizes one exact search and journals an unverified discovery without any paid analysis",async()=>{
+  const input=create(),rows:InvestigationPassV1[]=[];
+  const analyze=vi.fn(async()=>{throw Error("MODEL_MUST_NOT_RUN");});
+  const readSources=vi.fn(async()=>{throw Error("LEGACY_READER");});
+  const result=await runAdaptiveInvestigationV1({identity,store:{read:async()=>rows.slice(),
+   append:async(_id,_ordinal,_prior,pass)=>{rows.push(pass);}},
+   prepareDeskPass:()=>runDeskDiscoveryOnlyPassV1(input),readSources,analyze,
+   verifyFinding:async()=>({verified:false,verificationRef:null}),now:()=>NOW,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:1});
+  expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(input.executeTool).toHaveBeenCalledTimes(1);
+  expect(input.authorizeTool).toHaveBeenCalledTimes(2);
+  expect(input.verifyToolReceipt).toHaveBeenCalledTimes(1);
+  expect(analyze).not.toHaveBeenCalled();expect(readSources).not.toHaveBeenCalled();
+  expect(rows[0]).toMatchObject({costUnits:0,modelVersion:"mizizi.deterministic_discovery_only.v1",
+   sourceReceipts:[],findings:[],decision:{action:"pause"},deskToolReceipts:[{receiptId:RECEIPT}],
+   passFinding:"Authorized discovery recorded 1 unverified reference leads; no source content or recording claim was established."});
+ });
+ it("does not call discovery without current authority, or return a receipt after revocation",async()=>{
+  const denied=create();denied.authorizeTool.mockResolvedValueOnce(false);
+  await expect(runDeskDiscoveryOnlyPassV1(denied)).rejects.toThrow("AUTHORITY_DENIED");
+  expect(denied.executeTool).not.toHaveBeenCalled();
+  const revoked=create();revoked.authorizeTool.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  await expect(runDeskDiscoveryOnlyPassV1(revoked)).rejects.toThrow("AUTHORITY_CHANGED");
+  const missing=create();missing.verifyToolReceipt.mockResolvedValueOnce(false);
+  await expect(runDeskDiscoveryOnlyPassV1(missing)).rejects.toThrow("RECEIPT_DENIED");
+ });
+ it("rejects unexpected source content in a discovery-only response",async()=>{
+  const input=create();
+  input.executeTool.mockResolvedValueOnce({receiptId:RECEIPT,leads:[],sources:[{}] as never[]});
+  await expect(runDeskDiscoveryOnlyPassV1(input)).rejects.toThrow("RESULT_DENIED");
  });
 });

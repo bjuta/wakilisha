@@ -21,6 +21,7 @@ import {createDeskResearchDispatcherV1,type DeskLocalBrowserHostV1} from "./desk
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {createDeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 import {createDeskRetainedBatchPassV1} from "./desk-retained-batch-pass-v1.ts";
+import {runDeskDiscoveryOnlyPassV1} from "./desk-discovery-only-pass-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -265,8 +266,21 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
     for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
      throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
-    try{return (compact?await compact(id,question,history):null)??await deskPass(id,question,history);}
-    finally{await dispatcher.closeInteractive();}
+    try{
+     // Search-only authority cannot admit source content. Spend no model
+     // tokens to decide whether to search or interpret unverified titles.
+     // Keep existing in-flight batch recovery ahead of a new discovery.
+     const tool=operational?.toolNames[0];
+     if(operational&&batch&&history.length===0&&query&&operational.toolNames.length===1&&
+      (tool==="search_web"||tool==="search_news")&&dispatcher.enabledTools.includes(tool)&&
+      operational.questionSha256s.includes(operationalHash(question))&&
+      (await batch.plan(scope,question)).state==="disabled"){
+      return await runDeskDiscoveryOnlyPassV1({scope,query,operation:tool,
+       authorizeTool:modelAuthority.authorizeTool,executeTool:dispatcher.executeTool,
+       verifyToolReceipt:dispatcher.verifyToolReceipt,now:input.now});
+     }
+     return (compact?await compact(id,question,history):null)??await deskPass(id,question,history);
+    }finally{await dispatcher.closeInteractive();}
    };
    active={job,dispatcher};
    return createAdaptiveResearchWorkerHandlerV1({
