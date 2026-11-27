@@ -125,6 +125,7 @@ export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOp
   const enabledTools=requirement.needsVision?options.enabledTools:options.enabledTools.filter(n=>n!=="inspect_visual");
   const selected=selectCostEffectiveDeskModelV1(await options.readModelInventory(),requirement,(options.now??Date.now)());
   let reservedMicrousd=0;
+  const held=new Map<string,{requestSha256:string;maximum:number;settled:boolean}>();
   return createDeskAnthropicPassV1({...options,enabledTools,anthropic:{...options.anthropic,model:selected.model},
    asyncOpeningBatch:options.asyncOpeningBatch?{
     ...options.asyncOpeningBatch,
@@ -155,7 +156,27 @@ export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOp
     if(quote.maximumCostMicrousd>requirement.maximumCostMicrousd-reservedMicrousd)return null;
     // Precharge even if the durable reservation outcome is indeterminate.
     reservedMicrousd+=quote.maximumCostMicrousd;
-    return options.reserve(binding,quote,grant);
+    const reservation=await options.reserve(binding,quote,grant);
+    if(reservation){
+     if(held.has(reservation.reservationId))fail("DUPLICATE_RESERVATION");
+     held.set(reservation.reservationId,{requestSha256:binding.requestSha256,maximum:quote.maximumCostMicrousd,settled:false});
+    }
+    return reservation;
+   },
+   recordModelEvent:async event=>{
+    const acknowledged=await options.recordModelEvent(event);
+    // Only a durable exact readback may release an ordinary round's unused
+    // local hold. Unknown, legacy, batch and cache charges stay conservative.
+    if(event.state!=="response_metered"||event.responseModel!==selected.model||!event.usage||
+     event.usage.cacheCreationTokens!==0||event.usage.cacheReadTokens!==0)return;
+    const r=held.get(event.reservationId);
+    if(!r||r.settled||r.requestSha256!==event.requestSha256||
+     typeof acknowledged!=="number"||!Number.isSafeInteger(acknowledged)||
+     acknowledged<1||acknowledged>r.maximum)return;
+    const minimum=(BigInt(event.usage.inputTokens)*BigInt(selected.worstCaseInputMicrousdPerMillion)+
+     BigInt(event.usage.outputTokens)*BigInt(selected.worstCaseOutputMicrousdPerMillion)+999999n)/1000000n;
+    if(BigInt(acknowledged)<minimum)return;
+    r.settled=true;reservedMicrousd-=r.maximum-acknowledged;
    }})(identity,question,history);
  };
 }
@@ -177,7 +198,7 @@ export type DeskAnthropicOptionsV1=Readonly<{
  consume:(reservation:Reservation)=>Promise<boolean>;
  /** Durable pre-send and post-response/uncertain billing journal. */
  recordModelEvent:(event:Readonly<{reservationId:string;requestSha256:string;
- state:"send_pending"|"response_metered"|"response_unconfirmed";usage?:Usage}>)=>Promise<void>;
+ state:"send_pending"|"response_metered"|"response_unconfirmed";usage?:Usage;responseModel?:string}>)=>Promise<void|number>;
  authorizeTool:(scope:DeskSearchScopeV1,call:DeskToolCallV1,callSha256:string)=>Promise<boolean>;
  executeTool:(scope:DeskSearchScopeV1,call:DeskToolCallV1,callSha256:string)=>Promise<DeskToolResultV1>;
  /** Independent readback of actual durable source/lead/tool custody result.
@@ -452,12 +473,14 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
      headers:{"x-api-key":apiKey,"anthropic-version":"2023-06-01","Content-Type":"application/json",
       ...(workspace?{"anthropic-workspace-id":workspace}:{})},body,
      signal:AbortSignal.timeout(Math.min(45000,Math.max(1,deadline-now())))});
-    payload=await jsonResponse(response);usage=readUsage(payload,quote);
+    payload=await jsonResponse(response);
+    if(payload.model!==model)fail("MODEL_RESPONSE_MODEL_UNCONFIRMED");
+    usage=readUsage(payload,quote);
    }catch{
     await options.recordModelEvent({...event,state:"response_unconfirmed"});
     fail("MODEL_RESPONSE_UNCONFIRMED");
    }
-   await options.recordModelEvent({...event,state:"response_metered",usage});
+   await options.recordModelEvent({...event,state:"response_metered",usage,responseModel:model});
    }
    totalUnits+=Math.ceil((usage.inputTokens+usage.outputTokens+usage.cacheCreationTokens+usage.cacheReadTokens)/1000);
    live();const after=await options.authorizeEnvelope(binding,body);live();
