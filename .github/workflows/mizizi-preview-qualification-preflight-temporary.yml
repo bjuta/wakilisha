@@ -62,7 +62,7 @@ jobs:
       - name: Non-secret availability and migration preflight, exact Preview forward apply
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-            shell: bash
+        shell: bash
         run: |
           set -euo pipefail
           umask 077
