@@ -299,7 +299,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   return {source,excerpt:excerpt.trim().slice(0,4000).trim(),citation};
  }
  async function append(callText:string,callSha256:string,result:DeskToolResultV1,
-  p:CustodyPolicy,provenance:Record<string,unknown>,bindings:readonly {id:string;url:string}[]){
+  p:{host:string;revision:number|null},provenance:Record<string,unknown>,bindings:readonly {id:string;url:string}[]){
   const resultText=bodyOf(result),resultSha256=hash(resultText);
   if(Buffer.byteLength(resultText)>30000)fail("CUSTODY_PROJECTION_BOUND");
   const raw=await rpc("mizizi_record_desk_tool_receipt_v1",{p_call_text:callText,p_call_sha256:callSha256,
@@ -657,14 +657,25 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   if(retainedOnly)fail("SHARED_BATCH_READ_MISS");
   const receipt=await native({scope,url});
-  const p=await policy(urlOf(receipt.finalUrl).hostname);
-  if(!p||p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");
+  const host=urlOf(receipt.finalUrl).hostname,p=await policy(host);
+  if(p&&p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");
   const interpreted=await interpret({scope,receipt});
   if(interpreted.source.sha256!==receipt.sha256||interpreted.source.finalUrl!==receipt.finalUrl||
    interpreted.source.representation!=="native_response_bytes"||
    hash(receipt.body)!==receipt.sha256||interpreted.projectionSha256!==hash(JSON.stringify(interpreted.projection)))
    fail("SOURCE_PROJECTION_UNCONFIRMED");
   const projection=interpreted.projection;
+  if(!p){
+   // The server must independently admit a current session-bound access
+   // receipt. No page text, anchor text, visual, document cache or source ID
+   // may be retained/disclosed by this path.
+   const refs=leadsFrom(projection.links.filter((l:{url:string})=>!l.url.includes("?"))
+    .map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));
+   return append(callText,callSha256,{receiptId:randomUUID(),leads:refs.leads,sources:[]},
+    {host,revision:null},{requestedUrl:receipt.requestedUrl,finalUrl:receipt.finalUrl,sourceSha256:receipt.sha256,
+     projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,
+     byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:"no_text",documentPages:null,renderRequired:false},refs.bindings);
+  }
   const refs=leadsFrom(projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})));
   const leads=[...refs.leads],bindings=[...refs.bindings];
   const receiptId=randomUUID(),sources:SourceExcerptV1[]=[];

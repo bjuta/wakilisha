@@ -2274,7 +2274,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    }
    if(fn==="mizizi_read_desk_custody_policy_v1"){
     const host=String(args.p_host);
-    return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
+    return ok(disabled.has(host)||disabled.has("fixture_unknown_host")&&host==="archive.org"?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
      authorityRef:"contract:reviewed-rights",originKey:host==="www.loc.gov"?"library:original-origin":"archive:original-origin",lineageKey:host==="www.loc.gov"?"library:independent-lineage":"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
      excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host),externalModelProcessingAllowed:true,
@@ -2320,6 +2320,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return ok({receiptId:id,resultSha256:args.p_result_sha256,outcome:"created"});
    }
    if(fn==="mizizi_record_desk_tool_receipt_v1"){
+    if(args.p_policy_revision===null&&!disabled.has("fixture_unknown_host"))return ok(null);
     const parsed=JSON.parse(String(args.p_result_text)),provenance={...(args.p_provenance as Record<string,unknown>)};
     delete provenance.requestText;
     if(provenance.detail&&typeof provenance.detail==="object"){
@@ -2713,10 +2714,22 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   // disclosure, evidence or a source receipt for an unknown/revoked host.
   h.disabled.add("fixture_transient_access");
   const before=h.receipts.size;
-  await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("SOURCE_CUSTODY_DENIED");
+  await expect(h.execute(call("read_page",{lead_id:first.leads[0].id}))).rejects.toThrow("CUSTODY_APPEND_DENIED");
   expect(h.native).toHaveBeenCalledTimes(1);
   expect(h.receipts.size).toBe(before);
   expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
+  const open=fixture(new TextEncoder().encode('<html><body><article>Private projection only <a href="https://archive.org/next">Publisher expression</a><a href="https://archive.org/other?q=private">Query reference</a></article></body></html>'),"text/html");
+  open.disabled.add("fixture_unknown_host");
+  const found=await open.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const consulted=await open.execute(call("read_page",{lead_id:found.leads[0].id}));
+  expect(consulted.sources).toEqual([]);
+  expect(consulted.leads.every(l=>l.kind==="reference"&&l.label==="Public reference (unverified)")).toBe(true);
+  expect(open.native).toHaveBeenCalledTimes(1);
+  const appended=open.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1").at(-1)!;
+  expect(appended.args.p_policy_revision).toBeNull();
+  expect(JSON.stringify(appended.args)).not.toMatch(/Private projection only|Publisher expression|Query reference|q=private/);
+  expect(await open.dispatch.verifyToolReceipt(scope,{receiptId:consulted.receiptId,
+   callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},consulted)).toBe(true);
  });
 });
 
