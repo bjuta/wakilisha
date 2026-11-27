@@ -1278,6 +1278,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    output_config:{format:{type:"json_schema"}},
   });
   expect(JSON.stringify(calls[0].request)).not.toContain(key);
+  expect(calls[0].request.system).toContain("Write original factual research notes in your own words");
+  expect(calls[0].request.system).toContain("Separate directly observed facts, attributed source claims, and your own inferences");
   expect(actual).toMatchObject({
    modelVersion:"claude-opus-4-8",
    requestedDisposition:"continue",
@@ -2442,6 +2444,8 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   let round=0;
   const transport=vi.fn(async(_url:string,init:RequestInit)=>{
    const body=JSON.parse(String(init.body));round++;
+   expect(body.system).toContain("Write original factual research notes in your own words");
+   expect(body.system).toContain("Separate directly observed facts, attributed source claims, and your own inferences");
    const result=(value:unknown)=>new Response(JSON.stringify({model,usage:{input_tokens:500,output_tokens:100},...value as object}),{headers:{"content-type":"application/json"}});
    const tool=(name:string,input:unknown)=>result({stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_"+round,name,input}]});
    if(round===1){expect(body.tool_choice).toEqual({type:"tool",name:"search_web",disable_parallel_tool_use:true});return tool("search_web",{query:"Nairobi recording archive"});}
