@@ -104,7 +104,18 @@ export function createDeskResourceBudgetV1({rpc,now=Date.now}:Readonly<{rpc:Work
     const r=await reserve(d,full);return r as Awaited<ReturnType<ModelFinance["reserve"]>>;
    },
    consume:r=>consume(r,accountFingerprint),
-   recordModelEvent:e=>recordEvent(e,accountFingerprint,e.state,e.usage?{...e.usage}:{})
+   recordModelEvent:async e=>{
+    if(e.responseModel!==undefined&&(e.state!=="response_metered"||!e.usage||
+     typeof e.responseModel!=="string"||!/^[A-Za-z0-9._:-]{3,100}$/.test(e.responseModel)))
+     fail("MODEL_RESPONSE_PROOF_DENIED");
+    await recordEvent(e,accountFingerprint,e.state,e.usage?{...e.usage,
+     ...(e.responseModel===undefined?{}:{responseModel:e.responseModel})}:{});
+    if(e.state!=="response_metered"||e.responseModel===undefined)return;
+    const units=await call("mizizi_read_desk_resource_encumbrance_v1",{
+     p_reservation_id:e.reservationId,p_request_sha256:e.requestSha256,p_account_fingerprint:accountFingerprint});
+    if(typeof units!=="number"||!Number.isSafeInteger(units)||units<1)fail("METERED_READBACK_UNCONFIRMED");
+    return units;
+   }
   };
  }
  /** Native hop: precharge 2 MB capacity and consume before the HTTP read.
