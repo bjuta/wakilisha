@@ -1,28 +1,34 @@
-name: MIZIZI Mint Same Case Recall Migration
+name: MIZIZI Same Case Recall Regression
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
+concurrency:
+  group: mizizi-preview-schema-qualification
+  cancel-in-progress: false
 jobs:
-  mint:
+  worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 6a67464ff37e9b2c055058fd73d52c9ebe510a48
+          ref: 2ca6ac016c99979b2cd42d3ade7b9872a84e6f6e
           persist-credentials: false
-      - uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v4
         with:
-          version: 2.107.0
-          github-token: ${{ github.token }}
-      - name: Mint forward migration without linking or hosted access
+          node-version: "22"
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 6a67464ff37e9b2c055058fd73d52c9ebe510a48
-          supabase migration new mizizi_desk_same_case_recall
-          file="$(find supabase/migrations -name '*_mizizi_desk_same_case_recall.sql')"
-          test -f "$file"
-          printf 'MIZIZI_MINTED_MIGRATION=%s\n' "$file"
+          test "$(git rev-parse HEAD)" = 2ca6ac016c99979b2cd42d3ade7b9872a84e6f6e
+          test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
+          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
+
