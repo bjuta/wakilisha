@@ -11,6 +11,7 @@ import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptions
  from "./anthropic-investigation-analyst-v1.ts";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
+import type {DeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const TOOL_ID=/^[A-Za-z0-9_-]{1,128}$/;
@@ -74,6 +75,8 @@ export type DeskModelCandidateV1=Readonly<{
  ordinaryToolTranscript:boolean;qualityGateRef:string;pricingRef:string;
  maxInputTokens:number;maxOutputTokens:number;
  worstCaseInputMicrousdPerMillion:number;worstCaseOutputMicrousdPerMillion:number;
+ /** Independently qualified batch capability; absence does not imply support. */
+ batchEligible?:boolean;
  validUntil:string;
 }>;
 export type DeskModelRequirementV1=Readonly<{
@@ -123,6 +126,19 @@ export function createCostRoutedDeskAnthropicPassV1(options:Omit<DeskAnthropicOp
   const selected=selectCostEffectiveDeskModelV1(await options.readModelInventory(),requirement,(options.now??Date.now)());
   let reservedMicrousd=0;
   return createDeskAnthropicPassV1({...options,enabledTools,anthropic:{...options.anthropic,model:selected.model},
+   asyncOpeningBatch:options.asyncOpeningBatch?{
+    ...options.asyncOpeningBatch,
+    lookup:async binding=>{
+     const state=await options.asyncOpeningBatch!.lookup(binding);
+     if(state.state==="available"&&(requirement.tier!=="routine"||selected.batchEligible!==true))return {state:"disabled"};
+     if((state.state==="pending"||state.state==="metered")&&selected.batchEligible!==true)fail("RECOVERED_BATCH_MODEL_UNQUALIFIED");
+     return state;
+    }
+   }:undefined,
+   admitRecoveredBatchCost:cost=>{
+    if(!Number.isSafeInteger(cost)||cost<1||cost>requirement.maximumCostMicrousd-reservedMicrousd)return false;
+    reservedMicrousd+=cost;return true;
+   },
    quote:async(binding,body)=>{
     if(Date.parse(selected.validUntil)<=(options.now??Date.now)())return null;
     const q=await options.quote(binding,body);
@@ -147,6 +163,9 @@ export type DeskAnthropicOptionsV1=Readonly<{
  scope:DeskSearchScopeV1;
  anthropic:Pick<AnthropicInvestigationOptionsV1,"apiKey"|"model"|"workspaceId"|"transport">;
  enabledTools:readonly DeskToolNameV1[];
+ /** Operational-only opt-in, source-free first opening round. */
+ asyncOpeningBatch?:DeskAsyncOpeningBatchV1;
+ admitRecoveredBatchCost?:(microusd:number)=>boolean;
  /** Trusted, independent policy must inspect actual serialized payload,
   * question, exact sources, tool receipt bindings and current lease. */
  authorizeEnvelope:(binding:EnvelopeBinding,body:string)=>Promise<Grant|null>;
@@ -394,6 +413,17 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     text(g.policyRef,200,8)&&g.modelDisclosureAllowed===true&&expires(g.validUntil);
    const grant=await options.authorizeEnvelope(binding,body);live();
    if(!approved(grant))fail("ENVELOPE_DISCLOSURE_DENIED");
+   const batch=round===1&&history.length===0?options.asyncOpeningBatch:undefined;
+   const batchState=batch?await batch.lookup(binding):null;live();
+   let payload:Record<string,unknown>,usage:Usage;
+   if(batch&&batchState&&(batchState.state==="pending"||batchState.state==="metered")){
+    const recovered=await batch.poll(binding,batchState);
+    payload=recovered.payload;usage=recovered.usage;
+    // Count the earlier reservation against the current pass budget too.
+    // The durable ledger has already charged it; do not reserve again.
+    if(options.admitRecoveredBatchCost&&options.admitRecoveredBatchCost(recovered.reservedMicrousd)!==true)
+     fail("RECOVERED_BATCH_COST_DENIED");
+   }else{
    const quote=await options.quote(binding,body);live();
    if(!quote||quote.requestSha256!==binding.requestSha256||!text(quote.pricingRef,200,8)||
      !Number.isSafeInteger(quote.maxInputTokens)||quote.maxInputTokens<1||quote.maxInputTokens>1_000_000||
@@ -416,7 +446,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     await options.recordModelEvent({...event,state:"response_unconfirmed"});
     fail("ENVELOPE_AUTHORITY_CHANGED");
    }
-   let payload:Record<string,unknown>,usage:Usage;
+   if(batch&&batchState?.state==="available")await batch.submit(binding,body,reservation);
    try{
     const response=await send("https://api.anthropic.com/v1/messages",{method:"POST",redirect:"error",
      headers:{"x-api-key":apiKey,"anthropic-version":"2023-06-01","Content-Type":"application/json",
@@ -428,6 +458,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     fail("MODEL_RESPONSE_UNCONFIRMED");
    }
    await options.recordModelEvent({...event,state:"response_metered",usage});
+   }
    totalUnits+=Math.ceil((usage.inputTokens+usage.outputTokens+usage.cacheCreationTokens+usage.cacheReadTokens)/1000);
    live();const after=await options.authorizeEnvelope(binding,body);live();
    if(!approved(after)||after.policyRef!==grant.policyRef)fail("ENVELOPE_AUTHORITY_CHANGED");

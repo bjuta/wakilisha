@@ -1609,6 +1609,49 @@ describe("MIZIZI guarded browser fallback",()=>{
 });
 
 
+describe("MIZIZI asynchronous opening batch transport",()=>{
+ it("persists send intent before POST, resumes a new lease without another POST, meters exact result and fences uncertainty",async()=>{
+  const {createDeskAsyncOpeningBatchV1}=await import("../../scripts/registry/agents/mizizi/runtime/desk-async-batch-v1.ts");
+  const hash=(s:string)=>createHash("sha256").update(s).digest("hex");
+  const key="fixture-preview-key",account=hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,key]));
+  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+300000).toISOString()};
+  const body=JSON.stringify({model:"fixture-haiku",max_tokens:2500,messages:[{role:"user",content:"Public fixture question"}]});
+  const bindingFor=(s:typeof scope)=>({scope:s,question:"Public fixture question",model:"fixture-haiku",round:1,
+   requestSha256:hash(JSON.stringify({scope:s,round:1,credentialSha256:account,bodySha256:hash(body)})),
+   bodySha256:hash(body),credentialSha256:account,requestBytes:Buffer.byteLength(body),maxOutputTokens:2500,sourceIds:[],toolReceipts:[]});
+  const b=bindingFor(scope),events:string[]=[],batchId="msgbatch_fixture123";
+  const resultLine=JSON.stringify({custom_id:RECEIPT,result:{type:"succeeded",message:{model:"fixture-haiku",stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_a",name:"search_web",input:{query:"Fixture"}}],usage:{input_tokens:500,output_tokens:100}}}});
+  let state="available",resultSha256:string|null=null;
+  const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
+   if(fn==="mizizi_read_desk_async_batch_v1")return {error:null,data:state==="pending"||state==="metered"?{state,reservationId:RECEIPT,originalRequestSha256:b.requestSha256,providerBatchId:batchId,bodySha256:hash(body),model:b.model,maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,resultSha256}:{state}};
+   if(fn==="mizizi_begin_desk_async_batch_v1"){expect(state).toBe("available");events.push("intent");state="uncertain";return {data:true,error:null};}
+   if(fn==="mizizi_record_desk_async_batch_v1"){
+    if(args.p_state==="accepted"){events.push("accepted");state="pending";}else if(args.p_state==="metered"){events.push("metered");state="metered";resultSha256=String(args.p_result_sha256);}
+    else state="uncertain";return {data:true,error:null};
+   }throw Error("unexpected RPC");
+  });
+  const transport=vi.fn(async(url:string,init:RequestInit)=>{
+   expect(init.redirect).toBe("error");expect(url.startsWith("https://api.anthropic.com/v1/messages/batches")).toBe(true);
+   if(init.method==="POST"){expect(events).toEqual(["intent"]);events.push("POST");expect(JSON.parse(String(init.body)).requests[0].custom_id).toBe(RECEIPT);return new Response(JSON.stringify({id:batchId,processing_status:"in_progress"}));}
+   return url.endsWith("/results")?new Response(resultLine+"\n"):new Response(JSON.stringify({id:batchId,processing_status:"ended",results_url:"https://untrusted.invalid/"}));
+  });
+  const options={rpc,credential:{apiKey:key},transport:transport as unknown as typeof fetch,now:()=>NOW};
+  const first=createDeskAsyncOpeningBatchV1(options);
+  expect(await first.lookup(b)).toEqual({state:"available"});
+  await expect(first.submit(b,body,{reservationId:RECEIPT,requestSha256:b.requestSha256,pricingRef:"pricing:fixture",maximumCostMicrousd:2000,validUntil:new Date(NOW+20000).toISOString()})).rejects.toThrow("MIZIZI_DESK_BATCH_PENDING");
+  const resumed=createDeskAsyncOpeningBatchV1(options),next=bindingFor({...scope,leaseExpiresAt:new Date(NOW+600000).toISOString()});
+  expect(next.requestSha256).not.toBe(b.requestSha256);
+  const pending=await resumed.lookup(next);
+  if(pending.state!=="pending")throw Error("missing batch");
+  expect(await resumed.poll(next,pending)).toMatchObject({usage:{inputTokens:500,outputTokens:100},reservedMicrousd:2000});
+  expect(events).toEqual(["intent","POST","accepted","metered"]);
+  expect(transport.mock.calls.filter(([,i])=>i.method==="POST")).toHaveLength(1);
+  state="uncertain";await expect(resumed.lookup(next)).rejects.toThrow("SEND_UNCONFIRMED");
+  expect(researchRetryDecisionV1(Error("MIZIZI_DESK_BATCH_PENDING"),1).retryable).toBe(true);
+  expect(researchRetryDecisionV1(Error("MIZIZI_DESK_BATCH_SEND_UNCONFIRMED"),1).retryable).toBe(false);
+ });
+});
+
 describe("MIZIZI cost-routed autonomous application tool research",()=>{
  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,
   workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+300000).toISOString()};

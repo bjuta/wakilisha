@@ -308,12 +308,14 @@ export function researchRetryDecisionV1(
   "MIZIZI_WIKIDATA_RATE_LIMITED",
   "MIZIZI_WIKIDATA_MAXLAG_DEFERRED",
   "MIZIZI_ANALYST_TRANSPORT_UNCONFIRMED",
-  "MIZIZI_ANALYST_UPSTREAM_UNAVAILABLE"
+  "MIZIZI_ANALYST_UPSTREAM_UNAVAILABLE",
+  "MIZIZI_DESK_BATCH_PENDING"
  ]).has(raw);
  const category=/^MIZIZI_[A-Z0-9_]{3,100}$/.test(raw)?
   raw:"MIZIZI_RESEARCH_UNCLASSIFIED";
  const safeAttempt=Number.isSafeInteger(attempt)&&attempt>0?Math.min(attempt,16):1;
- const delaySeconds=Math.min(3600,Math.max(1,baseDelaySeconds)*
+ const delaySeconds=raw==="MIZIZI_DESK_BATCH_PENDING"?Math.min(3600,Math.max(60,baseDelaySeconds)*Math.pow(2,safeAttempt-1)):
+  Math.min(3600,Math.max(1,baseDelaySeconds)*
   Math.pow(2,safeAttempt-1));
  return Object.freeze({retryable,delaySeconds,category});
 }
