@@ -2560,3 +2560,49 @@ describe("MIZIZI keyless provider discovery through existing durable search budg
   expect(dispatcher.enabledTools).not.toContain("search_news");
  });
 });
+
+describe("MIZIZI retained compact batch recovery",()=>{
+ it("uses one retained acquisition and one paid submission across leases, and rejects forged evidence",async()=>{
+  const {createDeskRetainedBatchPassV1}=await import("../../scripts/registry/agents/mizizi/runtime/desk-retained-batch-pass-v1.ts");
+  const {createDeskAsyncOpeningBatchV1}=await import("../../scripts/registry/agents/mizizi/runtime/desk-async-batch-v1.ts");
+  const hash=(s:string)=>createHash("sha256").update(s).digest("hex");
+  const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,expectedRevision:2,workerId:"mizizi-chart:"+JOB,leaseExpiresAt:new Date(NOW+300000).toISOString()};
+  const question="What does the retained recording credit establish?",identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
+  const dependencies=[{receiptId:JOB,callSha256:"a".repeat(64),resultSha256:"b".repeat(64)},{receiptId:EVENT,callSha256:"c".repeat(64),resultSha256:"d".repeat(64)}];
+  const source={source:{sourceId:EVENT,caseId:CASE,workspaceId:WORKSPACE,originKey:"archive:original-publication",lineageKey:"archive:primary-origin",fingerprint:"e".repeat(64),authorityRef:"license:fixture",useBasis:"open_license" as const,observedAt:new Date(NOW-60000).toISOString(),expiresAt:new Date(NOW+172800000).toISOString(),revokedAt:null,privateResearchAllowed:true,privateEvidenceRetentionAllowed:true,externalModelProcessingAllowed:true},excerpt:"A retained publication credits an ensemble.",citation:"https://archive.org/details/fixture"};
+  const material={dependencies,sources:[source]},events:string[]=[];
+  let current:any=null,submitted=0,forged=false;
+  const rpc:WorkerRpc=async(fn,args)=>{
+   if(fn==="mizizi_read_desk_async_batch_v1")return {data:current??{state:"available",openingAllowed:true,retainedAllowed:true},error:null};
+   if(fn==="mizizi_probe_desk_retained_batch_v1")return {data:true,error:null};
+   if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{allowed:true,bindingSha256:args.p_binding_sha256,validUntil:new Date(NOW+200000).toISOString()},error:null};
+   if(fn==="mizizi_begin_desk_async_batch_v1"){
+    expect(current).toBeNull();const b=JSON.parse(String(args.p_binding_text));
+    expect(hash(String(args.p_body_text))).toBe(b.bodySha256);expect(events).toEqual(["reserve","consume","send_pending"]);
+    current={state:"uncertain",reservationId:RECEIPT,originalRequestSha256:b.requestSha256,providerBatchId:"msgbatch_fixture",bodySha256:b.bodySha256,model:b.model,maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,resultSha256:null,mode:"retained_text",dependencies,sourceIds:[EVENT]};
+    events.push("intent");return {data:true,error:null};
+   }
+   if(fn==="mizizi_record_desk_async_batch_v1"){events.push(String(args.p_state));current={...current,state:args.p_state==="accepted"?"pending":args.p_state,resultSha256:args.p_result_sha256};return {data:true,error:null};}
+   throw Error("unexpected RPC: "+fn);
+  };
+  const transport=vi.fn(async(url:string,init:RequestInit)=>{
+   if(init.method==="POST"){submitted++;expect(events.at(-1)).toBe("intent");expect(JSON.parse(JSON.parse(String(init.body)).requests[0].params.messages[0].content).sources).toHaveLength(1);return new Response(JSON.stringify({id:"msgbatch_fixture",processing_status:"in_progress"}));}
+   if(!url.endsWith("/results"))return new Response(JSON.stringify({id:"msgbatch_fixture",processing_status:"ended"}));
+   const analysis={hypotheses:[{statement:"Publication credits an ensemble.",reasoningSummary:"A bounded claim only about the source.",sourceIds:[forged?CASE:EVENT],interpretation:"supported",uncertainty:0.3}],leads:[],passFinding:"The retained text credits an ensemble.",requestedDisposition:"conclude"};
+   return new Response(JSON.stringify({custom_id:RECEIPT,result:{type:"succeeded",message:{model:"fixture-haiku",stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify(analysis)}],usage:{input_tokens:500,output_tokens:100}}}})+"\n");
+  });
+  const dispatcher={tryRetainedBatch:vi.fn(async()=>material),readBatchDependencies:vi.fn(async()=>material),authorizeSource:vi.fn(async()=>true)};
+  const credential={apiKey:"fixture-preview-key"},batch=createDeskAsyncOpeningBatchV1({rpc,credential,transport:transport as unknown as typeof fetch,now:()=>NOW});
+  const finance={quote:vi.fn(async(b:any)=>({requestSha256:b.requestSha256,pricingRef:"pricing:fixture",maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,validUntil:new Date(NOW+200000).toISOString()})),reserve:vi.fn(async(b:any)=>{events.push("reserve");return {reservationId:RECEIPT,requestSha256:b.requestSha256,pricingRef:"pricing:fixture",maximumCostMicrousd:2000,validUntil:new Date(NOW+200000).toISOString()};}),consume:vi.fn(async()=>{events.push("consume");return true;}),recordModelEvent:vi.fn(async(e:any)=>{events.push(e.state);})};
+  const config={rpc,credential,batch,dispatcher,query:"Fixture recording ensemble",readModelInventory:async()=>[{model:"fixture-haiku",family:"haiku" as const,active:true,toolUse:true,structuredOutput:true,vision:false,ordinaryToolTranscript:true,batchEligible:true,qualityGateRef:"eval:fixture",pricingRef:"pricing:fixture",maxInputTokens:5000,maxOutputTokens:2500,worstCaseInputMicrousdPerMillion:100000,worstCaseOutputMicrousdPerMillion:500000,validUntil:new Date(NOW+200000).toISOString()}],assessRequirement:async()=>({tier:"routine" as const,needsVision:false,inputTokenCeiling:5000,maximumCostMicrousd:2000,assessmentRef:"policy:fixture"}),finance,authorizeEnvelope:async(b:any)=>({requestSha256:b.requestSha256,modelDisclosureAllowed:true as const,policyRef:"policy:fixture",validUntil:new Date(NOW+200000).toISOString()}),authorizeTool:async()=>true,now:()=>NOW};
+  await expect(createDeskRetainedBatchPassV1({...config,scope})(identity,question,[])).rejects.toThrow("MIZIZI_DESK_BATCH_PENDING");
+  const resume=createDeskRetainedBatchPassV1({...config,scope:{...scope,leaseExpiresAt:new Date(NOW+600000).toISOString()}});
+  const result=await resume(identity,question,[]);
+  expect(result).toMatchObject({deskBatchReceipt:{reservationId:RECEIPT,resultSha256:current.resultSha256},deskToolReceipts:dependencies,costUnits:1,analysis:{hypotheses:[{sourceIds:[EVENT]}]}});
+  expect(submitted).toBe(1);expect(dispatcher.tryRetainedBatch).toHaveBeenCalledTimes(1);expect(dispatcher.readBatchDependencies).toHaveBeenCalledTimes(1);expect(finance.reserve).toHaveBeenCalledTimes(1);
+  dispatcher.authorizeSource.mockResolvedValueOnce(false);
+  await expect(resume(identity,question,[])).rejects.toThrow("SOURCE_AUTHORITY_CHANGED");
+  forged=true;await expect(resume(identity,question,[])).rejects.toThrow("RESULT_CHANGED");
+  expect(submitted).toBe(1);
+ });
+});

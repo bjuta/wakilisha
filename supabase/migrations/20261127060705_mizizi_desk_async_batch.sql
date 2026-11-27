@@ -365,6 +365,7 @@ create function mizizi_private.desk_retained_batch_journal_current_v1(c jsonb,p_
 returns boolean language plpgsql security definer set search_path=pg_catalog as $f$
 declare a mizizi_private.desk_async_batch_requests_v1;e mizizi_private.desk_async_batch_events_v1;
  p jsonb:=p_body->'deskBatchReceipt';ids jsonb;
+ o mizizi_private.desk_operational_policy_versions_v1;m mizizi_private.desk_model_authority_versions_v1;
 begin
  if jsonb_typeof(p) is distinct from 'object' or (select count(*) from jsonb_object_keys(p))<>3
  or coalesce(p->>'reservationId','') !~ '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$'
@@ -379,6 +380,14 @@ begin
  or p_body->>'ordinal' is distinct from '1'
  or a.question_sha256 is distinct from encode(sha256(convert_to(p_body->>'question','UTF8')),'hex')
  or a.dependencies is distinct from p_body->'deskToolReceipts' then return false;end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if o.revision is distinct from a.operational_revision or not coalesce(mizizi_private.desk_operational_policy_live_v1(o,c),false)
+ then return false;end if;
+ select * into m from mizizi_private.desk_model_authority_versions_v1
+ where workspace_id=a.workspace_id and case_id=a.case_id and operation='model_disclose' and binding_sha256=a.binding_sha256
+ order by revision desc limit 1;
+ if m.revision is distinct from a.exact_model_revision or (m.revision is not null and (not m.enabled or m.valid_until<=clock_timestamp()))
+ then return false;end if;
  select jsonb_agg(v->'sourceId' order by ord) into ids from jsonb_array_elements(p_body->'sourceReceipts') with ordinality x(v,ord);
  if ids is distinct from a.source_ids or not mizizi_private.desk_retained_batch_dependencies_current_v1(c,a.dependencies,a.source_ids,clock_timestamp())
  then return false;end if;
