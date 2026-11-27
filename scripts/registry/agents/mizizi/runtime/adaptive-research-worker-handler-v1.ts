@@ -241,16 +241,17 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    if(config.localBrowser&&(!operational||!operational.toolNames.includes("browse_page")))
     throw Error("MIZIZI_DESK_LOCAL_BROWSER_POLICY_REQUIRED");
    const factualNoteSubject=operational?{membershipSha256:job.chartContext.membershipSha256,observationSha256:job.chartContext.observationSha256}:undefined;
-   const modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,factualNoteSubject,
-    authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
+   let modelAuthority:ReturnType<typeof createDurableDeskModelAuthorityV1>;
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,factualNoteSubject,braveApiKey:config.braveApiKey,discovery:config.discovery,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
-    authorizeInteractiveCall:modelAuthority.authorizeTool,sharedNativeReuse:operational?.toolNames.includes("read_page")===true,
+    authorizeInteractiveCall:(...args)=>modelAuthority.authorizeTool(...args),sharedNativeReuse:operational?.toolNames.includes("read_page")===true,
     sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,
     allowSameCaseRecall:operational?.toolNames.includes("recall_evidence")===true,now:input.now});
+   modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,factualNoteSubject,
+    discoveryHosts:dispatcher.discoveryHosts,authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const batch=operational?createDeskAsyncOpeningBatchV1({rpc:input.rpc,credential:anthropic,now:input.now}):undefined;

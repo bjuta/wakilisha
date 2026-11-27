@@ -67,7 +67,20 @@ function openingDiscovery(enabled:ReadonlySet<string>):"search_web"|"search_news
  return enabled.has("search_web")?"search_web":enabled.has("search_news")?"search_news":null;
 }
 type DeskToolChoiceV1={type:"auto"|"any";disable_parallel_tool_use:true}|{type:"tool";name:DeskToolNameV1;disable_parallel_tool_use:true};
-function deskToolChoice(model:unknown,enabled:ReadonlySet<string>,round:number,leads:ReadonlyMap<string,DeskToolLeadV1>,sourceCount:number):DeskToolChoiceV1{
+type DiscoveryHostsV1=Readonly<Partial<Record<"search_web"|"search_news",string>>>;
+function alternateDiscoveryV1(enabled:ReadonlySet<string>,failedOperations:ReadonlySet<string>,failedHosts:ReadonlySet<string>,hosts:DiscoveryHostsV1|undefined){
+ return (["search_web","search_news"] as const).find(op=>{
+  const host=hosts?.[op];
+  return enabled.has(op)&&!failedOperations.has(op)&&!!host&&!failedHosts.has(host);
+ });
+}
+function deskToolChoice(model:unknown,enabled:ReadonlySet<string>,round:number,leads:ReadonlyMap<string,DeskToolLeadV1>,sourceCount:number,recovery?:Readonly<{failedOperations:ReadonlySet<string>;failedHosts:ReadonlySet<string>;hosts:DiscoveryHostsV1|undefined}>):DeskToolChoiceV1{
+ // Recovery scheduling is reconstructed from verified unavailable receipts
+ // and trusted dispatcher inventory, never model-provided host choices.
+ if(model==="claude-haiku-5-5"&&round<MAX_CALLS&&sourceCount===0&&leads.size===0&&recovery?.failedOperations.size){
+  const alternate=alternateDiscoveryV1(enabled,recovery.failedOperations,recovery.failedHosts,recovery.hosts);
+  if(alternate)return {type:"tool",name:alternate,disable_parallel_tool_use:true};
+ }
  // Only the currently qualified ordinary Haiku 5.5 protocol supports this
  // forced path. Other models retain auto and the independent progress fence.
  const opening=openingDiscovery(enabled);
@@ -256,7 +269,7 @@ export type DeskAnthropicOptionsV1=Readonly<{
 /** Independently reconstruct the allowed serialized transcript from durable
  * custody readback. The model cannot introduce arbitrary free text, image
  * bytes, schemas, source claims or prior private analysis into the envelope. */
-async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string,subject:DeskFactualNoteSubjectV1|undefined,now:()=>number):Promise<boolean>{
+async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string,subject:DeskFactualNoteSubjectV1|undefined,now:()=>number,hosts:DiscoveryHostsV1|undefined):Promise<boolean>{
  try{
   const parsed=record(JSON.parse(body));
   const thinking=ordinaryThinking(b.model);
@@ -284,7 +297,8 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(!packet.notes.length||packet.bodySha256!==b.factualNoteReadbackSha256||
     JSON.stringify(question.factualNotes)!==JSON.stringify(factualNoteContextV1(packet)))return false;
   }else if(Object.hasOwn(question,"factualNotes"))return false;
-  const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>();
+  const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>(),failedHosts=new Set<string>();
+  const recovery={failedOperations,failedHosts,hosts};
   for(let i=0;i<b.toolReceipts.length;i++){
    const binding=b.toolReceipts[i];
    if(receiptIds.has(binding.receiptId)||!UUID.test(binding.receiptId))return false;
@@ -300,13 +314,15 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(assistant.role!=="assistant"||!Array.isArray(assistant.content)||assistant.content.length!==1||
     user.role!=="user"||!Array.isArray(user.content)||user.content.length!==1)return false;
    const block=record(assistant.content[0]),call=canonicalTool(block.name,block.input,enabled,leads);
-   const choice=deskToolChoice(b.model,enabled,i+1,leads,sourceIds.length);
-   if(failedOperations.has(call.name)||choice.type==="tool"&&call.name!==choice.name)return false;
+   const choice=deskToolChoice(b.model,enabled,i+1,leads,sourceIds.length,recovery);
+   if(failedOperations.has(call.name)||choice.type==="tool"&&call.name!==choice.name||
+    ((call.name==="search_web"||call.name==="search_news")&&failedHosts.has(hosts?.[call.name]??"")))return false;
    const unavailable=result.unavailable;
    if(unavailable!==undefined){
     if(!isDeskUnavailableOutcomeV1(unavailable)||!["search_web","search_news"].includes(call.name)||
-     result.leads.length||result.sources.length||result.visual!==null)return false;
-    failedOperations.add(call.name);
+     result.leads.length||result.sources.length||result.visual!==null||
+     hosts?.[call.name as "search_web"|"search_news"]!==unavailable.host)return false;
+    failedOperations.add(call.name);failedHosts.add(unavailable.host);
    }
    if(block.type!=="tool_use"||typeof block.id!=="string"||!TOOL_ID.test(block.id)||ids.has(block.id)||
     hash(JSON.stringify({scope:b.scope,call}))!==binding.callSha256||
@@ -333,7 +349,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(JSON.stringify(user)!==JSON.stringify({role:"user",content:[{type:"tool_result",tool_use_id:block.id,content:expected}]}))return false;
   }
   return JSON.stringify(sourceIds)===JSON.stringify(b.sourceIds)&&
-   JSON.stringify(parsed.tool_choice)===JSON.stringify(deskToolChoice(b.model,enabled,b.round,leads,sourceIds.length));
+   JSON.stringify(parsed.tool_choice)===JSON.stringify(deskToolChoice(b.model,enabled,b.round,leads,sourceIds.length,recovery));
  }catch{return false;}
 }
 /** Exact owner approval is additive to independent host inspection of
@@ -341,7 +357,8 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
 export function createDurableDeskModelAuthorityV1(options:Readonly<{
  rpc:WorkerRpc;scope:DeskSearchScopeV1;
  authorizeEnvelope:DeskAnthropicOptionsV1["authorizeEnvelope"];
- authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];factualNoteSubject?:DeskFactualNoteSubjectV1;now?:()=>number;
+ authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];factualNoteSubject?:DeskFactualNoteSubjectV1;
+ discoveryHosts?:DiscoveryHostsV1;now?:()=>number;
 }>):Pick<DeskAnthropicOptionsV1,"authorizeEnvelope"|"authorizeTool">{
  const now=options.now??Date.now,scope=options.scope;
  const sameScope=(s:DeskSearchScopeV1)=>JSON.stringify(s)===JSON.stringify(scope);
@@ -364,7 +381,7 @@ export function createDurableDeskModelAuthorityV1(options:Readonly<{
   authorizeEnvelope:async(binding,body)=>{
    if(!sameScope(binding.scope)||hash(body)!==binding.bodySha256||Buffer.byteLength(body,"utf8")!==binding.requestBytes||
     hash(JSON.stringify({scope:binding.scope,round:binding.round,credentialSha256:binding.credentialSha256,bodySha256:binding.bodySha256}))!==binding.requestSha256)return null;
-   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body,options.factualNoteSubject,now))return null;
+   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body,options.factualNoteSubject,now,options.discoveryHosts))return null;
    const external=await options.authorizeEnvelope(binding,body);
    if(!external||external.requestSha256!==binding.requestSha256||external.modelDisclosureAllowed!==true||
     !text(external.policyRef,200,8)||!Number.isFinite(Date.parse(external.validUntil))||Date.parse(external.validUntil)<=now()||
@@ -499,20 +516,15 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
      requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
     costUnits:totalUnits};
   };
-  const alternateDiscovery=()=> (["search_web","search_news"] as const).find(op=>{
-   const host=options.discoveryHosts?.[op];
-   return enabled.has(op)&&!failedOperations.has(op)&&!!host&&!failedHosts.has(host);
-  });
+  const recovery={failedOperations,failedHosts,hosts:options.discoveryHosts};
+  const alternateDiscovery=()=>alternateDiscoveryV1(enabled,failedOperations,failedHosts,options.discoveryHosts);
   for(let round=1;round<=MAX_CALLS;round++){
    live();await checkSources();live();
    // Once a verified unavailable result leaves no leads or evidence, choose
    // the distinct configured discovery operation on the qualified Haiku path.
    // This is scheduling only: existing authorization, budget, custody and
    // host fences still apply to the exact subsequent call.
-   const alternate=lastUnavailable&&!sources.size&&!leads.size?alternateDiscovery():undefined;
-   const choice:DeskToolChoiceV1=model==="claude-haiku-5-5"&&alternate&&round<MAX_CALLS?
-    {type:"tool",name:alternate,disable_parallel_tool_use:true}:
-    deskToolChoice(model,enabled,round,leads,sources.size);
+   const choice=deskToolChoice(model,enabled,round,leads,sources.size,recovery);
    const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system,...ordinaryThinking(model),
     tools,tool_choice:choice,
     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});

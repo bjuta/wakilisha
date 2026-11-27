@@ -2054,7 +2054,7 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
     }
     return {data:null,error:null};
    };
-   const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+   const authority=createDurableDeskModelAuthorityV1({rpc,scope,discoveryHosts:options.discoveryHosts,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
    const out=await createCostRoutedDeskAnthropicPassV1({...options,...authority})(identity,question,[]);
    if(mode.startsWith("distinct")){
     expect(out.sources).toHaveLength(1);expect(out.deskToolReceipts).toHaveLength(3);
