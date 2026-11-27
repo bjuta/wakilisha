@@ -239,7 +239,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
-    authorizeInteractiveCall:modelAuthority.authorizeTool,sharedNativeReuse:operational?.toolNames.includes("read_page")===true,now:input.now});
+    authorizeInteractiveCall:modelAuthority.authorizeTool,sharedNativeReuse:operational?.toolNames.includes("read_page")===true,
+    sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const deskPass=createCostRoutedDeskAnthropicPassV1({
@@ -276,7 +277,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
 type OperationalNativeDeskPolicyV1=Readonly<{
  revision:number;scope:DeskSearchScopeV1;credentialSha256:string;modelIds:readonly string[];
  questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
- adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];
+ adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];sharedNativeAutoAllowed?:boolean;
  accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
  validUntil:string;
 }>;
@@ -290,6 +291,7 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   !Number.isSafeInteger(p.revision)||p.revision<1||!sha.test(p.credentialSha256)||
   !Array.isArray(p.modelIds)||p.modelIds.length<1||p.modelIds.length>5||p.modelIds.some(m=>! /^[A-Za-z0-9._:-]{3,100}$/.test(m))||
   !Array.isArray(p.questionSha256s)||p.questionSha256s.length<1||p.questionSha256s.length>8||p.questionSha256s.some(q=>!sha.test(q))||
+  (p.sharedNativeAutoAllowed!==undefined&&typeof p.sharedNativeAutoAllowed!=="boolean")||
   typeof p.adaptiveFollowupsAllowed!=="boolean"||!Array.isArray(p.publicQueryTerms)||
   p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
   p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||

@@ -70,6 +70,7 @@ type Options=Readonly<{
  nativeTestSeams?:Pick<NativeOptions,"resolve4"|"readPinned">;
  /** Only operational composition enables lookup of separately authorized shared native fields. */
  sharedNativeReuse?:boolean;
+ sharedNativeSearch?:boolean;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -433,6 +434,22 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(call.name==="search_web"||call.name==="search_news"){
    const query=call.input.query;
    if(!text(query,300,3))fail("QUERY_DENIED");
+   if(call.name==="search_web"&&options.sharedNativeSearch===true){
+    const receiptId=randomUUID(),leadId=randomUUID();
+    const result:DeskToolResultV1={receiptId,leads:[{id:leadId,kind:"reference",label:"Retained source candidate (unverified)"}],sources:[]};
+    const resultText=bodyOf(result),resultSha256=hash(resultText);
+    const shared=await rpc("mizizi_use_desk_shared_search_v1",{p_call_text:callText,p_call_sha256:callSha256,
+     p_receipt_id:receiptId,p_lead_id:leadId,p_result_text:resultText,p_result_sha256:resultSha256}) as
+      {receiptId?:string;resultSha256?:string;outcome?:string}|null;
+    if(shared!==null){
+     if(!shared||shared.receiptId!==receiptId||shared.resultSha256!==resultSha256||
+      !["created","replayed"].includes(shared.outcome??""))fail("SHARED_SEARCH_ADMISSION_DENIED");
+     const stored=await readReceipt(receiptId);
+     if(!stored||stored.row.callSha256!==callSha256||stored.row.resultSha256!==resultSha256||stored.row.resultText!==resultText)
+      fail("CUSTODY_READBACK_UNCONFIRMED");
+     return result;
+    }
+   }
    const selected=discovery.get(call.name);
    if(!selected)fail("DISCOVERY_CONFIGURATION_DENIED");
    const p=await policy(selected.host);
