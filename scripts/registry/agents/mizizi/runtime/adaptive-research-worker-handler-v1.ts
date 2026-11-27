@@ -28,6 +28,7 @@ export type AdaptiveWorkerDependenciesV1=Readonly<{
  readSources:InvestigationReaderV1;
  analyze:InvestigationAnalystV1;
  prepareDeskPass?:DeskPassResearcherV1;
+ canPrepareDeskPass?:Parameters<typeof runAdaptiveInvestigationV1>[0]["canPrepareDeskPass"];
  /** Only the exact durable standing-policy worker enables this. */
  continuationEnabled?:boolean;
  verifyFinding:IndependentFindingVerifierV1;
@@ -51,7 +52,7 @@ export function createAdaptiveResearchWorkerHandlerV1(
    analyze:deps.analyze,prepareDeskPass:deps.prepareDeskPass,verifyFinding:deps.verifyFinding,
    maxNewPasses:deps.maxNewPasses,maxTotalPasses:deps.maxTotalPasses,
    costBudgetUnits:deps.costBudgetUnits,measureCostUnits:deps.measureCostUnits,
-   authorizeModelProcessing:deps.authorizeModelProcessing
+   authorizeModelProcessing:deps.authorizeModelProcessing,canPrepareDeskPass:deps.canPrepareDeskPass
   });
   // Re-read durable case history: never trust an ephemeral in-memory claim
   // of success after the append transport potentially timed out.
@@ -251,8 +252,23 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     const models=await config.readModelInventory();
     return operational?models.filter(m=>operational.modelIds.includes(m.model)):models;
    };
-   const deskPass=createCostRoutedDeskAnthropicPassV1({
-    scope,anthropic,enabledTools:operational?dispatcher.enabledTools.filter(t=>operational.toolNames.includes(t)):dispatcher.enabledTools,
+   const enabledTools=operational?dispatcher.enabledTools.filter(t=>operational.toolNames.includes(t)):dispatcher.enabledTools;
+   let eligibleTools=enabledTools;
+   const canPrepareDeskPass:NonNullable<AdaptiveWorkerDependenciesV1["canPrepareDeskPass"]>=async(_id,_question,history)=>{
+    const available=await dispatcher.restoreJournalHistory(history);
+    eligibleTools=enabledTools.filter(t=>available.includes(t));
+    const isDiscovery=(t:string)=>t==="search_web"||t==="search_news";
+    // No previous-lease lead or source is authorized in the opening envelope.
+    // If recovery removed every opening discovery route, preserve the prior
+    // journal and defer before model selection, finance, or network activity.
+    if(history.length&&enabledTools.some(isDiscovery)&&!eligibleTools.some(isDiscovery)){
+     if(operational?.adaptiveFollowupsAllowed===true)return false;
+     throw Error("MIZIZI_DESK_HISTORY_NO_AVAILABLE_AVENUE");
+    }
+    return true;
+   };
+   const createDeskPass=()=>createCostRoutedDeskAnthropicPassV1({
+    scope,anthropic,enabledTools:eligibleTools,
     // Always consult existing async intent in operational mode, including
     // after a policy change. The SQL opt-in is default false.
     asyncOpeningBatch:batch,readModelInventory,
@@ -264,8 +280,6 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     query,readModelInventory,assessRequirement:config.assessRequirement,finance,
     authorizeEnvelope:config.authorizeEnvelope,authorizeTool:modelAuthority.authorizeTool,now:input.now}):null;
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
-    for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
-     throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
     try{
      // Search-only authority cannot admit source content. Spend no model
      // tokens to decide whether to search or interpret unverified titles.
@@ -279,7 +293,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
        authorizeTool:modelAuthority.authorizeTool,executeTool:dispatcher.executeTool,
        verifyToolReceipt:dispatcher.verifyToolReceipt,now:input.now});
      }
-     return (compact?await compact(id,question,history):null)??await deskPass(id,question,history);
+     return (compact?await compact(id,question,history):null)??await createDeskPass()(id,question,history);
     }finally{await dispatcher.closeInteractive();}
    };
    active={job,dispatcher};
@@ -287,7 +301,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     store:guardDeskResearchPassStoreV1(createLeasedResearchPassStoreV1(input.rpc,job,input.workerId),dispatcher.verifyJournalPass),
     openingQuestion:input.openingQuestion,readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
     analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
-    verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,
+    verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,canPrepareDeskPass,
     continuationEnabled:operational?.adaptiveFollowupsAllowed===true,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,costBudgetUnits:input.costBudgetUnits})(job);
   }

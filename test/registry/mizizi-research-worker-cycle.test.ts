@@ -577,6 +577,14 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    analyze:async()=>{throw Error("LEGACY_ANALYST");},authorizeModelProcessing:async()=>true,
    verifyFinding:async()=>({verified:false,verificationRef:null})};
   expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:1,disposition:"continue",nextQuestion:q2});
+  const prior=structuredClone(store.rows),gate=vi.fn(async()=>false);
+  const deferred=createAdaptiveResearchWorkerHandlerV1({...deps,openingQuestion:async()=>identity.openingQuestion,
+   continuationEnabled:true,canPrepareDeskPass:gate});
+  const outcome=await deferred({jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,attempt:2,maxAttempts:3,
+   chartContext:{}} as ResearchJobV1);
+  expect(outcome).toMatchObject({investigation:{disposition:"deferred",totalPasses:1,lastFingerprint:prior[0].fingerprint}});
+  expect(gate).toHaveBeenCalledExactlyOnceWith(identity,q2,prior);
+  expect(prepareDeskPass).toHaveBeenCalledTimes(1);expect(store.rows).toEqual(prior);
   expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:1,totalPasses:2,disposition:"paused",nextQuestion:null});
   expect(prepareDeskPass).toHaveBeenCalledTimes(2);
   expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:0,disposition:"paused"});
@@ -2206,12 +2214,13 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    }
    throw Error("unexpected RPC: "+fn);
   };
-  const dispatch=createDeskResearchDispatcherV1({scope,rpc,...(useTavily?{discovery:{search_web:{provider:"tavily_keyless" as const,host:"api.tavily.com",allocationRef:"fixture:tavily-keyless"}},discoveryTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:tavily}}:{braveApiKey:"fixture-only-brave-key"}),
+  const dispatchOptions:Parameters<typeof createDeskResearchDispatcherV1>[0]={scope,rpc,...(useTavily?{discovery:{search_web:{provider:"tavily_keyless" as const,host:"api.tavily.com",allocationRef:"fixture:tavily-keyless"}},discoveryTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:tavily}}:{braveApiKey:"fixture-only-brave-key"}),
    nativeAccountFingerprint:"a".repeat(64),authorizeAcquisition:access,authorizeExamination:examination,
    searchTransport:provider as unknown as typeof fetch,nativeTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:native},
-   now:()=>NOW,...browserOptions});
+   now:()=>NOW,...browserOptions};
+  const dispatch=createDeskResearchDispatcherV1(dispatchOptions);
   const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
-  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,tavily,native,access,examination,rpc};
+  return {dispatch,dispatchOptions,execute,calls,receipts,leadRows,disabled,provider,tavily,native,access,examination,rpc};
  }
  it("connects actual search, budget, native reader and parser to private opaque custody and source readback",async()=>{
   const h=fixture(),search=call("search_web",{query:"Nairobi recording archive"});
@@ -2266,6 +2275,31 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(h.execute(call("search_web",{query:query+" other"}))).rejects.toThrow("DISCOVERY_AVENUE_UNAVAILABLE");
   expect(h.tavily).toHaveBeenCalledTimes(1);
   expect(h.calls.filter(c=>c.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+  expect(h.native).not.toHaveBeenCalled();
+  // Reconstruct a new process from the real journal writer's immutable pass.
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"Which original sources establish the recording credits?"};
+  const passes:InvestigationPassV1[]=[],code=first.unavailable!.code;
+  const refs=[{receiptId:first.receiptId,callSha256:String(stored.callSha256),resultSha256:String(stored.resultSha256)}];
+  const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_ordinal,_prior,pass)=>{passes.push(pass);}},h.dispatch.verifyJournalPass);
+  await expect(runAdaptiveInvestigationV1({identity,store,maxNewPasses:1,maxTotalPasses:4,costBudgetUnits:20,now:()=>NOW,
+   readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
+   authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:async()=>({verified:false,verificationRef:null}),
+   prepareDeskPass:async()=>({method:"interrupted",interruptionCode:code,costUnits:0,sources:[],deskToolReceipts:refs,
+    analysis:{hypotheses:[],leads:[],passFinding:"Discovery interrupted; the durable receipt is retained.",requestedDisposition:"pause",
+     modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint:hash("fixture:interrupted")}})})).rejects.toThrow(code);
+  expect(passes).toHaveLength(1);
+  const nextScope={...scope,workerId:"mizizi-chart:"+EVENT,leaseExpiresAt:new Date(NOW+600000).toISOString()};
+  const restarted=createDeskResearchDispatcherV1({...h.dispatchOptions,scope:nextScope,braveApiKey:"fixture-only-brave-key"});
+  const available=await restarted.restoreJournalHistory(passes);
+  expect(available).not.toContain("search_web");expect(available).toContain("search_news");
+  expect(h.calls.some(c=>c.fn==="mizizi_read_desk_tool_receipt_v1"&&JSON.stringify(c.args.p_scope)===JSON.stringify(nextScope))).toBe(true);
+  await expect(restarted.executeTool(nextScope,search,hash(JSON.stringify({scope:nextScope,call:search})))).rejects.toThrow("DISCOVERY_AVENUE_UNAVAILABLE");
+  expect(h.tavily).toHaveBeenCalledTimes(1);expect(h.provider).not.toHaveBeenCalled();
+  expect(h.calls.filter(c=>c.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+  const altered={...passes[0],deskToolReceipts:[{...refs[0],resultSha256:hash("forged")}],fingerprint:undefined};
+  await expect(restarted.restoreJournalHistory([{...altered,fingerprint:hash(JSON.stringify(altered))}])).rejects.toThrow("HISTORY_CUSTODY_DENIED");
+  h.disabled.add("api.tavily.com");
+  await expect(restarted.restoreJournalHistory(passes)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(h.native).not.toHaveBeenCalled();
  });
  it("composes one Tavily-only investigation across open-web discovery, two independent native sources, model authority, finance and guarded journal",async()=>{

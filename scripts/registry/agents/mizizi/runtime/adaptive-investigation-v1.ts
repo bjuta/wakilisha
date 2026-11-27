@@ -117,7 +117,7 @@ function digest(v:unknown):string{
  return createHash("sha256").update(JSON.stringify(v)).digest("hex");
 }
 function questionKey(s:string):string{return s.normalize("NFKC").toLowerCase().replace(/\s+/g," ").trim();}
-function verifyHistory(id:InvestigationIdentityV1,history:readonly InvestigationPassV1[]){
+export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:readonly InvestigationPassV1[]){
  let prior:string|null=null;
  for(let i=0;i<history.length;i++){
   const pass=history[i];
@@ -169,6 +169,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  readSources:InvestigationReaderV1;analyze:InvestigationAnalystV1;
  verifyFinding:IndependentFindingVerifierV1;
  prepareDeskPass?:DeskPassResearcherV1;
+ /** Trusted, read-only restart gate. False defers without a fabricated pass. */
+ canPrepareDeskPass?:(...args:Parameters<DeskPassResearcherV1>)=>Promise<boolean>;
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  reopen?:Readonly<{sourceEventRef:string;question:string}>;
  verifyReopen?:(sourceEventRef:string,identity:InvestigationIdentityV1,
@@ -197,9 +199,11 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  if(input.prepareDeskPass!==undefined&&(typeof input.prepareDeskPass!=="function"||
     typeof input.authorizeModelProcessing!=="function"))
   throw new Error("MIZIZI_DESK_INDEPENDENT_MODEL_AUTHORITY_REQUIRED");
+ if(input.canPrepareDeskPass!==undefined&&(!input.prepareDeskPass||typeof input.canPrepareDeskPass!=="function"))
+  throw Error("MIZIZI_DESK_RESTART_GATE_INVALID");
  const now=input.now??Date.now;
  const history=[...await store.read(identity)];
- verifyHistory(identity,history);
+ verifyInvestigationHistoryV1(identity,history);
  let latest=history.at(-1);
  if(latest?.decision.action==="conclude")return {
   caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
@@ -230,8 +234,10 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  while(added<input.maxNewPasses&&history.length<input.maxTotalPasses){
   // Do not enter an externally metered desk pass with an exhausted budget.
   if(input.prepareDeskPass&&remainingCost<=0)break;
+  const snapshot=Object.freeze([...history]);
+  if(input.canPrepareDeskPass&&await input.canPrepareDeskPass(identity,question,snapshot)!==true)break;
   const prepared=input.prepareDeskPass?
-   await input.prepareDeskPass(identity,question,Object.freeze([...history])):null;
+   await input.prepareDeskPass(identity,question,snapshot):null;
   const discoveryOnly=prepared?.method==="discovery_only";
   const interrupted=prepared?.method==="interrupted";
   if(interrupted?(!prepared||!isDeskAvailabilityFailureV1(prepared.interruptionCode)||

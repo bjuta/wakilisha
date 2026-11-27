@@ -13,7 +13,7 @@ import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,type DeskBrow
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
-import {verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
+import {verifyInvestigationHistoryV1,verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
 import {serializeDeskToolResultV1,isDeskUnavailableOutcomeV1,type DeskAnthropicOptionsV1,type DeskToolCallV1,type DeskToolLeadV1,type DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
 const SHA=/^[a-f0-9]{64}$/;
@@ -706,7 +706,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   return currentSource(source);
  };
  // Exact stored excerpts must match the current independent custody projection.
- const verifyJournalPass=async(pass:InvestigationPassV1):Promise<boolean>=>{
+ const checkJournalPass=async(pass:InvestigationPassV1,failedHosts?:Set<string>):Promise<boolean>=>{
   if(pass.caseId!==scope.caseId||pass.workspaceId!==scope.workspaceId||
    !Array.isArray(pass.sourceReceipts)||pass.sourceReceipts.length>30)return false;
   const seen=new Set<string>();
@@ -731,13 +731,35 @@ export function createDeskResearchDispatcherV1(options:Options){
     const read=await readReceipt(ref.receiptId);
     if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256)return false;
     deps.add(ref.receiptId);
-    if(read.result.unavailable)unavailableCodes.add(read.result.unavailable.code);
+    if(read.result.unavailable){
+     unavailableCodes.add(read.result.unavailable.code);
+     failedHosts?.add(read.result.unavailable.host);
+    }
     for(const s of read.result.sources)depSources.add(s.source.sourceId);
    }
    if(depSources.size!==seen.size||[...depSources].some(id=>!seen.has(id)))return false;
    if(pass.costUnits===0&&pass.interruptionCode&&!unavailableCodes.has(pass.interruptionCode))return false;
   }
   return true;
+ };
+ const verifyJournalPass=(pass:InvestigationPassV1)=>checkJournalPass(pass);
+ // A new dispatcher has no previous process memory. Reconstruct only the
+ // negative discovery fence from the exact current, independently read
+ // journal. Do not import old source bytes, opaque leads or tool transcripts
+ // into the new lease. A permission or custody failure is never availability.
+ const restoreJournalHistory=async(history:readonly InvestigationPassV1[])=>{
+  verifyInvestigationHistoryV1(identity,history);
+  const failedHosts=new Set<string>();
+  for(const pass of history)if(await checkJournalPass(pass,failedHosts)!==true)
+   fail("HISTORY_CUSTODY_DENIED");
+  live();
+  // Apply only after the complete chain passed; the fence never grants access.
+  for(const host of failedHosts)unavailableHosts.add(host);
+  return Object.freeze(TOOLS.filter(tool=>{
+   if(tool!=="search_web"&&tool!=="search_news")return true;
+   const configured=discovery.get(tool);
+   return !!configured&&!unavailableHosts.has(configured.host);
+  }));
  };
  const verifySources:ResearchSourceVerifierV1=async(job,refs)=>{
   assertScope({jobId:job.jobId,caseId:job.caseId,workspaceId:job.workspaceId,
@@ -755,7 +777,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   return verified;
  };
- return Object.freeze({enabledTools:TOOLS,discoveryHosts,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,
+ return Object.freeze({enabledTools:TOOLS,discoveryHosts,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,restoreJournalHistory,
   tryRetainedBatch,readBatchDependencies,
   closeInteractive:async()=>{if(local)await local.close();}});
 }
