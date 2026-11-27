@@ -462,8 +462,8 @@ begin
    and d.expected_revision=o.expected_revision and d.operational_revision=o.revision
    and d.lease_expires_at is distinct from j.lease_expires_at and d.operation in ('search_web','search_news')
    and lead.kind='reference' and not(d.provenance ? 'sharedNativeSearch') and not(d.result_text::jsonb ? 'unavailable')
-   and exists(select 1 from mizizi_private.research_passes p where p.case_id=d.case_id and p.workspace_id=d.workspace_id and p.job_id=j.id
-    and p.body_text::jsonb->'deskToolReceipts' @> jsonb_build_array(jsonb_build_object('receiptId',d.id,'callSha256',d.call_sha256,'resultSha256',d.result_sha256)))
+   and exists(select 1 from mizizi_private.research_passes journal_pass where journal_pass.case_id=d.case_id and journal_pass.workspace_id=d.workspace_id and journal_pass.job_id=j.id
+    and journal_pass.body_text::jsonb->'deskToolReceipts' @> jsonb_build_array(jsonb_build_object('receiptId',d.id,'callSha256',d.call_sha256,'resultSha256',d.result_sha256)))
    and not exists(select 1 from mizizi_private.desk_tool_receipts_v1 q where q.case_id=d.case_id and
     (q.operation='recall_evidence' and q.provenance->'sameCaseRecall'->>'originLeadId'=lead.id::text
      or q.operation in ('read_page','browse_page') and (q.provenance->>'requestedUrl'=lead.url or q.provenance->>'finalUrl'=lead.url)))
