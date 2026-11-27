@@ -1,4 +1,4 @@
-name: MIZIZI Preview Migration 306 Qualification
+name: MIZIZI Preview Bounded Session Qualification
 on:
   push:
     branches:
@@ -11,128 +11,180 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  preflight:
+  integrated:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      PREVIEW_REF: ehkmjrjjhzyjkxdfsqdc
-      PROD_REF: pgzizndxdyhqmtyywjmt
-      EXPECTED_HEAD: 0901ae5f51dcd1edadb58ffed408d74a855f7a45
     steps:
-      - name: Check out exact approved integration candidate
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: 0901ae5f51dcd1edadb58ffed408d74a855f7a45
+          ref: c903c786dc37f15869c4bbc093c4a5896a58f3c3
           persist-credentials: false
-      - name: Set up pinned Supabase CLI
-        uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: supabase/setup-cli@v1
         with:
           version: 2.107.0
           github-token: ${{ github.token }}
-      - name: Reverify exact protected acceptance and open integration PR
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Check pinned host and current protected candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request,time
-          def get(path):
-              request=urllib.request.Request("https://api.github.com/repos/bjuta/wakilisha/"+path,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"})
-              with urllib.request.urlopen(request,timeout=15) as f: return json.load(f)
-          h=os.environ["EXPECTED_HEAD"]
-          pr=get("pulls/1442")
-          if pr.get("state")!="open" or pr.get("merged") or pr["head"]["sha"]!=h: raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
-          deadline=time.monotonic()+600
-          gates={46043820205:"Critical Control Plane",46043820122:"MIZIZI Slice 1 Disposable PostgreSQL Proof"}
-          while True:
-              pr=get("pulls/1442")
-              if pr.get("state")!="open" or pr.get("merged") or pr.get("draft") or pr["head"]["sha"]!=h:
-                  raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
-              pending=False
-              for number,name in gates.items():
-                  run=get("actions/runs/"+str(number))
-                  if run.get("head_sha")!=h or run.get("event")!="pull_request" or run.get("name")!=name:
-                      raise SystemExit("MIZIZI_PROTECTED_GATE_IDENTITY=STOP")
-                  if run.get("status")!="completed":
-                      pending=True
-                  elif run.get("conclusion")!="success":
-                      raise SystemExit("MIZIZI_PROTECTED_GATE=STOP:"+name)
-              if not pending: break
-              if time.monotonic()>=deadline: raise SystemExit("MIZIZI_PROTECTED_GATE_TIMEOUT=STOP")
-              time.sleep(15)
-          print("MIZIZI_EXACT_PROTECTED_ACCEPTANCE=PASS")
-          PY
-      - name: Non-secret availability and migration preflight, exact Preview forward apply
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          test "$(git rev-parse HEAD)" = c903c786dc37f15869c4bbc093c4a5896a58f3c3
+          gh api repos/bjuta/wakilisha/pulls/1442 --jq '.head.sha+" "+(.draft|tostring)+" "+(.merged|tostring)' | grep -Fx 'c903c786dc37f15869c4bbc093c4a5896a58f3c3 true false'
+          for run in 46043820205 46043820122; do
+            gh api repos/bjuta/wakilisha/actions/runs/$run --jq '.head_sha+" "+.conclusion' | grep -Fx '0901ae5f51dcd1edadb58ffed408d74a855f7a45 success'
+          done
+          image=mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+          docker pull "$image"
+          echo "MIZIZI_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$image")" >> "$GITHUB_ENV"
+      - name: Requalify isolated connected browser without provider or hosted credentials
         shell: bash
         run: |
           set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import {createHash,randomUUID} from "node:crypto";
+          import {createDockerDeskBrowserHostV1} from "./scripts/registry/agents/mizizi/runtime/desk-docker-browser-host-v1.mjs";
+          import {withDeskInteractiveBrowserV1} from "./scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
+          const hash=x=>createHash("sha256").update(x).digest("hex");
+          const fingerprint=hash("synthetic qualification only:"+process.env.MIZIZI_IMAGE_ID);
+          const scope={jobId:randomUUID(),caseId:randomUUID(),workspaceId:randomUUID(),expectedRevision:1,workerId:"mizizi-chart:"+randomUUID(),leaseExpiresAt:new Date(Date.now()+110000).toISOString()};
+          const host=await createDockerDeskBrowserHostV1({accountFingerprint:fingerprint,imageId:process.env.MIZIZI_IMAGE_ID,dependenciesDirectory:process.cwd()+"/node_modules",authorizeHost:async()=>null,captureVisual:true});
+          // No operational grant is fabricated. Direct adapter transport test
+          // with synthetic source only, never the durable worker or finance.
+          const binding={scope,accountFingerprint:fingerprint,reserveSeconds:120,mode:"interactive"};
+          const id=randomUUID(),control=new AbortController();
+          const url="https://archive.org/catalogue";
+          const body=new TextEncoder().encode('<html><body><main><button aria-expanded="false" onclick="this.setAttribute(\'aria-expanded\',\'true\');document.getElementById(\'credit\').hidden=false">Reveal credits</button><p id="credit" hidden>Connected host evidence</p></main></body></html>');
+          try {
+            const browser=await host.open(binding,id,control.signal);
+            console.log("MIZIZI_CONNECTED_HOST_OPEN=PASS");
+            await assert.rejects(host.open(binding,randomUUID(),control.signal));
+            const evidence=await withDeskInteractiveBrowserV1({browser,scope,authorizeAction:async b=>b.operation!=="navigate"||b.url===url,authorizeRequest:async b=>b.url===url,readResource:async(b,digest)=>b.url===url?{requestSha256:digest,status:200,contentType:"text/html",body,sha256:hash(body)}:null},async session=>{
+              let o=await session.navigate(url);
+              const button=o.elements.find(e=>e.kind==="expand"&&e.label==="Reveal credits");
+              assert.ok(button);
+              o=await session.expand(button.ref,o.generation);
+              assert.ok(o.visibleText.includes("Connected host evidence"));
+              return session.capture({visual:true});
+            });
+            assert.equal(evidence.sha256,hash(evidence.body));
+            assert.equal(evidence.visual.sha256,hash(evidence.visual.body));
+            console.log("MIZIZI_CONNECTED_HOST_INTERACTION_AND_CAPTURE=PASS");
+          } finally {
+            assert.equal(await host.close(id,AbortSignal.timeout(10000)),true);
+          }
+          assert.equal(await host.close(id,AbortSignal.timeout(5000)),true);
+          console.log("MIZIZI_CONNECTED_HOST_CLEANUP=PASS");
+          const abortId=randomUUID(),abort=new AbortController();
+          const opening=host.open(binding,abortId,abort.signal);
+          abort.abort();
+          await assert.rejects(opening);
+          assert.equal(await host.close(abortId,AbortSignal.timeout(10000)),true);
+          console.log("MIZIZI_CONNECTED_HOST_ABORT_CLEANUP=PASS");
+          JS
+          test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
+          echo MIZIZI_CONNECTED_HOST_NO_RESIDUE=PASS
+      - name: Preview-only temporary session qualification and cleanup
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
           umask 077
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          test "$(find supabase/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')" = 306
-          test "$(sha256sum supabase/migrations/20261127171129_mizizi_desk_factual_note_custody.sql | cut -d ' ' -f1)" = 56097391bb50dee68e102ab71ab3cd5cee72a9d037c0173ea62209da72cd4be4
-          echo "MIZIZI_PREFLIGHT_EXACT_CANDIDATE=PASS"
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "MIZIZI_MANAGEMENT_CREDENTIAL=MISSING"
-            exit 1
-          fi
-          echo "MIZIZI_MANAGEMENT_CREDENTIAL=PRESENT"
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$MIZIZI_PREVIEW_ANTHROPIC_API_KEY"
           scratch="$(mktemp -d)"
-          trap 'rm -rf "$scratch"' EXIT
-          # CLI-native forward plan. Only the approved Preview database may
-          # change; no secret mutation, provider calls, or runtime fixtures.
-          if ! supabase link --project-ref "$PREVIEW_REF" >"$scratch/link" 2>&1; then
-            echo "MIZIZI_PREVIEW_LINK=UNCONFIRMED"; exit 1
-          fi
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          echo "MIZIZI_PREVIEW_LINK=PASS"
-          if ! supabase db push --dry-run --linked >"$scratch/dry" 2>&1; then
-            echo "MIZIZI_PREVIEW_DRY_RUN=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/dry" <<'PY'
-          import pathlib,re,sys
-          actual=sorted(set(re.findall(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",pathlib.Path(sys.argv[1]).read_text())))
-          expected=["20261127171129_mizizi_desk_factual_note_custody.sql"]
-          if actual!=expected:
-              print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=STOP")
-              print("expected_count="+str(len(expected))+" actual_count="+str(len(actual)))
-              raise SystemExit(1)
-          print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=PASS")
-          print("MIZIZI_PREVIEW_DRY_RUN_COUNT=1")
-          PY
-          echo "MIZIZI_PREVIEW_EXACT_DELTA=PASS"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          test "$PREVIEW_REF" = "ehkmjrjjhzyjkxdfsqdc"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          export SUPABASE_PROJECT_REF="$PREVIEW_REF"
-          # Explicitly discover the noninteractive CLI contract before write.
-          supabase db push --help >"$scratch/push-help" 2>&1
-          grep -q -- '--yes' "$scratch/push-help"
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=START"
-          if ! supabase db push --linked --yes >"$scratch/apply" 2>&1; then
-            python3 - "$scratch/apply" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          print("MIZIZI_PREVIEW_FORWARD_APPLY=STOP")
-          for m in re.findall(r"Applying migration ([0-9]{14}_[A-Za-z0-9_-]+\.sql)",data): print("MIZIZI_ATTEMPTED_MIGRATION="+m)
-          for state in set(re.findall(r"SQLSTATE ([A-Z0-9]{5})",data)): print("MIZIZI_SQLSTATE="+state)
-          PY
+          trap 'rm -rf "$scratch" .mizizi-integrated-run.mjs; rm -rf supabase/.temp' EXIT
+          if ! supabase link --project-ref ehkmjrjjhzyjkxdfsqdc >"$scratch/link" 2>&1; then echo MIZIZI_PREVIEW_LINK=STOP; exit 1; fi
+          test "$(cat supabase/.temp/project-ref)" = ehkmjrjjhzyjkxdfsqdc
+          # Same production trust anchor bundled in the pinned Supabase CLI 2.107.0.
+          curl --fail --silent --show-error --proto '=https' --max-time 30 'https://raw.githubusercontent.com/supabase/cli/v2.107.0/apps/cli-go/internal/gen/types/templates/prod-ca-2021.crt' -o "$scratch/prod-ca-2021.crt"
+          test "$(git hash-object "$scratch/prod-ca-2021.crt")" = 3d693669b23c340c57a3457bdc8b6fefe1806cc5
+          openssl x509 -in "$scratch/prod-ca-2021.crt" -noout -checkend 3600
+          pooler_host="$(node -e 'const u=new URL(require("fs").readFileSync("supabase/.temp/pooler-url","utf8").trim());if(!/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(u.hostname)||!u.username.endsWith(".ehkmjrjjhzyjkxdfsqdc"))process.exit(1);process.stdout.write(u.hostname)')" || { echo MIZIZI_POOLER_HOST_VALIDATION=STOP; exit 1; }
+          echo MIZIZI_POOLER_HOST_VALIDATION=PASS
+          if ! timeout 30 openssl s_client -starttls postgres -connect "$pooler_host:5432" -servername "$pooler_host" -verify_hostname "$pooler_host" -CAfile "$scratch/prod-ca-2021.crt" -verify_return_error </dev/null >"$scratch/tls-check" 2>&1; then
+            echo MIZIZI_PINNED_POOLER_TLS=STOP
+            grep -E "verify error:num=|Verify return code:|Verification error:" "$scratch/tls-check" || true
             exit 1
           fi
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=COMMAND_SUCCEEDED"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          if ! supabase db push --dry-run --linked >"$scratch/post" 2>&1; then
-            echo "MIZIZI_PREVIEW_POSTFLIGHT=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/post" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text()
-          if re.search(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",data):
-              raise SystemExit("MIZIZI_PREVIEW_POSTFLIGHT_PENDING=STOP")
-          print("MIZIZI_PREVIEW_POSTFLIGHT_ZERO_PENDING=PASS")
-          PY
-          echo "MIZIZI_PREVIEW_SCHEMA_QUALIFICATION=PASS"
-
+          grep -Fq 'Verify return code: 0 (ok)' "$scratch/tls-check"
+          echo MIZIZI_PINNED_POOLER_TLS=PASS
+          export NODE_EXTRA_CA_CERTS="$scratch/prod-ca-2021.crt"
+          cat > .mizizi-integrated-run.mjs <<'MIZIZI_RUNNER'
+          import {createHash,createHmac,pbkdf2Sync,randomBytes,randomUUID} from "node:crypto";
+          import {readFileSync,writeFileSync,mkdtempSync,rmSync} from "node:fs";
+          import {createClient} from "@supabase/supabase-js";
+          import pg from "pg";
+          import {validatePreviewCalibrationJitUrlV1} from "./scripts/registry/agents/mizizi/runtime/run-preview-chart-calibration-v1.ts";
+          const ref="ehkmjrjjhzyjkxdfsqdc", root="https://"+ref+".supabase.co",api="https://api.supabase.com/v1/projects/"+ref;
+          const ws="70555b3d-07b6-41a2-b1b9-7d88f9a5a3ea";
+          const caseIds=["84c42a4c-2ffe-4fee-928d-8ba618b82da7","99a1fc20-2af1-4137-b398-a5e8c175babc","a669dcae-c8f9-4199-9e18-bee56c72e20c"];
+          const anthropicWorkspace="wrkspc_01HcEs7qPApMFiBvMA5wt1dn",credential="1e3d775fdfd5e8ab00bc48acedf48aa56207a1957c5e25c24e753f996d2a6380";
+          // Founder authorized a maximum 60-minute temporary session; issue only 25 minutes.
+          const approvedExpiry=new Date(Date.now()+25*60000).toISOString();
+          const hash=x=>createHash("sha256").update(x).digest("hex"),fail=()=>{throw Error("STOP")},check=x=>{if(!x)fail()},note=x=>console.log("MIZIZI_"+x+"=PASS");
+          const token=process.env.SUPABASE_ACCESS_TOKEN,key=process.env.MIZIZI_PREVIEW_ANTHROPIC_API_KEY,imageId=process.env.MIZIZI_IMAGE_ID;
+          const dir=mkdtempSync(process.cwd()+"/.mizizi-private-");const opts={auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
+          const mask=x=>{if(x)console.log("::add-mask::"+x)};
+          let stage="PREFLIGHT",uid=null,issued=null,operator=null,admin=null,email=null,expiry=null,failed=false;
+          const request=async(url,headers,body,method)=>{
+           const res=await fetch(url,{headers,method:method??(body===undefined?"GET":"POST"),...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:"error",signal:AbortSignal.timeout(30000)});
+           if(!res.ok)throw Object.assign(Error("HTTP"),{httpStatus:res.status});
+           const b=await res.text();check(b.length<=4000000);return b?JSON.parse(b):null;
+          };
+          const mgmt={Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"};
+          const sql=async q=>{const r=await request(api+"/database/query",mgmt,{query:q});check(Array.isArray(r));return r};
+          const one=async q=>{const a=await sql(q);check(a.length===1);return a[0]};
+          const roleGuard="select current_user='postgres' and exists(select 1 from pg_roles where rolname=current_user and rolcreaterole) and exists(select 1 from pg_auth_members m join pg_roles r on r.oid=m.roleid join pg_roles p on p.oid=m.member where r.rolname='mizizi_executor' and p.rolname=current_user and m.admin_option) and exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolcanlogin and not rolsuper and not rolcreaterole and not rolcreatedb and not rolbypassrls and not rolreplication and not rolinherit and (rolvaliduntil is null or rolvaliduntil<=clock_timestamp())) and not exists(select 1 from pg_stat_activity where usename='mizizi_executor') and not exists(select 1 from pg_auth_members m join pg_roles r on r.oid=m.member where r.rolname='mizizi_executor') and exists(select 1 from platform_private.system_actor_executor_bindings where actor_key='mizizi' and executor_kind='database_role' and executor_key='mizizi_executor' and status='active') and exists(select 1 from platform_private.system_actor_executor_bindings where actor_key='mizizi' and executor_kind='database_role' and executor_key='postgres' and status='disabled') and not has_schema_privilege('mizizi_executor','platform_private','USAGE') and not has_table_privilege('mizizi_executor','public.registry_tracks','UPDATE') and not has_table_privilege('mizizi_executor','public.registry_releases','UPDATE') and not has_table_privilege('mizizi_executor','public.registry_artists','UPDATE') and not has_table_privilege('mizizi_executor','public.wk_chart_entries_v2','UPDATE') as allowed";
+          const rpcOf=client=>async(fn,args)=>{const r=await client.rpc(fn,args);return {data:r.data,error:r.error?{message:"RPC_REJECTED"}:null}};
+          const caseSet=caseIds.map(x=>"'"+x+"'").join(",");
+          const preimage="select (select count(*) from supabase_migrations.schema_migrations)=306 and (select max(version) from supabase_migrations.schema_migrations)='20261127171129' and (select count(*) from mizizi_private.cases)=497 and (select count(*) from platform_private.jobs where job_type='mizizi.case_research_v1')=6 and (select count(*) from mizizi_private.cases where id in ("+caseSet+") and workspace_id='"+ws+"' and revision=1 and case_state='open' and current_stage='triage')=3 and not exists(select 1 from platform_private.jobs where resource_id in ("+caseSet+")) and not exists(select 1 from mizizi_private.desk_operational_policy_versions_v1 where case_id in ("+caseSet+")) and (select count(*) from mizizi_private.desk_operational_policy_versions_v1)=7 and (select count(*) from mizizi_private.desk_factual_notes_v1)=0 and (select count(*) from mizizi_private.desk_factual_note_reviews_v1)=0 and (select count(*) from mizizi_private.desk_tool_receipts_v1)=0 and (select count(*) from mizizi_private.desk_resource_reservations_v1 where resource='anthropic')=4 and (select sum(mizizi_private.desk_resource_encumbered_units_v1(r)) from mizizi_private.desk_resource_reservations_v1 r where resource='anthropic')=5785 and (select count(*) from mizizi_private.desk_search_reservations_v1)=2 and (select array_agg(capability_key order by capability_key) from public.role_capabilities where role_key='mizizi_preview_calibration')=array['manage_charts','manage_registry'] as ok";
+          try{
+           stage="PREFLIGHT_ENV";check(token&&key&&/^sha256:[a-f0-9]{64}$/.test(imageId??"")&&Date.now()+5*60000<Date.parse(approvedExpiry));note("PREFLIGHT_ENV");
+           stage="PREFLIGHT_CREDENTIAL_BINDING";check(hash(JSON.stringify(["mizizi:anthropic:credential:v1",anthropicWorkspace,key]))===credential);note("PREFLIGHT_CREDENTIAL_BINDING");
+           stage="PREFLIGHT_DATABASE";check((await one(preimage)).ok===true);note("PREFLIGHT_DATABASE");stage="PREFLIGHT_ROLE";check((await one(roleGuard)).allowed===true);note("PREFLIGHT_ROLE");
+           stage="PREFLIGHT_LINK";check(readFileSync("supabase/.temp/project-ref","utf8").trim()===ref);note("PREFLIGHT_LINK");stage="PREFLIGHT_POOLER";
+           const url=new URL(readFileSync("supabase/.temp/pooler-url","utf8").trim());check(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.pooler\.supabase\.com$/.test(url.hostname)&&url.pathname==="/postgres"&&url.username.endsWith("."+ref));
+           note("PREFLIGHT_POOLER");note("EXACT_PREFLIGHT");
+           stage="KEY_SCOPE";
+           const keys=await request(api+"/api-keys?reveal=true",mgmt);
+           const scoped=role=>{const a=keys.filter(x=>x.name===role);check(a.length===1);const k=a[0].api_key;mask(k);const p=k.split(".");check(p.length===3);const c=JSON.parse(Buffer.from(p[1],"base64url").toString());check(c.ref===ref&&c.role===role);return k};
+           const service=scoped("service_role"),anon=scoped("anon");admin={apikey:service,Authorization:"Bearer "+service,"Content-Type":"application/json"};
+           stage="STEWARD_CREATE";email="mizizi-preview-integrated-"+randomUUID().replaceAll("-","")+"@example.test";const pass="Aa1!"+randomBytes(36).toString("base64url");mask(pass);
+           const user=await request(root+"/auth/v1/admin/users",admin,{email,password:pass,email_confirm:true});uid=user.id;check(/^[a-f0-9-]{36}$/.test(uid)&&user.email===email);
+           stage="STEWARD_GRANT";
+           await sql("begin; do $g$ begin if not (select ok from ("+preimage+") q) or not exists(select 1 from auth.users where id='"+uid+"' and email='"+email+"') then raise exception 'STOP_INTEGRATED_PREIMAGE';end if;end $g$; insert into public.user_role_assignments(user_id,role_key,status,expires_at,notes) values('"+uid+"','mizizi_preview_calibration','active','"+approvedExpiry+"'::timestamptz,'Founder authorized bounded Preview session qualification, 27 November 2026'); insert into mizizi_private.workspace_memberships(workspace_id,user_id,member_role,grant_source,valid_from,valid_until,granted_by,last_changed_by,change_reason) values('"+ws+"','"+uid+"','steward','operator_review',transaction_timestamp(),'"+approvedExpiry+"'::timestamptz,'"+uid+"','"+uid+"','Management bootstrap for founder-authorized temporary technical session; not independent case review');commit;");
+           const grant=await one("select m.valid_until as expires_at,(a.expires_at=m.valid_until and m.valid_until>clock_timestamp() and m.valid_until<=clock_timestamp()+interval '40 minutes') as bounded from mizizi_private.workspace_memberships m join public.user_role_assignments a on a.user_id=m.user_id and a.role_key='mizizi_preview_calibration' where m.user_id='"+uid+"' and m.revoked_at is null and a.status='active'");check(grant.bounded===true);expiry=new Date(grant.expires_at).toISOString();note("STEWARD_GRANT");
+           stage="GENUINE_OPERATOR";operator=createClient(root,anon,opts);const login=await operator.auth.signInWithPassword({email,password:pass});check(!login.error&&login.data.user?.id===uid&&login.data.session?.access_token);const jwt=login.data.session.access_token;mask(jwt);mask(login.data.session.refresh_token);
+           for(const [cap,expected] of [["manage_registry",true],["manage_charts",true],["manage_users",false],["publish_charts",false]]){const v=await operator.rpc("current_user_has_capability",{required_capability:cap});check(!v.error&&v.data===expected)}note("GENUINE_STEWARD_JWT");
+           stage="NARROW_EXECUTOR";const password=randomBytes(32).toString("base64url");mask(password);const salt=randomBytes(16),salted=pbkdf2Sync(password,salt,4096,32,"sha256"),stored=createHash("sha256").update(createHmac("sha256",salted).update("Client Key").digest()).digest("base64"),server=createHmac("sha256",salted).update("Server Key").digest("base64");const verifier="SCRAM-SHA-256$4096:"+salt.toString("base64")+"$"+stored+":"+server;mask(verifier);issued={verifier,expiry};
+           await sql("do $g$ begin if not (select allowed from ("+roleGuard+") q) then raise exception 'STOP_ROLE_PREIMAGE';end if; alter role mizizi_executor password '"+verifier+"' valid until '"+expiry+"';end $g$;");
+           check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword='"+verifier+"' and rolvaliduntil='"+expiry+"'::timestamptz) as ok")).ok===true);
+           url.username="mizizi_executor."+ref;url.password=password;url.port="5432";url.search="";url.searchParams.set("options","-c jit=true");url.hash="";mask(url.href);validatePreviewCalibrationJitUrlV1(url.href,url.hostname,5432);
+           stage="EXECUTOR_TLS";for(let n=0;n<2;n++){const pool=new pg.Pool({connectionString:url.href,ssl:{rejectUnauthorized:true},max:1,connectionTimeoutMillis:10000,query_timeout:30000,statement_timeout:30000});try{const l=await pool.query("select session_user::text as role,current_database() as db");check(l.rowCount===1&&l.rows[0].role==="mizizi_executor"&&l.rows[0].db==="postgres");await pool.query("select mizizi_private.assert_executor_v1()");break}catch(e){if(n!==0||e.code!=="28P01")throw e;await new Promise(r=>setTimeout(r,15000))}finally{await pool.end()}}note("NARROW_EXECUTOR_TLS");
+           stage="AUTH_READBACK";const current=await operator.auth.getUser(jwt);check(!current.error&&current.data.user?.id===uid);note("GENUINE_OPERATOR_READBACK");
+           stage="NO_RESEARCH_MUTATION";check((await one(preimage)).ok===true);note("NO_RESEARCH_MUTATION");
+           // No case admission, policy grant, model call, or provider search.
+          }catch(e){failed=true;const code=String(e?.message??"");console.log("MIZIZI_STOP_STAGE="+stage);if(/^MIZIZI_[A-Z0-9_]+$/.test(code))console.log("MIZIZI_STOP_CODE="+code);if(Number.isInteger(e?.httpStatus))console.log("MIZIZI_STOP_HTTP="+e.httpStatus);if(/^[A-Z0-9_]{3,40}$/.test(String(e?.code??"")))console.log("MIZIZI_STOP_LAYER_CODE="+e.code)}
+          finally{
+           if(issued){try{await sql("do $g$ begin if exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolvaliduntil='"+issued.expiry+"'::timestamptz and (rolpassword='"+issued.verifier+"' or rolpassword is null)) then alter role mizizi_executor password null valid until '1970-01-01 00:00:00+00'; elsif not exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) then raise exception 'STOP_CREDENTIAL_CHANGED';end if;end $g$;");check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) as ok")).ok===true);note("EXECUTOR_REVOKED")}catch{failed=true;console.log("MIZIZI_EXECUTOR_REVOKED=UNCONFIRMED")}}
+           if(uid&&/^[a-f0-9-]{36}$/.test(uid)){try{await sql("begin; update public.user_role_assignments set status='revoked' where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active'; update mizizi_private.workspace_memberships set revoked_at=clock_timestamp(),revision=revision+1,last_changed_by='"+uid+"',change_reason='Integrated technical run ended; revoke temporary steward' where user_id='"+uid+"' and workspace_id='"+ws+"' and revoked_at is null;commit;");check((await one("select not exists(select 1 from public.user_role_assignments where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active') and not exists(select 1 from mizizi_private.workspace_memberships where user_id='"+uid+"' and revoked_at is null) as ok")).ok===true);note("STEWARD_REVOKED")}catch{failed=true;console.log("MIZIZI_STEWARD_REVOKED=UNCONFIRMED")}}
+           if(operator){try{const out=await operator.auth.signOut({scope:"global"});check(!out.error);note("SESSION_SIGNED_OUT")}catch{failed=true;console.log("MIZIZI_SESSION_SIGNED_OUT=UNCONFIRMED")}}
+           for(const k of ["MIZIZI_PREVIEW_ANON_KEY","MIZIZI_PREVIEW_SERVICE_ROLE_KEY","MIZIZI_PREVIEW_OPERATOR_JWT","MIZIZI_PREVIEW_JIT_DATABASE_URL","MIZIZI_PREVIEW_ANTHROPIC_API_KEY","SUPABASE_ACCESS_TOKEN"])delete process.env[k];rmSync(dir,{recursive:true,force:true});
+          }
+          if(!failed){try{check((await one(preimage)).ok===true);check((await one(roleGuard)).allowed===true);note("POSTFLIGHT_NO_RESEARCH_MUTATION_AND_EXECUTOR_CLEANUP")}catch{failed=true;console.log("MIZIZI_POSTFLIGHT=STOP")}}
+          if(failed)process.exitCode=1;
+          
+          MIZIZI_RUNNER
+          node --check .mizizi-integrated-run.mjs
+          node_modules/.bin/tsx .mizizi-integrated-run.mjs
+      - name: Verify browser cleanup
+        if: always()
+        run: test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
