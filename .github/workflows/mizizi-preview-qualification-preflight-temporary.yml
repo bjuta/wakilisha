@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: c84cde19c78d7943cd8a5f3343a7d7c397d48b82
+          ref: b1466796f4ae75ca37b16a037d0c51daec493c7e
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -25,7 +25,7 @@ jobs:
       - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = c84cde19c78d7943cd8a5f3343a7d7c397d48b82
+          test "$(git rev-parse HEAD)" = b1466796f4ae75ca37b16a037d0c51daec493c7e
           test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
           test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
           test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
