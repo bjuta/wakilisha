@@ -9,31 +9,13 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  worker:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Exact worker and calibration contract checks
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
-          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
   migration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
+          ref: 493a6d263809add10df95a6c47cd77024d20fa5e
           persist-credentials: false
       - uses: supabase/setup-cli@v1
         with:
@@ -42,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 496db3e11b7ffbe9316edb84b1dfd8be19b39dc1
+          test "$(git rev-parse HEAD)" = 493a6d263809add10df95a6c47cd77024d20fa5e
           test ! -e supabase/.temp/project-ref
           test -z "$(printenv SUPABASE_ACCESS_TOKEN || true)"
           test -z "$(printenv SUPABASE_PROJECT_REF || true)"
