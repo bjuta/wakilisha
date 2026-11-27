@@ -115,9 +115,9 @@ begin
  or (p_decision='revoked' and p_model_processing_allowed)
  or p_review_ref is null or length(p_review_ref) not between 8 and 500 or btrim(p_review_ref)<>p_review_ref or p_review_ref ~ '[[:cntrl:]]'
  or p_valid_until is null or not isfinite(p_valid_until) or p_valid_until<=clock_timestamp() or p_valid_until>clock_timestamp()+interval '24 hours'
- or p_acknowledgement is distinct from case when p_decision='admitted'
+ or p_acknowledgement is distinct from (case when p_decision='admitted'
  then 'I independently reviewed this exact original note, consultation method, provenance and permitted use; this is not factual verification.'
- else 'I revoke this exact factual note admission.' end
+ else 'I revoke this exact factual note admission.' end )
  then raise exception 'Invalid factual note review' using errcode='22023';end if;
  perform pg_advisory_xact_lock(214781521,61431);
  select * into n from mizizi_private.desk_factual_notes_v1 where note_id=p_note_id;
