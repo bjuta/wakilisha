@@ -4,8 +4,8 @@
  * Local checkpoints contain private case coordinates, never credentials.
  */
 import {createHash} from "node:crypto";
-import {open,readFile,stat} from "node:fs/promises";
-import {resolve} from "node:path";
+import {open,readFile,stat,lstat} from "node:fs/promises";
+import {resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createClient} from "@supabase/supabase-js";
 import pg from "pg";
@@ -34,7 +34,7 @@ type Manifest=Readonly<{
   policyReviewRef:string;sourceReviewRef:string;financeReviewRef:string;runtimeReviewRef:string;
   model:DeskModelCandidateV1;credentialSha256:string;nativeAccountFingerprint:string;
   maximumCostMicrousd:number;costBudgetUnits:number;maxTotalPasses:number;
-  executorHost:string;discovery?:DeskDiscoveryConfigurationV1;
+  executorHost:string;executorPort:number;discovery?:DeskDiscoveryConfigurationV1;
   browser?:Readonly<{imageId:string;accountFingerprint:string;qualificationRef:string;validUntil:string;captureVisual:boolean}>;
  }>;
 }>;
@@ -42,7 +42,7 @@ type Transition=Awaited<ReturnType<typeof beginChartCalibrationCaseV1>>;
 type Mode="admit"|"execute"|"resume";
 async function exactFile(path:string,digest:string,max=2000000){
  if(!SHA.test(digest))fail("REVIEW_DIGEST_REQUIRED");
- const s=await stat(path);if(!s.isFile()||s.size<2||s.size>max||(s.mode&0o077)!==0)fail("PRIVATE_FILE_REQUIRED");
+ const s=await lstat(path);if(!s.isFile()||s.size<2||s.size>max||(s.mode&0o077)!==0)fail("PRIVATE_FILE_REQUIRED");
  const b=await readFile(path);if(hash(b)!==digest)fail("REVIEW_DIGEST_MISMATCH");
  return JSON.parse(b.toString("utf8"));
 }
@@ -60,7 +60,8 @@ export async function readPreviewCalibrationManifestV1(path:string,digest:string
    !Number.isSafeInteger(c.maximumCostMicrousd)||c.maximumCostMicrousd<1||c.maximumCostMicrousd>600000||
    !Number.isSafeInteger(c.costBudgetUnits)||c.costBudgetUnits<1||c.costBudgetUnits>1000||
    !Number.isSafeInteger(c.maxTotalPasses)||c.maxTotalPasses<1||c.maxTotalPasses>3||
-   !/^[a-z0-9.-]+\.supabase\.co$/.test(c.executorHost))fail("CASE_RUNTIME_SCOPE");
+   c.executorHost!=="db."+REF+".supabase.co"||!Number.isSafeInteger(c.executorPort)||
+   c.executorPort<1||c.executorPort>65535)fail("CASE_RUNTIME_SCOPE");
   if(!c.model||c.model.batchEligible===true||c.model.family!=="haiku"||
    !Number.isSafeInteger(c.model.maxInputTokens)||c.model.maxInputTokens<1||c.model.maxInputTokens>1000000)
    fail("MODEL_REVIEW_REQUIRED");
@@ -102,6 +103,16 @@ async function requireOperator(m:Manifest){
  }
  return rpc;
 }
+async function requirePrivateOutput(prefix:string){
+ const parent=await stat(dirname(resolve(prefix)));
+ if(!parent.isDirectory()||(parent.mode&0o077)!==0)fail("PRIVATE_OUTPUT_REQUIRED");
+ // Checkpoint files are not overwritten even on retry. SQL remains the
+ // authoritative state if a process stops after mutation and before fsync.
+ for(const stage of ["admission","transition","dispatch","worker"]){
+  try{await lstat(prefix+"."+stage+".json");fail("CHECKPOINT_ALREADY_EXISTS");}
+  catch(e){if((e as NodeJS.ErrnoException)?.code!=="ENOENT")throw e;}
+ }
+}
 async function checkpoint(path:string,receipt:unknown){
  const b=Buffer.from(JSON.stringify(receipt)+"\n"),file=await open(path,"wx",0o600);
  try{await file.writeFile(b);await file.sync();}finally{await file.close();}
@@ -113,6 +124,7 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
   (mode==="admit"&&args.length!==4)||(mode==="execute"&&args.length!==5)||(mode==="resume"&&args.length!==7))
   fail("ARGUMENTS");
  const m=await readPreviewCalibrationManifestV1(manifestPath,digest,mode as Mode);
+ await requirePrivateOutput(outputPrefix);
  const key=env("MIZIZI_PREVIEW_SERVICE_ROLE_KEY");validateLegacyKey(key,"service_role");
  const service=createClient(ROOT,key,clientOptions),serviceRpc=rpcOf(service);
  const plan=await prepareChartCalibrationV1({serviceRpc,expectedInputSha256:m.inputSha256,targets:m.targets});
@@ -160,7 +172,7 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
   }}):undefined;
  const dsn=env("MIZIZI_PREVIEW_JIT_DATABASE_URL"),url=new URL(dsn);
  if(!["postgres:","postgresql:"].includes(url.protocol)||url.hostname!==c.executorHost||
-  url.username!=="mizizi_executor"||url.pathname!=="/postgres"||url.search||url.hash||!url.password)
+  url.port!==String(c.executorPort)||url.username!=="mizizi_executor"||url.pathname!=="/postgres"||url.search||url.hash||!url.password)
   fail("JIT_ENDPOINT_SCOPE");
  // The reviewed exact host is required; no guessed port, role switching,
  // disabled TLS verification or fallback to a management connection.
