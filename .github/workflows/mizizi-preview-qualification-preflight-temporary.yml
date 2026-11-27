@@ -1,29 +1,67 @@
-name: MIZIZI Consolidated Batch Focused Verification
+name: MIZIZI Consolidated Migration 300 Local Replay
 on:
   push:
     branches: [ops/mizizi-preview-qualification-preflight-20261127]
 permissions:
   contents: read
 jobs:
-  focused:
+  replay:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 83fe705144c31b82ad78bf9e05de26a3b2843d2f
+          ref: c8109a979340a7311b2bd3e357ff3ee827bdc4e1
           persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Verify exact draft candidate without hosted credentials
+      - name: Verify exact candidate and absence of hosted authority
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "83fe705144c31b82ad78bf9e05de26a3b2843d2f"
+          test "$(git rev-parse HEAD)" = "c8109a979340a7311b2bd3e357ff3ee827bdc4e1"
           test ! -e supabase/.temp/project-ref
           test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          test -z "${SUPABASE_PROJECT_REF:-}"
           test -z "${ANTHROPIC_API_KEY:-}"
-          npm ci --no-audit --no-fund
-          npx vitest run test/registry/mizizi-research-worker-cycle.test.ts
-          echo MIZIZI_BATCH_FOCUSED_VERIFICATION=PASS
+          node --check scripts/acceptance/charts2-real-jwt-registry-ci.mjs
+          echo WK_CI_NO_REMOTE_TARGET=PASS
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+      - name: Replay the exact 300 migrations locally
+        run: |
+          set -euo pipefail
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          echo WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS
+      - name: Verify migration ledger and private batch authority
+        run: |
+          set -euo pipefail
+          DB="$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -n "$DB"
+          test "$(printf '%s\n' "$DB" | wc -l | tr -d ' ')" = 1
+          test "$(docker exec -i "$DB" psql -X -qAt -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c "select count(*)::text||'|'||max(version) from supabase_migrations.schema_migrations")" = "300|20261127060705"
+          docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < scripts/control-plane/verify-charts2-evidence-privacy-v1.sql
+          echo WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS
+          docker exec -i "$DB" psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres <<'SQL'
+          do $proof$ begin
+            if (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='mizizi_private' and c.relname in ('desk_async_batch_requests_v1','desk_async_batch_events_v1') and c.relrowsecurity and c.relforcerowsecurity)<>2
+             or has_table_privilege('service_role','mizizi_private.desk_async_batch_requests_v1','INSERT')
+             or has_table_privilege('authenticated','mizizi_private.desk_async_batch_events_v1','SELECT')
+             or has_function_privilege('anon','public.mizizi_probe_desk_retained_batch_v1(jsonb)','EXECUTE')
+             or has_function_privilege('authenticated','public.mizizi_begin_desk_async_batch_v1(jsonb,text,text,uuid,text)','EXECUTE')
+             or has_function_privilege('mizizi_executor','public.mizizi_record_desk_async_batch_v1(uuid,text,text,text,text,jsonb)','EXECUTE')
+             or not has_function_privilege('service_role','public.mizizi_read_desk_async_batch_v1(jsonb,text,text,text,text)','EXECUTE')
+             or exists(select 1 from mizizi_private.desk_async_batch_requests_v1)
+             or exists(select 1 from mizizi_private.desk_async_batch_events_v1)
+             or exists(select 1 from mizizi_private.desk_operational_policy_versions_v1 where public_opening_batch_allowed or public_retained_batch_allowed)
+             or exists(select 1 from mizizi_private.desk_custody_policy_versions_v1 where batch_open_license_allowed)
+            then raise exception 'STOP_BATCH_LOCAL_DEFAULTS_OR_ACL';end if;
+          end $proof$;
+          SQL
+          echo MIZIZI_BATCH_LOCAL_REPLAY_ACL_DEFAULT_DENY=PASS
+      - name: Destroy all disposable local database containers and volumes
+        if: always()
+        run: |
+          set -euo pipefail
+          supabase stop --no-backup
+          test -z "$(docker ps --filter 'name=^supabase_db_' --format '{{.Names}}')"
+          test -z "$(docker volume ls --filter 'label=com.supabase.cli.project=wakilisha' --format '{{.Name}}')"
+          echo WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS
