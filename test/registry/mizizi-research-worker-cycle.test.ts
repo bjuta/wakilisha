@@ -122,6 +122,10 @@ describe("Actual MIZIZI shared worker transport lifecycle adapter",()=>{
   expect(calls.at(-1)?.args.p_error).toBe("TypeError");
   expect(calls.at(-1)?.args.p_retryable).toBe(false);
   expect(JSON.stringify(calls)).not.toContain("PRIVATE source details");
+  const upstream=harness();
+  await expect(cycle(upstream.rpc,async()=>{throw new Error("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429");}))
+   .resolves.toMatchObject({failed:1,succeeded:0});
+  expect(upstream.calls.at(-1)?.args).toMatchObject({p_error:"MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429",p_retryable:false});
  });
  it("backs off transient research failures while stopping permanent errors",async()=>{
   const transient=harness({claimed:[{...row,attempt_count:3,max_attempts:25}]});
@@ -2634,6 +2638,16 @@ describe("MIZIZI keyless provider discovery through existing durable search budg
   const error=fixture(config,{error:{code:"maxlag"}});
   await expect(createDurableDeskPublicDiscoveryGatewayV1(error.options)(request)).rejects.toThrow("SEARCH_PROVIDER_UNCONFIRMED");
   expect(error.readPinned).toHaveBeenCalledTimes(1);
+  // A real HTTP error is not a successful empty search. It remains
+  // precharged, terminal, and distinguishable without retaining a body.
+  for(const status of [403,429,503]){
+   const unavailable=fixture({provider:"gdelt",host:"api.gdeltproject.org",allocationRef:"fixture:gdelt-allocation"});
+   unavailable.readPinned.mockResolvedValueOnce({status,contentType:"application/json",body:new Uint8Array(),headers:{}});
+   await expect(createDurableDeskPublicDiscoveryGatewayV1(unavailable.options)({...request,operation:"search_news"}))
+    .rejects.toThrow("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_"+status);
+   expect(unavailable.calls.filter(x=>x.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+   expect(unavailable.readPinned).toHaveBeenCalledTimes(1);
+  }
  });
  it("constructs the operational dispatcher without a Brave credential",()=>{
   const h=fixture();

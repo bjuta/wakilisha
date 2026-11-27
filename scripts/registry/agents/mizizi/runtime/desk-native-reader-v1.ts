@@ -220,7 +220,8 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
     redirects.push(url.href);
     url=publicUrl(response.location,url.href);continue;
    }
-   if(response.status!==200)fail("SOURCE_UNAVAILABLE");
+   if(response.status!==200)fail(Number.isInteger(response.status)&&response.status>=100&&response.status<=599?
+    "SOURCE_UNAVAILABLE_HTTP_"+response.status:"SOURCE_UNAVAILABLE");
    const type=contentType(response.contentType);
    const body=Uint8Array.from(response.body);
    if(body.length===0||(type==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-"))
@@ -308,7 +309,8 @@ export function createDeskBrowserResourceReaderV1(options:BrowserResourceReadOpt
    const location=publicUrl(response.location,url.href).href;
    return Object.freeze({requestSha256,status:response.status,location});
   }
-  if(response.status!==200)fail("SOURCE_UNAVAILABLE");
+  if(response.status!==200)fail(Number.isInteger(response.status)&&response.status>=100&&response.status<=599?
+    "SOURCE_UNAVAILABLE_HTTP_"+response.status:"SOURCE_UNAVAILABLE");
   const type=browserContentType(response.contentType,exact.resourceType),body=Uint8Array.from(response.body);
   if(body.length<1)fail("BODY_UNCONFIRMED");
   const headers:Record<string,string>={};

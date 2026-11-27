@@ -435,7 +435,10 @@ export async function runResearchWorkerCycleV1(input:Readonly<{
      console.error("MIZIZI_AUTHENTIC_WORKER_FAILURE_CODE="+decision.category);
      const failedReceipt=record(confirmed(await rpc("mizizi_fail_case_research_job_v1",{
        p_job_id:job.jobId,p_worker_id:workerId,
-       p_error:error instanceof Error?error.name:"Research handler failed",
+       // Preserve only the bounded, numeric native HTTP failure diagnostic.
+       // Do not persist provider bodies, headers, URLs or arbitrary errors.
+       p_error:/^MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_[1-5][0-9]{2}$/.test(decision.category)?
+        decision.category:error instanceof Error?error.name:"Research handler failed",
        p_retryable:decision.retryable,p_retry_delay_seconds:decision.delaySeconds,
      }),"FAIL"));
      if(uuid(failedReceipt.job_id)!==job.jobId||uuid(failedReceipt.case_id)!==job.caseId||
