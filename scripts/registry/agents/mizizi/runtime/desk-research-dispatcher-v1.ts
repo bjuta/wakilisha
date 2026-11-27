@@ -71,6 +71,8 @@ type Options=Readonly<{
  /** Only operational composition enables lookup of separately authorized shared native fields. */
  sharedNativeReuse?:boolean;
  sharedNativeSearch?:boolean;
+ /** Explicit standing authority only; availability independently restored from journal. */
+ allowSameCaseRecall?:boolean;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -181,12 +183,13 @@ export function createDeskResearchDispatcherV1(options:Options){
  if(!discovery.size)fail("DISCOVERY_CONFIGURATION_REQUIRED");
  const discoveryHosts=Object.freeze(Object.fromEntries([...discovery].map(([op,value])=>[op,value.host])));
  const unavailableHosts=new Set<string>();
+ let recallCandidate:Readonly<{sourceReceiptId:string;sourceResultSha256:string}>|null=null;
  if(options.localBrowser&&(options.browser||typeof options.authorizeInteractiveCall!=="function"||
   typeof options.localBrowser.authorizeAccess!=="function"||typeof options.localBrowser.authorizeQuery!=="function"))
   fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
  const budget=createDeskResourceBudgetV1({rpc:options.rpc,now});
  const TOOLS:readonly DeskToolCallV1["name"][]=Object.freeze([...BASE_TOOLS.filter(n=>
-  n!=="search_web"&&n!=="search_news"||discovery.has(n)),...(options.browser?["render_page" as const]:[]),...(options.localBrowser?["browse_page" as const]:[])]);
+  n!=="search_web"&&n!=="search_news"||discovery.has(n)),...(options.allowSameCaseRecall?["recall_evidence" as const]:[]),...(options.browser?["render_page" as const]:[]),...(options.localBrowser?["browse_page" as const]:[])]);
  const transient=new Map<string,TransientSource>();
  let transientBytes=0;
  function remember(id:string,receipt:TransientSource["receipt"],provenance:Record<string,unknown>){
@@ -431,6 +434,31 @@ export function createDeskResearchDispatcherV1(options:Options){
    if(!local)fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
    if(await options.authorizeInteractiveCall!(candidate,call,callSha256)!==true)fail("LOCAL_TOOL_AUTHORITY_DENIED");
    return await local.execute(candidate,call,callSha256);
+  }
+  if(call.name==="recall_evidence"){
+   if(retainedOnly||!options.allowSameCaseRecall||call.input.query!=="case evidence"||!recallCandidate)
+    fail("RECALL_AUTHORITY_DENIED");
+   const origin=recallCandidate!;
+   const prior=await readReceipt(origin.sourceReceiptId);
+   if(!prior||prior.row.resultSha256!==origin.sourceResultSha256||prior.result.sources.length!==1||
+    prior.result.unavailable||prior.result.visual||prior.result.sources[0].source.sourceId!==origin.sourceReceiptId)
+    fail("RECALL_ORIGIN_DENIED");
+   const entry=prior!.result.sources[0];
+   verifyInvestigationSourceV1(entry.source,identity,now());
+   if(!entry.source.externalModelProcessingAllowed)fail("RECALL_DISCLOSURE_DENIED");
+   const receiptId=randomUUID();
+   const result:DeskToolResultV1={receiptId,leads:[],sources:[{source:{...entry.source,sourceId:receiptId},excerpt:entry.excerpt,citation:entry.citation}]};
+   const resultText=bodyOf(result),resultSha256=hash(resultText);
+   const admitted=await rpc("mizizi_admit_desk_same_case_recall_v1",{p_call_text:callText,p_call_sha256:callSha256,
+    p_receipt_id:receiptId,p_origin_id:origin.sourceReceiptId,p_result_text:resultText,p_result_sha256:resultSha256}) as
+     {receiptId?:string;resultSha256?:string;outcome?:string}|null;
+   if(!admitted||admitted.receiptId!==receiptId||admitted.resultSha256!==resultSha256||admitted.outcome!=="created")
+    fail("RECALL_ADMISSION_DENIED");
+   const stored=await readReceipt(receiptId);
+   if(!stored||stored.row.callSha256!==callSha256||stored.row.resultSha256!==resultSha256||stored.row.resultText!==resultText)
+    fail("RECALL_READBACK_DENIED");
+   recallCandidate=null;
+   return result;
   }
   if(call.name==="search_web"||call.name==="search_news"){
    const query=call.input.query;
@@ -744,18 +772,32 @@ export function createDeskResearchDispatcherV1(options:Options){
  };
  const verifyJournalPass=(pass:InvestigationPassV1)=>checkJournalPass(pass);
  // A new dispatcher has no previous process memory. Reconstruct only the
- // negative discovery fence from the exact current, independently read
- // journal. Do not import old source bytes, opaque leads or tool transcripts
- // into the new lease. A permission or custody failure is never availability.
+ // negative discovery fence and optional opaque native recall candidate from
+ // the exact current journal. Source content is not disclosed until a fresh
+ // current-lease recall receipt is independently admitted and read back.
  const restoreJournalHistory=async(history:readonly InvestigationPassV1[])=>{
+  recallCandidate=null;
   verifyInvestigationHistoryV1(identity,history);
   const failedHosts=new Set<string>();
   for(const pass of history)if(await checkJournalPass(pass,failedHosts)!==true)
    fail("HISTORY_CUSTODY_DENIED");
   live();
+  if(options.allowSameCaseRecall&&history.length){
+   const raw=await rpc("mizizi_read_desk_same_case_recall_candidate_v1",{p_scope:scope}) as
+    {sourceReceiptId:string;sourceResultSha256:string}|null;
+   if(raw!==null){
+    if(!raw||Object.keys(raw).length!==2||!UUID.test(raw.sourceReceiptId)||!SHA.test(raw.sourceResultSha256)||
+     !history.some(p=>p.sourceReceipts.some(s=>s.sourceId===raw.sourceReceiptId&&s.modelDisclosed===true)&&
+      p.deskToolReceipts?.some(r=>r.receiptId===raw.sourceReceiptId&&r.resultSha256===raw.sourceResultSha256)))
+     fail("RECALL_CANDIDATE_DENIED");
+    recallCandidate=Object.freeze({...raw});
+   }
+  }
+  live();
   // Apply only after the complete chain passed; the fence never grants access.
   for(const host of failedHosts)unavailableHosts.add(host);
   return Object.freeze(TOOLS.filter(tool=>{
+   if(tool==="recall_evidence")return recallCandidate!==null;
    if(tool!=="search_web"&&tool!=="search_news")return true;
    const configured=discovery.get(tool);
    return !!configured&&!unavailableHosts.has(configured.host);

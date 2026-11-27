@@ -45,7 +45,7 @@ const schema=(properties:Record<string,unknown>)=>({type:"object",additionalProp
 const QUERY={query:{type:"string"}},LEAD={lead_id:{type:"string"}};
 const TOOL_SPECS=[
  ["search_registry","Find possible canonical Registry subjects; not an identity decision.",QUERY],
- ["recall_evidence","Retrieve previously admitted, currently permitted case evidence.",QUERY],
+ ["recall_evidence",'Retrieve one previously examined native source from this same case using the exact query "case evidence".',QUERY],
  ["search_web","Discover public web leads using an authorized research query.",QUERY],
  ["search_news","Discover public reporting leads using an authorized research query.",QUERY],
  ["read_page","Acquire and interpret a previously returned public source lead.",LEAD],
@@ -57,8 +57,9 @@ const TOOL_SPECS=[
 ] as const;
 // The chart worker independently reads Registry before entering the desk.
  // If internal lookup tools are present, preserve their priority and model choice.
-function openingDiscovery(enabled:ReadonlySet<string>):"search_web"|"search_news"|null{
- if(enabled.has("search_registry")||enabled.has("recall_evidence"))return null;
+function openingDiscovery(enabled:ReadonlySet<string>):"search_web"|"search_news"|"recall_evidence"|null{
+ if(enabled.has("search_registry"))return null;
+ if(enabled.has("recall_evidence"))return "recall_evidence";
  return enabled.has("search_web")?"search_web":enabled.has("search_news")?"search_news":null;
 }
 type DeskToolChoiceV1={type:"auto"|"any";disable_parallel_tool_use:true}|{type:"tool";name:DeskToolNameV1;disable_parallel_tool_use:true};
@@ -300,6 +301,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    ids.add(block.id);
    const typedLeads=result.leads as DeskToolLeadV1[],sources=result.sources as SourceExcerptV1[];
    const visual=result.visual as {sourceId:string;sha256:string;contentType:string}|null;
+   if(call.name==="recall_evidence"&&(typedLeads.length||sources.length!==1||visual||unavailable))return false;
    for(const lead of typedLeads){if(!UUID.test(lead.id)||leads.has(lead.id))return false;leads.set(lead.id,lead);}
    for(const s of sources){if(!UUID.test(s.source.sourceId)||sourceIds.includes(s.source.sourceId))return false;sourceIds.push(s.source.sourceId);}
    const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
@@ -381,7 +383,7 @@ function canonicalTool(name:unknown,input:unknown,enabled:Set<string>,leads:Map<
    (lead.kind==="reference"&&obj.query!==""))fail("INVALID_QUERY");
   value.lead_id=obj.lead_id;value.query=obj.query;
  }else if(keys.includes("query")){
-  if(!text(obj.query,300,3))fail("INVALID_QUERY");value.query=obj.query;
+  if(!text(obj.query,300,3)||(name==="recall_evidence"&&obj.query!=="case evidence"))fail("INVALID_QUERY");value.query=obj.query;
  }else{
   if(typeof obj.lead_id!=="string"||!UUID.test(obj.lead_id)||!leads.has(obj.lead_id))fail("UNOBSERVED_LEAD");
   const lead=leads.get(obj.lead_id)!;value.lead_id=obj.lead_id;
@@ -634,6 +636,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    if(!raw||!UUID.test(raw.receiptId)||receipts.some(r=>r.receiptId===raw.receiptId)||
      !Array.isArray(raw.leads)||!Array.isArray(raw.sources)||raw.leads.length>20||
      raw.sources.length>MAX_SOURCES)fail("TOOL_RESULT_INVALID");
+   if(call.name==="recall_evidence"&&(raw.leads.length||raw.sources.length!==1||raw.visual||raw.unavailable))fail("RECALL_RESULT_INVALID");
    const newLeads=raw.leads.map(l=>{
     if(!l||!UUID.test(l.id)||!["reference","document","render","visual","browser_action"].includes(l.kind)||
      (l.kind==="browser_action"&&call.name!=="browse_page")||

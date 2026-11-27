@@ -244,7 +244,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
     authorizeInteractiveCall:modelAuthority.authorizeTool,sharedNativeReuse:operational?.toolNames.includes("read_page")===true,
-    sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,now:input.now});
+    sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,
+    allowSameCaseRecall:operational?.toolNames.includes("recall_evidence")===true,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const batch=operational?createDeskAsyncOpeningBatchV1({rpc:input.rpc,credential:anthropic,now:input.now}):undefined;
@@ -257,7 +258,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const canPrepareDeskPass:NonNullable<AdaptiveWorkerDependenciesV1["canPrepareDeskPass"]>=async(_id,_question,history)=>{
     const available=await dispatcher.restoreJournalHistory(history);
     eligibleTools=enabledTools.filter(t=>available.includes(t));
-    const isDiscovery=(t:string)=>t==="search_web"||t==="search_news";
+    const isDiscovery=(t:string)=>t==="search_web"||t==="search_news"||t==="recall_evidence";
     // No previous-lease lead or source is authorized in the opening envelope.
     // If recovery removed every opening discovery route, preserve the prior
     // journal and defer before model selection, finance, or network activity.
@@ -335,7 +336,7 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
   p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||
   (!p.adaptiveFollowupsAllowed&&p.publicQueryTerms.length>0)||
-  !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document","browse_page","inspect_visual"].includes(t))||
+  !Array.isArray(p.toolNames)||p.toolNames.length<1||p.toolNames.some(t=>!["search_web","search_news","read_page","read_document","browse_page","inspect_visual","recall_evidence"].includes(t))||
   !Number.isSafeInteger(p.maxRounds)||p.maxRounds<1||p.maxRounds>5||
   !Number.isSafeInteger(p.maxRequestBytes)||p.maxRequestBytes<1||p.maxRequestBytes>3200000||
   !Array.isArray(p.accessRules)||p.accessRules.length>20||p.accessRules.some(x=>!x||typeof x.host!=="string"||
@@ -434,6 +435,7 @@ export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
      const p=await fresh(candidate);
      return !!p&&p.toolNames.includes(call.name)&&operationalHash(JSON.stringify({scope:candidate,call}))===callSha256&&
       (!["search_web","search_news"].includes(call.name)||typeof call.input.query==="string"&&queryAllowed(p,call.input.query))&&
+      (call.name!=="recall_evidence"||call.input.query==="case evidence")&&
       (call.name!=="browse_page"||typeof call.input.query==="string"&&(call.input.query===""||queryAllowed(p,call.input.query)));
     }
    };

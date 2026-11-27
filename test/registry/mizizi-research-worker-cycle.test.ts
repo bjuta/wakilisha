@@ -2263,6 +2263,63 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(base.append).toHaveBeenCalledTimes(1);
  },20000);
+ it("recalls a journal-bound original native source into a fresh lease without another acquisition",async()=>{
+  const h=fixture(),question="Which original archival evidence establishes the recording credits?";
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const second=await h.execute(call("read_page",{lead_id:first.leads[0].id}));
+  const original=second.sources[0],old=h.receipts.get(second.receiptId)!;
+  const refs=[first,second].map(r=>({receiptId:r.receiptId,
+   callSha256:String(h.receipts.get(r.receiptId)!.callSha256),resultSha256:String(h.receipts.get(r.receiptId)!.resultSha256)}));
+  const passes:InvestigationPassV1[]=[];
+  const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_ordinal,_prior,p)=>{passes.push(p);}},h.dispatch.verifyJournalPass);
+  await runAdaptiveInvestigationV1({identity,store,maxNewPasses:1,maxTotalPasses:5,costBudgetUnits:10000,now:()=>NOW,
+   readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
+   authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:async()=>({verified:false,verificationRef:null}),
+   prepareDeskPass:async()=>({sources:[original],deskToolReceipts:refs,costUnits:10,analysis:{hypotheses:[],leads:[],
+    passFinding:"Original archival source retained; further identity evidence is necessary.",requestedDisposition:"pause",
+    modelVersion:"fixture:model",promptFingerprint:hash("fixture:recall")}})});
+  expect(passes).toHaveLength(1);
+  const nextScope={...scope,workerId:"mizizi-chart:"+EVENT,leaseExpiresAt:new Date(NOW+600000).toISOString()};
+  let candidate:unknown={sourceReceiptId:second.receiptId,sourceResultSha256:old.resultSha256},deny=false;
+  const rpc:WorkerRpc=async(fn,args)=>{
+   if(fn==="mizizi_read_desk_same_case_recall_candidate_v1")return {data:candidate,error:null};
+   if(fn==="mizizi_admit_desk_same_case_recall_v1"){
+    if(deny)return {data:null,error:null};
+    expect(args.p_origin_id).toBe(second.receiptId);
+    expect(JSON.parse(String(args.p_call_text)).scope).toEqual(nextScope);
+    const body=JSON.parse(String(args.p_result_text)),id=String(args.p_receipt_id);
+    expect(body.sources).toEqual([{...original,source:{...original.source,sourceId:id}}]);
+    expect(body.leads).toEqual([]);
+    h.receipts.set(id,{receiptId:id,callSha256:args.p_call_sha256,resultSha256:args.p_result_sha256,
+     resultText:args.p_result_text,host:"archive.org",provenance:{sameCaseRecall:{originReceiptId:second.receiptId,originResultSha256:old.resultSha256}}});
+    candidate=null;
+    return {data:{receiptId:id,resultSha256:args.p_result_sha256,outcome:"created"},error:null};
+   }
+   return h.rpc(fn,args);
+  };
+  const restart=()=>createDeskResearchDispatcherV1({...h.dispatchOptions,scope:nextScope,rpc,allowSameCaseRecall:true});
+  const fresh=restart(),recall={name:"recall_evidence" as const,input:{query:"case evidence"}};
+  const invoke=(d:ReturnType<typeof restart>)=>d.executeTool(nextScope,recall,hash(JSON.stringify({scope:nextScope,call:recall})));
+  expect(await fresh.restoreJournalHistory([])).not.toContain("recall_evidence");
+  await expect(invoke(fresh)).rejects.toThrow("RECALL_AUTHORITY_DENIED");
+  candidate={sourceReceiptId:second.receiptId,sourceResultSha256:hash("forged")};
+  await expect(fresh.restoreJournalHistory(passes)).rejects.toThrow("RECALL_CANDIDATE_DENIED");
+  candidate={sourceReceiptId:second.receiptId,sourceResultSha256:old.resultSha256};
+  expect(await fresh.restoreJournalHistory(passes)).toContain("recall_evidence");
+  deny=true;await expect(invoke(fresh)).rejects.toThrow("RECALL_ADMISSION_DENIED");
+  deny=false;
+  const result=await invoke(fresh);
+  expect(result.receiptId).not.toBe(second.receiptId);
+  expect(result.sources).toEqual([{...original,source:{...original.source,sourceId:result.receiptId}}]);
+  expect(await fresh.authorizeSource(identity,question,result.sources[0])).toBe(true);
+  await expect(invoke(fresh)).rejects.toThrow("RECALL_AUTHORITY_DENIED");
+  expect(await restart().restoreJournalHistory(passes)).not.toContain("recall_evidence");
+  expect(h.native).toHaveBeenCalledTimes(1);expect(h.provider).toHaveBeenCalledTimes(1);
+  expect(h.calls.filter(c=>c.fn==="mizizi_consume_desk_resource_v1")).toHaveLength(1);
+  h.disabled.add("archive.org");
+  await expect(restart().restoreJournalHistory(passes)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
+ },20000);
  it("preserves a consumed unavailable discovery result, denies same-host replay, and does not confuse failure with absence",async()=>{
   const h=fixture(textBytes,"text/plain",{},true),query="Nairobi recording archive";
   h.tavily.mockResolvedValueOnce({status:429,contentType:"application/json",body:new Uint8Array(),headers:{}});
