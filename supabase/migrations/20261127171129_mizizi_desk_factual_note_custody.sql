@@ -182,4 +182,59 @@ begin
   end loop;
  end loop;
 end $acl$;
+-- Narrow worker readback. This is a note representation, not a native source
+-- receipt, tool authorization, exact-envelope disclosure or factual verdict.
+-- No private notes without explicit model-use eligibility enter this path.
+create function public.mizizi_read_desk_factual_notes_v1(p_scope jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
+declare c jsonb;n mizizi_private.desk_factual_notes_v1;d mizizi_private.desk_factual_note_reviews_v1;
+ items jsonb:='[]'::jsonb;body text;expiry timestamptz;
+begin
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ for n in select x.* from mizizi_private.desk_factual_notes_v1 x
+  where x.case_id=(c->>'caseId')::uuid and x.workspace_id=(c->>'workspaceId')::uuid
+   and x.expected_revision=(c->>'expectedRevision')::integer
+   and x.membership_sha256=c->>'membershipSha256' and x.observation_sha256=c->>'observationSha256'
+  order by x.note_id
+ loop
+  select * into d from mizizi_private.desk_factual_note_reviews_v1 r where r.note_id=n.note_id order by r.revision desc limit 1;
+  if not found or d.decision<>'admitted' or not d.model_processing_allowed or d.valid_until<=clock_timestamp()
+   or d.note_sha256<>n.note_sha256 or d.reviewer_id=n.author_id then continue;end if;
+  -- An expired or revoked actor invalidates this note rather than becoming
+  -- permission to transmit it. Fail closed on any unexpected exception.
+  begin
+   perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,n.author_id);
+   perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,d.reviewer_id);
+  exception when insufficient_privilege then continue;end;
+  if jsonb_array_length(items)>=12 then raise exception 'Factual note readback bound exceeded' using errcode='55000';end if;
+  expiry:=least(d.valid_until,(c->>'leaseExpiresAt')::timestamptz);
+  if expiry<=clock_timestamp() then return null;end if;
+  items:=items||jsonb_build_array(jsonb_build_object(
+   'noteId',n.note_id,'noteSha256',n.note_sha256,'reviewRevision',d.revision,
+   'caseId',n.case_id,'workspaceId',n.workspace_id,'expectedRevision',n.expected_revision,
+   'membershipSha256',n.membership_sha256,'observationSha256',n.observation_sha256,
+   'authorId',n.author_id,'reviewerId',d.reviewer_id,'fieldKey',n.field_key,'noteKind',n.note_kind,
+   'consultationMethod',n.consultation_method,'sourceLocator',n.source_locator,'noteText',n.note_text,
+   'noteTextSha256',encode(sha256(convert_to(n.note_text,'UTF8')),'hex'),
+   'locatorSha256',encode(sha256(convert_to(n.source_locator,'UTF8')),'hex'),
+   'observedAt',n.observed_at,'reviewRef',d.review_ref,'validUntil',expiry,
+   'representation','original_factual_note','verified',false,'modelUseEligible',true));
+ end loop;
+ if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then return null;end if;
+ body:=jsonb_build_object('contract','mizizi.desk_factual_note_readback.v1',
+  'scope',p_scope,'membershipSha256',c->>'membershipSha256','observationSha256',c->>'observationSha256',
+  'notes',items)::text;
+ return jsonb_build_object('bodyText',body,'bodySha256',encode(sha256(convert_to(body,'UTF8')),'hex'));
+end $f$;
+revoke all on function public.mizizi_read_desk_factual_notes_v1(jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+grant execute on function public.mizizi_read_desk_factual_notes_v1(jsonb) to service_role;
+do $note_read_acl$ begin
+ if not has_function_privilege('service_role','public.mizizi_read_desk_factual_notes_v1(jsonb)','execute')
+ or has_function_privilege('anon','public.mizizi_read_desk_factual_notes_v1(jsonb)','execute')
+ or has_function_privilege('authenticated','public.mizizi_read_desk_factual_notes_v1(jsonb)','execute')
+ or has_function_privilege('mizizi_executor','public.mizizi_read_desk_factual_notes_v1(jsonb)','execute')
+ then raise exception 'STOP_NOTE_WORKER_READ_ACL';end if;
+end $note_read_acl$;
 commit;

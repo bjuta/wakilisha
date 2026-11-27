@@ -663,6 +663,49 @@ export async function verifyCharts2RealJwtRegistryV1({
      p.original_bucket==="charts2-evidence-private-v1"&&p.original_byte_length===1024&&
      p.original_object_key===p.source_key+"/"+p.original_sha256.slice(0,2)+"/"+p.original_sha256+extension;
   }),"STOP_CHART_SCOPED_ORIGINAL_CONTEXT");
+ // Genuine JWT note readback, scoped to this current worker lease.
+ {
+ const name="mizizi_read_desk_factual_notes_v1";
+ const noteScope={jobId:job.job_id,caseId:pairedId,workspaceId:ws,expectedRevision:2,
+  workerId:activeWorker,leaseExpiresAt:context.leaseExpiresAt};
+ const args={p_scope:noteScope};
+ const readNotes=async()=>{const packet=await call(name,args);
+  fail(packet&&createHash("sha256").update(packet.bodyText).digest("hex")===packet.bodySha256,"STOP_NOTE_READBACK_DIGEST");
+  const body=JSON.parse(packet.bodyText);
+  fail(body.contract==="mizizi.desk_factual_note_readback.v1"&&body.scope.jobId===job.job_id&&
+   body.membershipSha256===context.membershipSha256&&body.observationSha256===context.observationSha256,"STOP_NOTE_READBACK_SCOPE");
+  return body.notes;};
+ for(const actor of [first.user,subscriber])denied(await actor.rpc(name,args),"42501","STOP_NOTE_READBACK_BROWSER");
+ fail((await readNotes()).length===0,"STOP_NOTE_REVOKED_VISIBLE");
+ const payload={p_note_id:randomUUID(),p_case_id:pairedId,p_expected_revision:2,p_field_key:"release_date",
+  p_note_kind:"attributed_claim",p_consultation_method:"manual_public_consultation",
+  p_source_locator:"https://example.org/fixture/dated-release",
+  p_note_text:"The fixture lists a release year; the original recording date is unresolved.",
+  p_observed_at:new Date(Date.now()-60000).toISOString(),
+  p_acknowledgement:"I personally consulted this source by a permitted method and wrote an original factual note, not copied source content."};
+ const n=await accept(first.user,"admin_mizizi_submit_factual_note_v1",payload,"STOP_NOTE_WORKER_SUBMIT");
+ fail((await readNotes()).length===0,"STOP_NOTE_UNREVIEWED_VISIBLE");
+ const review="admin_mizizi_review_factual_note_v1",rev={p_note_id:n.noteId,p_note_sha256:n.noteSha256,
+  p_expected_review_revision:0,p_decision:"admitted",p_model_processing_allowed:false,
+  p_review_ref:"fixture:note-disclosure-review",p_valid_until:new Date(Date.now()+3600000).toISOString(),
+  p_acknowledgement:"I independently reviewed this exact original note, consultation method, provenance and permitted use; this is not factual verification."};
+ await accept(second.user,review,rev,"STOP_NOTE_WORKER_PRIVATE_ADMISSION");
+ fail((await readNotes()).length===0,"STOP_NOTE_PRIVATE_VISIBLE");
+ await accept(second.user,review,{...rev,p_expected_review_revision:1,p_model_processing_allowed:true},"STOP_NOTE_WORKER_DISCLOSURE_REVIEW");
+ const rows=await readNotes(),item=rows[0];
+ fail(rows.length===1&&item.noteId===n.noteId&&item.noteSha256===n.noteSha256&&item.reviewRevision===2&&
+  item.noteText===payload.p_note_text&&item.sourceLocator===payload.p_source_locator&&item.authorId===first.id&&
+  item.reviewerId===second.id&&item.representation==="original_factual_note"&&!item.verified&&item.modelUseEligible===true&&
+  item.noteTextSha256===createHash("sha256").update(payload.p_note_text).digest("hex")&&
+  Date.parse(item.validUntil)<=Date.parse(context.leaseExpiresAt),"STOP_NOTE_WORKER_EXACT_REPRESENTATION");
+ fail(await call(name,{p_scope:{...noteScope,caseId:staleId}})===null,"STOP_NOTE_FOREIGN_CASE");
+ fail(await call(name,{p_scope:{...noteScope,expectedRevision:1}})===null,"STOP_NOTE_STALE_SCOPE");
+ await deny(name,{p_scope:{...noteScope,workerId:losingWorker}},"55000");
+ await accept(first.user,review,{...rev,p_expected_review_revision:2,p_decision:"revoked",
+  p_acknowledgement:"I revoke this exact factual note admission."},"STOP_NOTE_WORKER_REVOKE");
+ fail((await readNotes()).length===0,"STOP_NOTE_WORKER_REVOKED");
+ console.log("WK_AUTH_MIZIZI_NOTE_EXACT_LEASE_READBACK_PRIVATE_REVOCATION=PASS");
+ }
  // Durable desk-search budget: actual service JWTs and concurrent SQL
  // transactions; synthetic owner policy/credential, no external calls.
  {
