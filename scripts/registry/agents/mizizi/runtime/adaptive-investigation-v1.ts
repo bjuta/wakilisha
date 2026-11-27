@@ -39,6 +39,7 @@ export type PassDecisionV1=Readonly<{
 export type InvestigationIdentityV1=Readonly<{
  caseId:string;workspaceId:string;openingQuestion:string;
 }>;
+export type DeskBatchReceiptV1=Readonly<{reservationId:string;bodySha256:string;resultSha256:string}>;
 export type InvestigationPassV1=Readonly<{
  contract:typeof ADAPTIVE_INVESTIGATION_CONTRACT;
  caseId:string;workspaceId:string;ordinal:number;question:string;
@@ -53,6 +54,7 @@ export type InvestigationPassV1=Readonly<{
   custodyFingerprint?:string;
  }>[];
  deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
+ deskBatchReceipt?:DeskBatchReceiptV1;
  findings:readonly VerifiedClaimV1[];
  passFinding:string;proposedLeads:readonly ResearchLeadV1[];
  decision:PassDecisionV1;
@@ -77,6 +79,7 @@ export type InvestigationAnalystV1=(
 export type PreparedDeskPassV1=Readonly<{
  sources:readonly SourceExcerptV1[];analysis:ResearchAnalysisV1;costUnits:number;
  deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
+ deskBatchReceipt?:DeskBatchReceiptV1;
 }>;
 export type DeskPassResearcherV1=(identity:InvestigationIdentityV1,question:string,
  history:readonly InvestigationPassV1[])=>Promise<PreparedDeskPassV1>;
@@ -389,6 +392,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
+   ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
    promptFingerprint:analysis.promptFingerprint,

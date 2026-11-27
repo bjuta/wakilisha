@@ -1623,7 +1623,7 @@ describe("MIZIZI asynchronous opening batch transport",()=>{
   const resultLine=JSON.stringify({custom_id:RECEIPT,result:{type:"succeeded",message:{model:"fixture-haiku",stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_a",name:"search_web",input:{query:"Fixture"}}],usage:{input_tokens:500,output_tokens:100}}}});
   let state="available",resultSha256:string|null=null;
   const rpc:WorkerRpc=vi.fn(async(fn,args)=>{
-   if(fn==="mizizi_read_desk_async_batch_v1")return {error:null,data:state==="pending"||state==="metered"?{state,reservationId:RECEIPT,originalRequestSha256:b.requestSha256,providerBatchId:batchId,bodySha256:hash(body),model:b.model,maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,resultSha256}:{state}};
+   if(fn==="mizizi_read_desk_async_batch_v1")return {error:null,data:state==="pending"||state==="metered"?{state,reservationId:RECEIPT,originalRequestSha256:b.requestSha256,providerBatchId:batchId,bodySha256:hash(body),model:b.model,maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,resultSha256,mode:"opening",dependencies:[],sourceIds:[]}:{state,openingAllowed:true,retainedAllowed:false}};
    if(fn==="mizizi_begin_desk_async_batch_v1"){expect(state).toBe("available");events.push("intent");state="uncertain";return {data:true,error:null};}
    if(fn==="mizizi_record_desk_async_batch_v1"){
     if(args.p_state==="accepted"){events.push("accepted");state="pending";}else if(args.p_state==="metered"){events.push("metered");state="metered";resultSha256=String(args.p_result_sha256);}
@@ -1637,7 +1637,7 @@ describe("MIZIZI asynchronous opening batch transport",()=>{
   });
   const options={rpc,credential:{apiKey:key},transport:transport as unknown as typeof fetch,now:()=>NOW};
   const first=createDeskAsyncOpeningBatchV1(options);
-  expect(await first.lookup(b)).toEqual({state:"available"});
+  expect(await first.lookup(b)).toEqual({state:"available",openingAllowed:true,retainedAllowed:false});
   await expect(first.submit(b,body,{reservationId:RECEIPT,requestSha256:b.requestSha256,pricingRef:"pricing:fixture",maximumCostMicrousd:2000,validUntil:new Date(NOW+20000).toISOString()})).rejects.toThrow("MIZIZI_DESK_BATCH_PENDING");
   const resumed=createDeskAsyncOpeningBatchV1(options),next=bindingFor({...scope,leaseExpiresAt:new Date(NOW+600000).toISOString()});
   expect(next.requestSha256).not.toBe(b.requestSha256);

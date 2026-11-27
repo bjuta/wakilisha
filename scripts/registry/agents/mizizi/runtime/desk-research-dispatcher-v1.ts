@@ -417,7 +417,8 @@ export function createDeskResearchDispatcherV1(options:Options){
    }
   })
  }):null;
- const executeTool:DeskAnthropicOptionsV1["executeTool"]=async(candidate,call,callSha256)=>{
+ const execute=async(candidate:Parameters<DeskAnthropicOptionsV1["executeTool"]>[0],
+  call:Parameters<DeskAnthropicOptionsV1["executeTool"]>[1],callSha256:string,retainedOnly=false):Promise<DeskToolResultV1|null>=>{
   assertScope(candidate);
   const callText=JSON.stringify({scope:candidate,call});
   if(!SHA.test(callSha256)||hash(callText)!==callSha256||!TOOLS.some(t=>t===call.name)||
@@ -450,6 +451,7 @@ export function createDeskResearchDispatcherV1(options:Options){
      return result;
     }
    }
+   if(retainedOnly)return null;
    const selected=discovery.get(call.name);
    if(!selected)fail("DISCOVERY_CONFIGURATION_DENIED");
    const p=await policy(selected.host);
@@ -601,6 +603,7 @@ export function createDeskResearchDispatcherV1(options:Options){
     return result;
    }
   }
+  if(retainedOnly)fail("SHARED_BATCH_READ_MISS");
   const receipt=await native({scope,url});
   const p=await policy(urlOf(receipt.finalUrl).hostname);
   if(!p||p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");
@@ -636,6 +639,44 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(leads.some(l=>l.kind==="document"||l.kind==="render"))remember(receiptId,receipt,meta);
   return result;
   }finally{activeCallSha256=null;}
+ };
+ const executeTool:DeskAnthropicOptionsV1["executeTool"]=async(candidate,call,callSha256)=>{
+  const result=await execute(candidate,call,callSha256);
+  if(!result)fail("TOOL_RESULT_UNCONFIRMED");
+  return result!;
+ };
+ const readBatchDependencies=async(dependencies:NonNullable<InvestigationPassV1["deskToolReceipts"]>)=>{
+  if(!Array.isArray(dependencies)||dependencies.length!==2)fail("BATCH_DEPENDENCY_SHAPE");
+  const sources:SourceExcerptV1[]=[];
+  for(const ref of dependencies){
+   const read=await readReceipt(ref.receiptId);
+   if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256||read.result.visual)
+    fail("BATCH_DEPENDENCY_CUSTODY_DENIED");
+   sources.push(...read!.result.sources);
+  }
+  if(sources.length!==1||sources[0].source.useBasis!=="open_license"||sources[0].source.externalModelProcessingAllowed!==true)
+   fail("BATCH_SOURCE_DENIED");
+  verifyInvestigationSourceV1(sources[0].source,identity,now());
+  return Object.freeze({dependencies:Object.freeze([...dependencies]),sources:Object.freeze(sources)});
+ };
+ // Independent deterministic calls use existing tool authority, not
+ // manufactured model tool messages. A miss never contacts a provider.
+ const tryRetainedBatch=async(query:string,authorizeTool:DeskAnthropicOptionsV1["authorizeTool"])=>{
+  if(!options.sharedNativeSearch||!options.sharedNativeReuse)return null;
+  const search={name:"search_web" as const,input:{query}};
+  const sh=hash(JSON.stringify({scope,call:search}));
+  if(await authorizeTool(scope,search,sh)!==true)return null;
+  const found=await execute(scope,search,sh,true);
+  if(!found)return null;
+  if(found.leads.length!==1||found.leads[0].kind!=="reference"||found.sources.length||found.visual)
+   fail("BATCH_SEARCH_RESULT_DENIED");
+  const read={name:"read_page" as const,input:{lead_id:found.leads[0].id}};
+  const rh=hash(JSON.stringify({scope,call:read}));
+  if(await authorizeTool(scope,read,rh)!==true)fail("BATCH_READ_AUTHORITY_DENIED");
+  const source=await execute(scope,read,rh,true);
+  if(!source||source.sources.length!==1||source.leads.length||source.visual)fail("BATCH_SOURCE_DENIED");
+  return readBatchDependencies([{receiptId:found.receiptId,callSha256:sh,resultSha256:hash(bodyOf(found))},
+   {receiptId:source!.receiptId,callSha256:rh,resultSha256:hash(bodyOf(source!))}]);
  };
  const verifyToolReceipt:DeskAnthropicOptionsV1["verifyToolReceipt"]=async(candidate,binding,result)=>{
   assertScope(candidate);
@@ -707,5 +748,6 @@ export function createDeskResearchDispatcherV1(options:Options){
   return verified;
  };
  return Object.freeze({enabledTools:TOOLS,executeTool,verifyToolReceipt,authorizeSource,authorizeModelProcessing,verifySources,verifyJournalPass,
+  tryRetainedBatch,readBatchDependencies,
   closeInteractive:async()=>{if(local)await local.close();}});
 }

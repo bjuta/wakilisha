@@ -20,6 +20,7 @@ import {createCostRoutedDeskAnthropicPassV1,createDurableDeskModelAuthorityV1} f
 import {createDeskResearchDispatcherV1,type DeskLocalBrowserHostV1} from "./desk-research-dispatcher-v1.ts";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {createDeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
+import {createDeskRetainedBatchPassV1} from "./desk-retained-batch-pass-v1.ts";
 export type AdaptiveWorkerDependenciesV1=Readonly<{
  store:InvestigationStoreV1;
  openingQuestion:(job:ResearchJobV1)=>Promise<string>;
@@ -244,21 +245,27 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
+   const batch=operational?createDeskAsyncOpeningBatchV1({rpc:input.rpc,credential:anthropic,now:input.now}):undefined;
+   const readModelInventory=async()=>{
+    const models=await config.readModelInventory();
+    return operational?models.filter(m=>operational.modelIds.includes(m.model)):models;
+   };
    const deskPass=createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:operational?dispatcher.enabledTools.filter(t=>operational.toolNames.includes(t)):dispatcher.enabledTools,
     // Always consult existing async intent in operational mode, including
     // after a policy change. The SQL opt-in is default false.
-    asyncOpeningBatch:operational?createDeskAsyncOpeningBatchV1({rpc:input.rpc,credential:anthropic,now:input.now}):undefined,
-    readModelInventory:async()=>{
-     const models=await config.readModelInventory();
-     return operational?models.filter(m=>operational.modelIds.includes(m.model)):models;
-    },
+    asyncOpeningBatch:batch,readModelInventory,
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,now:input.now});
+   const labels=job.chartContext.positions,first=labels[0];
+   const query=first?.artist&&labels.every(p=>p.title===first.title&&p.artist===first.artist)?first.title+" "+first.artist:null;
+   const compact=batch?createDeskRetainedBatchPassV1({rpc:input.rpc,scope,credential:anthropic,batch,dispatcher,
+    query,readModelInventory,assessRequirement:config.assessRequirement,finance,
+    authorizeEnvelope:config.authorizeEnvelope,authorizeTool:modelAuthority.authorizeTool,now:input.now}):null;
    const prepareDeskPass:DeskPassResearcherV1=async(id,question,history)=>{
     for(const pass of history)if(await dispatcher.verifyJournalPass(pass)!==true)
      throw Error("MIZIZI_DESK_HISTORY_CUSTODY_DENIED");
-    try{return await deskPass(id,question,history);}
+    try{return (compact?await compact(id,question,history):null)??await deskPass(id,question,history);}
     finally{await dispatcher.closeInteractive();}
    };
    active={job,dispatcher};
