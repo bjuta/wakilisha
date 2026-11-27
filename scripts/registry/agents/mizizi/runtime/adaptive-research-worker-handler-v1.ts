@@ -7,7 +7,7 @@ import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1
 import {createCharts2RegistryCatalogueCohortV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
- type InvestigationStoreV1,type InvestigationReaderV1,
+ type InvestigationStoreV1,type InvestigationReaderV1,type InvestigationReopenAuthorityV1,
  type InvestigationAnalystV1,type IndependentFindingVerifierV1,type DeskPassResearcherV1}
  from "./adaptive-investigation-v1.ts";
 import type {ResearchJobHandlerV1,ResearchJobV1}
@@ -29,6 +29,8 @@ export type AdaptiveWorkerDependenciesV1=Readonly<{
  analyze:InvestigationAnalystV1;
  prepareDeskPass?:DeskPassResearcherV1;
  canPrepareDeskPass?:Parameters<typeof runAdaptiveInvestigationV1>[0]["canPrepareDeskPass"];
+ reopen?:InvestigationReopenAuthorityV1;
+ verifyReopen?:Parameters<typeof runAdaptiveInvestigationV1>[0]["verifyReopen"];
  /** Only the exact durable standing-policy worker enables this. */
  continuationEnabled?:boolean;
  verifyFinding:IndependentFindingVerifierV1;
@@ -52,7 +54,8 @@ export function createAdaptiveResearchWorkerHandlerV1(
    analyze:deps.analyze,prepareDeskPass:deps.prepareDeskPass,verifyFinding:deps.verifyFinding,
    maxNewPasses:deps.maxNewPasses,maxTotalPasses:deps.maxTotalPasses,
    costBudgetUnits:deps.costBudgetUnits,measureCostUnits:deps.measureCostUnits,
-   authorizeModelProcessing:deps.authorizeModelProcessing,canPrepareDeskPass:deps.canPrepareDeskPass
+   authorizeModelProcessing:deps.authorizeModelProcessing,canPrepareDeskPass:deps.canPrepareDeskPass,
+   reopen:deps.reopen,verifyReopen:deps.verifyReopen
   });
   // Re-read durable case history: never trust an ephemeral in-memory claim
   // of success after the append transport potentially timed out.
@@ -297,16 +300,40 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
      return (compact?await compact(id,question,history):null)??await createDeskPass()(id,question,history);
     }finally{await dispatcher.closeInteractive();}
    };
+   if(job.reopenEventId&&!operational)throw Error("MIZIZI_DESK_REOPEN_OPERATIONAL_POLICY_REQUIRED");
+   const reopen=job.reopenEventId?await readCurrentDeskReopeningEventV1(input.rpc,scope,job.reopenEventId):undefined;
+   const verifyReopen:AdaptiveWorkerDependenciesV1["verifyReopen"]=job.reopenEventId?
+    async(event,id,previous)=>{
+     if(id.caseId!==job.caseId||id.workspaceId!==job.workspaceId||previous.fingerprint!==event.predecessorFingerprint)return false;
+     const fresh=await readCurrentDeskReopeningEventV1(input.rpc,scope,job.reopenEventId!);
+     return !!fresh&&fresh.sourceEventRef===event.sourceEventRef&&fresh.eventSha256===event.eventSha256&&
+      fresh.predecessorFingerprint===event.predecessorFingerprint&&fresh.question===event.question;
+    }:undefined;
    active={job,dispatcher};
    return createAdaptiveResearchWorkerHandlerV1({
     store:guardDeskResearchPassStoreV1(createLeasedResearchPassStoreV1(input.rpc,job,input.workerId),dispatcher.verifyJournalPass),
     openingQuestion:input.openingQuestion,readSources:async()=>{throw Error("MIZIZI_DESK_LEGACY_READER_DENIED");},
     analyze:async()=>{throw Error("MIZIZI_DESK_LEGACY_ANALYST_DENIED");},prepareDeskPass,
     verifyFinding:input.verifyFinding,authorizeModelProcessing:dispatcher.authorizeModelProcessing,canPrepareDeskPass,
-    continuationEnabled:operational?.adaptiveFollowupsAllowed===true,
+    continuationEnabled:operational?.adaptiveFollowupsAllowed===true,reopen,verifyReopen,
     maxNewPasses:input.maxNewPasses,maxTotalPasses:input.maxTotalPasses,costBudgetUnits:input.costBudgetUnits})(job);
   }
  });
+}
+
+/** Current service lease is the only source of event authority. Never infer
+ * an event from the model, manifest, old job result, or caller question. */
+export async function readCurrentDeskReopeningEventV1(rpc:WorkerRpc,scope:DeskSearchScopeV1,eventId:string):Promise<InvestigationReopenAuthorityV1|undefined>{
+ const reply=await rpc("mizizi_read_desk_reopening_event_v1",{p_scope:scope});
+ if(!reply||reply.error)throw Error("MIZIZI_DESK_REOPEN_READ_UNCONFIRMED");
+ if(reply.data===null)return undefined;
+ const event=reply.data as InvestigationReopenAuthorityV1;
+ const sha=/^[a-f0-9]{64}$/,uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+ if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,question,sourceEventRef"||
+  !uuid.test(eventId)||event.sourceEventRef!==eventId||!sha.test(event.eventSha256)||!sha.test(event.predecessorFingerprint)||
+  typeof event.question!=="string"||event.question.length<8||event.question.length>500||event.question.trim()!==event.question||
+  /[\p{Cc}\p{Cf}]/u.test(event.question))throw Error("MIZIZI_DESK_REOPEN_SCOPE_DENIED");
+ return Object.freeze({...event});
 }
 
 /** Server-only operational entrypoint, with optional qualified local Chromium. Reuses the existing exact job

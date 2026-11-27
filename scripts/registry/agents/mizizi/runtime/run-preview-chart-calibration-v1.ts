@@ -17,6 +17,7 @@ import {createDockerDeskBrowserHostV1} from "./desk-docker-browser-host-v1.mjs";
 import {qualifyDeskPublicDiscoveryProviderV1,type DeskDiscoveryConfigurationV1} from "./desk-research-gateway-v1.ts";
 import {selectCostEffectiveDeskModelV1,type DeskModelCandidateV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
+import {admitReviewedDeskReopeningViaTrustedGatewayV1,validateReviewedDeskReopeningReceiptV1,type ReviewedDeskReopeningReceiptV1} from "./shared-job-adapter.ts";
 
 const REF="ehkmjrjjhzyjkxdfsqdc",ROOT="https://"+REF+".supabase.co";
 const ACK="I authorize read-only investigation of this chart recording hypothesis.";
@@ -54,7 +55,7 @@ type Manifest=Readonly<{
  }>;
 }>;
 type Transition=Awaited<ReturnType<typeof beginChartCalibrationCaseV1>>;
-type Mode="admit"|"execute"|"resume";
+type Mode="admit"|"execute"|"resume"|"reopen";
 async function exactFile(path:string,digest:string,max=2000000){
  if(!SHA.test(digest))fail("REVIEW_DIGEST_REQUIRED");
  const s=await lstat(path);if(!s.isFile()||s.size<2||s.size>max||(s.mode&0o077)!==0)fail("PRIVATE_FILE_REQUIRED");
@@ -134,8 +135,8 @@ async function checkpoint(path:string,receipt:unknown){
 }
 export async function runPreviewCalibrationCommandV1(args:readonly string[]){
  const [mode,manifestPath,digest,outputPrefix,admissionPath,transitionPath,transitionSha]=args;
- if(!["admit","execute","resume"].includes(mode)||!manifestPath||!digest||!outputPrefix||
-  (mode==="admit"&&args.length!==4)||(mode==="execute"&&args.length!==5)||(mode==="resume"&&args.length!==7))
+ if(!["admit","execute","resume","reopen"].includes(mode)||!manifestPath||!digest||!outputPrefix||
+  (mode==="admit"&&args.length!==4)||(mode==="execute"&&args.length!==5)||((mode==="resume"||mode==="reopen")&&args.length!==7))
   fail("ARGUMENTS");
  const m=await readPreviewCalibrationManifestV1(manifestPath,digest,mode as Mode);
  await requirePrivateOutput(outputPrefix);
@@ -195,8 +196,13 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
    const r=await pool.query(sql,[...values]);return {rows:r.rows,rowCount:r.rowCount};};
   const login=await query("select session_user::text as login_role",[]);
   if(login.rowCount!==1||login.rows[0].login_role!=="mizizi_executor")fail("JIT_IDENTITY");
-  let transition:Transition;
-  if(mode==="execute"){
+  let transition:Transition|undefined,event:ReviewedDeskReopeningReceiptV1|undefined;
+  if(mode==="reopen"){
+   event=await exactFile(transitionPath,transitionSha) as ReviewedDeskReopeningReceiptV1;
+   validateReviewedDeskReopeningReceiptV1(event);
+   if(event.caseId!==c.caseId||event.workspaceId!==m.workspaceId||event.expectedRevision!==candidate.revision+1)fail("REOPEN_SCOPE");
+   await checkpoint(outputPrefix+".transition.json",event);
+  }else if(mode==="execute"){
    const operatorRpc=await requireOperator(m);
    if(!live(m.validUntil))fail("REVIEW_EXPIRED");
    transition=await beginChartCalibrationCaseV1({operatorRpc,admission,caseId:c.caseId,workspaceId:m.workspaceId,acknowledgement:ACK});
@@ -207,14 +213,15 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
     transition.expectedRevision!==candidate.revision+1)fail("TRANSITION_SCOPE");
   }
   if(!live(m.validUntil))fail("REVIEW_EXPIRED");
-  const job=await dispatchChartCalibrationCaseV1(query,transition);
+  const expectedRevision=event?.expectedRevision??transition!.expectedRevision;
+  const job=event?await admitReviewedDeskReopeningViaTrustedGatewayV1({query},event):await dispatchChartCalibrationCaseV1(query,transition!);
   await checkpoint(outputPrefix+".dispatch.json",job);
   if(job.jobStatus==="running"||job.jobStatus==="succeeded")return {stage:job.jobStatus,jobId:job.jobId};
   const result=await driveProductiveChartResearchV1({receipt:job,maxLeases:c.maxTotalPasses,
    checkpoint:async(ordinal,cycle)=>{await checkpoint(outputPrefix+".worker."+String(ordinal).padStart(2,"0")+".json",cycle);},
    cycle:async receipt=>runChartCalibrationJobV1({receipt,serviceRpc,storage:service.storage,
    registryClient:service,preflight:async r=>live(m.validUntil)&&r.caseId===c.caseId&&r.workspaceId===m.workspaceId&&
-    r.caseRevision===transition.expectedRevision,
+    r.caseRevision===expectedRevision,
    runtime:{credentials:{anthropic:{apiKey,workspaceId},nativeAccountFingerprint:c.nativeAccountFingerprint,discovery:c.discovery},
     localBrowser,readModelInventory,assessRequirement:async()=>({tier:"routine",needsVision:browser?.captureVisual===true,
      inputTokenCeiling:c.model.maxInputTokens,maximumCostMicrousd:c.maximumCostMicrousd,assessmentRef:c.runtimeReviewRef}),

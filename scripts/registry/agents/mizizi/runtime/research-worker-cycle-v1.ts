@@ -42,6 +42,8 @@ export type ResearchJobV1=Readonly<{
  expectedRevision:number;attempt:number;maxAttempts:number;leaseExpiresAt:string;
  /** Exact original job reason, only a publicly approved question may be searched. */
  researchQuestion:string|null;publicSourceSearchApproved:boolean;
+ /** Present only on a separately admitted, event-bound chart job. */
+ reopenEventId?:string;
  chartContext?:LeasedChartResearchContextV1;
  /** Discovery leads, never identity proof or source permission. */
  chartRegistryDiscovery?:Readonly<Awaited<ReturnType<typeof readCharts2RegistryDiscoveryV1>>>;
@@ -109,6 +111,8 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
  if(row.command_type!==JOB_TYPE||row.job_type!==JOB_TYPE||
     uuid(payload.case_id)!==caseId||payload.operation!=="read_only_research")
    throw new TypeError("MIZIZI_WORKER_UNBOUND_JOB");
+ const reopenEventId=payload.reopen_event_id===undefined?undefined:uuid(payload.reopen_event_id);
+ if(reopenEventId&&payload.reason!==CHART_REASON)throw Error("MIZIZI_WORKER_REOPEN_SCOPE_DENIED");
  const expectedRevision=positive(payload.expected_case_revision);
  const attempt=positive(row.attempt_count),maxAttempts=positive(row.max_attempts);
  if(attempt>maxAttempts)throw new TypeError("MIZIZI_WORKER_ATTEMPT_OVERFLOW");
@@ -128,7 +132,7 @@ function validateClaim(raw:unknown,nowMs:number):ResearchJobV1{
    throw new TypeError("MIZIZI_WORKER_STALE_LEASE");
  return Object.freeze({jobId,receiptId,caseId,workspaceId,expectedRevision,
    attempt,maxAttempts,leaseExpiresAt,
-   researchQuestion,publicSourceSearchApproved});
+   researchQuestion,publicSourceSearchApproved,...(reopenEventId?{reopenEventId}:{})});
 }
 const CHART_REASON="Investigate receipt-bound chart recording identity.";
 const CHART_WORKER=/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;

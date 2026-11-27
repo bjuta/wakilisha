@@ -236,3 +236,37 @@ export async function admitResearchJobViaTrustedGatewayV1(
     outcome: row.outcome as TrustedResearchJobReceiptV1["outcome"],
   });
 }
+
+
+/** Exact reviewed event receipt, obtained independently through the steward
+ * gateway. The JIT executor cannot mint an event or select a new question. */
+export type ReviewedDeskReopeningReceiptV1=Readonly<{
+ eventId:string;caseId:string;workspaceId:string;previousJobId:string;expectedRevision:number;
+ eventSha256:string;predecessorFingerprint:string;validUntil:string;jobsDispatched:0;
+}>;
+export function validateReviewedDeskReopeningReceiptV1(event:ReviewedDeskReopeningReceiptV1,now=Date.now()):void{
+ if(!event||Object.keys(event).sort().join(",")!=="caseId,eventId,eventSha256,expectedRevision,jobsDispatched,predecessorFingerprint,previousJobId,validUntil,workspaceId"||
+  ![event.eventId,event.caseId,event.workspaceId,event.previousJobId].every(id=>UUID.test(id)&&id===id.toLowerCase())||
+  !SHA256.test(event.eventSha256)||!SHA256.test(event.predecessorFingerprint)||
+  !Number.isSafeInteger(event.expectedRevision)||event.expectedRevision<2||event.jobsDispatched!==0||
+  !Number.isFinite(Date.parse(event.validUntil))||Date.parse(event.validUntil)<=now)
+  throw Error("MIZIZI_REOPEN_REVIEW_RECEIPT_INVALID");
+}
+export async function admitReviewedDeskReopeningViaTrustedGatewayV1(executor:TrustedResearchJobExecutorV1,event:ReviewedDeskReopeningReceiptV1):Promise<TrustedResearchJobReceiptV1>{
+ validateReviewedDeskReopeningReceiptV1(event);
+ if(!executor||typeof executor.query!=="function")throw Error("MIZIZI_REOPEN_JIT_REQUIRED");
+ const result=await executor.query<ResearchJobGatewayRowV1>(
+  `select case_id::text,workspace_id::text,resource_id::text,case_revision,
+    command_receipt_id::text,job_id::text,job_status,outcome
+    from mizizi_private.admit_desk_reopening_job_v1($1::uuid,$2::text)`,
+  [event.eventId,event.eventSha256]);
+ const row=result.rows?.[0];
+ if(result.rowCount!==1||result.rows.length!==1||!row||row.case_id!==event.caseId||row.workspace_id!==event.workspaceId||
+  row.resource_id!==event.caseId||row.case_revision!==event.expectedRevision||
+  !UUID.test(row.command_receipt_id)||!UUID.test(row.job_id)||row.job_id===event.previousJobId||
+  !["queued","running","retry_wait","succeeded"].includes(row.job_status)||!["created","replayed"].includes(row.outcome))
+  throw Error("MIZIZI_REOPEN_JIT_RECEIPT_UNCONFIRMED");
+ return Object.freeze({caseId:row.case_id,workspaceId:row.workspace_id,resourceId:row.resource_id,caseRevision:row.case_revision,
+  commandReceiptId:row.command_receipt_id,jobId:row.job_id,jobStatus:row.job_status as TrustedResearchJobReceiptV1["jobStatus"],
+  outcome:row.outcome as TrustedResearchJobReceiptV1["outcome"]});
+}
