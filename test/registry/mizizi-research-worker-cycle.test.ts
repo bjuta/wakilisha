@@ -1836,6 +1836,40 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    .rejects.toThrow("NO_AFFORDABLE_CAPABLE_MODEL");
   expect(noModel.send).not.toHaveBeenCalled();
  });
+ it("recycles only a confirmed durable ordinary response charge within the same pass",async()=>{
+  const h=fixture(),events:Parameters<DeskAnthropicOptionsV1["recordModelEvent"]>[0][]=[];
+  const recordModelEvent:DeskAnthropicOptionsV1["recordModelEvent"]=async e=>{
+   events.push(e);
+   // 500 input * $0.10/M + 100 output * $0.50/M = 100 microusd.
+   if(e.state==="response_metered")return 100;
+  };
+  const out=await createCostRoutedDeskAnthropicPassV1({...h.config,recordModelEvent,
+   assessRequirement:async()=>({...requirement,maximumCostMicrousd:2200})})(identity,question,[]);
+  expect(out.costUnits).toBe(3);
+  expect(h.send).toHaveBeenCalledTimes(3);
+  expect(events.filter(e=>e.state==="response_metered").map(e=>e.responseModel)).toEqual(
+   ["fixture-haiku","fixture-haiku","fixture-haiku"]);
+  for(const invalid of [0,99,2001,undefined]){
+   const f=fixture();
+   await expect(createCostRoutedDeskAnthropicPassV1({...f.config,
+    recordModelEvent:async e=>e.state==="response_metered"?invalid:undefined,
+    assessRequirement:async()=>({...requirement,maximumCostMicrousd:2200})})(identity,question,[]))
+    .rejects.toThrow("COST_QUOTE_UNCONFIRMED");
+   expect(f.send).toHaveBeenCalledTimes(1);
+  }
+ });
+ it("retains the full hold for a different response model or cache usage",async()=>{
+  const wrong=fixture();wrong.replies[0]={...wrong.replies[0],model:"fixture-sonnet"};
+  await expect(createCostRoutedDeskAnthropicPassV1(wrong.config)(identity,question,[])).rejects.toThrow("MODEL_RESPONSE_UNCONFIRMED");
+  expect(wrong.recordModelEvent.mock.calls.at(-1)?.[0]).toMatchObject({state:"response_unconfirmed"});
+  const cached=fixture();
+  cached.replies[0]={...cached.replies[0],usage:{...cached.replies[0].usage,cache_read_input_tokens:5} as never};
+  await expect(createCostRoutedDeskAnthropicPassV1({...cached.config,
+   recordModelEvent:async e=>e.state==="response_metered"?100:undefined,
+   assessRequirement:async()=>({...requirement,maximumCostMicrousd:2200})})(identity,question,[]))
+   .rejects.toThrow("COST_QUOTE_UNCONFIRMED");
+  expect(cached.send).toHaveBeenCalledTimes(1);
+ });
  it("rejects unknown tools, forged lead IDs, unconfirmed custody, and revoked source authority without disclosing evidence",async()=>{
   const unknown=fixture();unknown.replies[0]=nextTool("execute_sql",{query:"unsafe"},"toolu_bad");
   await expect(createCostRoutedDeskAnthropicPassV1(unknown.config)(identity,question,[])).rejects.toThrow("UNKNOWN_TOOL");
@@ -1878,6 +1912,7 @@ describe("MIZIZI durable resource finance adapters",()=>{
      pricingRef:model?"pricing:fixture-haiku":null,maxInputTokens:model?5000:null,maxOutputTokens:model?2500:null,
      maximumCostMicrousd:model?units:0,...(fn==="mizizi_reserve_desk_resource_v1"?{reservationId:EVENT}:{})},error:null};
    }
+   if(fn==="mizizi_read_desk_resource_encumbrance_v1")return {data:100,error:null};
    return {data:true,error:null};
   });
   return {calls,budget:createDeskResourceBudgetV1({rpc,now:()=>NOW})};
@@ -1903,6 +1938,17 @@ describe("MIZIZI durable resource finance adapters",()=>{
   expect(JSON.stringify(h.calls)).not.toContain("Private test question");
   await expect(finance.quote(binding,body+" ")).rejects.toThrow("MODEL_ENVELOPE_BINDING_DENIED");
   expect(h.calls).toHaveLength(4);
+ });
+ it("reads the exact durable ordinary meter after the append is acknowledged",async()=>{
+  const h=fixture(),finance=h.budget.modelFinance({apiKey:key});
+  const event={reservationId:EVENT,requestSha256:"a".repeat(64),state:"response_metered" as const,
+   usage:{inputTokens:500,outputTokens:100,cacheCreationTokens:0,cacheReadTokens:0},responseModel:"fixture-haiku"};
+  await expect(finance.recordModelEvent(event)).resolves.toBe(100);
+  expect(h.calls).toEqual([
+   {fn:"mizizi_record_desk_resource_event_v1",args:{p_reservation_id:EVENT,p_request_sha256:event.requestSha256,
+    p_account_fingerprint:account,p_state:"response_metered",p_detail:{...event.usage,responseModel:event.responseModel}}},
+   {fn:"mizizi_read_desk_resource_encumbrance_v1",args:{p_reservation_id:EVENT,p_request_sha256:event.requestSha256,p_account_fingerprint:account}}
+  ]);
  });
  it("precharges native hops and browser reservations in their own units, not monetary inference",async()=>{
   const h=fixture();
