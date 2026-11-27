@@ -2992,3 +2992,35 @@ describe("MIZIZI source-first discovery-only pass",()=>{
   await expect(runDeskDiscoveryOnlyPassV1(input)).rejects.toThrow("RESULT_DENIED");
  });
 });
+
+describe("MIZIZI independent recording-field adjudication",()=>{
+ it("binds evaluator-only decisions to exact journal claims and source spans, without counting partial coverage as resolution",async()=>{
+  const {adjudicateRecordingFieldsV1,RECORDING_RESEARCH_FIELDS_V1}=await import("../../scripts/registry/agents/mizizi/runtime/research-field-adjudication-v1");
+  const h=(value:string)=>createHash("sha256").update(value,"utf8").digest("hex");
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"Investigate the exact recording version."};
+  const excerpt="A fixture archive identifies the performer.",statement="The performer is identified by the fixture archive.";
+  const body={contract:"mizizi.adaptive_investigation.v1" as const,caseId:CASE,workspaceId:WORKSPACE,ordinal:1,
+   question:identity.openingQuestion,predecessorFingerprint:null,
+   sourceReceipts:[{sourceId:RECEIPT,originKey:"fixture:archive-origin",lineageKey:"fixture:archive-lineage",payloadFingerprint:h("fixture bytes"),
+    useBasis:"documented_contract",authorityRef:"fixture:authority",observedAt:new Date(0).toISOString(),citation:"https://archive.org/details/fixture",
+    excerpt,modelDisclosed:true}],findings:[{statement,sourceIds:[RECEIPT],interpretation:"hypothesis" as const,uncertainty:.4,
+    reasoningSummary:"The original archive gives the performer.",independentlyVerified:false,verificationRef:null}],
+   passFinding:"The performer remains independently unreviewed.",proposedLeads:[],
+   decision:{action:"pause" as const,nextQuestion:null,rationale:"Independent review is required.",revisitTrigger:"New independent evidence"},
+   modelVersion:"fixture:model",promptFingerprint:h("prompt"),recordedAt:new Date(1000).toISOString(),costUnits:42};
+  const pass={...body,fingerprint:h(JSON.stringify(body))};
+  const source=body.sourceReceipts[0],span={sourceId:RECEIPT,payloadFingerprint:source.payloadFingerprint,lineageKey:source.lineageKey,
+   excerptSha256:h(excerpt),spanStart:0,spanLength:excerpt.length,spanSha256:h(excerpt)};
+  const fields=RECORDING_RESEARCH_FIELDS_V1.map(field=>field==="performer"?{field,disposition:"correct",reviewRef:"review:performer",
+   rationale:"Evaluator checked the original recording credit.",finding:{passFingerprint:pass.fingerprint,claimIndex:0,statementSha256:h(statement)},evidence:[span]}:
+   {field,disposition:"unresolved",reviewRef:"review:unresolved",rationale:"No independently reviewed field evidence.",evidence:[]});
+  const review={contract:"mizizi.recording_field_review.v1",caseId:CASE,workspaceId:WORKSPACE,subjectVersionSha256:h("version"),rubricSha256:h("rubric"),
+   lastFingerprint:pass.fingerprint,reviewerRef:"fixture:independent-reviewer",reviewedAt:new Date(2000).toISOString(),fields};
+  const score=(packet:unknown)=>{const reviewText=JSON.stringify(packet);return adjudicateRecordingFieldsV1({identity,history:[pass],subjectVersionSha256:h("version"),
+   rubricSha256:h("rubric"),reviewText,reviewSha256:h(reviewText),now:3000});};
+  expect(score(review)).toMatchObject({correct:1,incorrect:0,unresolved:5,unreviewable:0,precision:1,reviewedCoverage:1/6,recordingFullyCorrect:false,journalCostUnits:42});
+  expect(()=>score({...review,lastFingerprint:h("other")})).toThrow("SCOPE");
+  expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,evidence:[{...span,spanSha256:h("forged")}]}:f)})).toThrow("EVIDENCE_BINDING");
+  expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,finding:{...f.finding,statementSha256:h("different claim")}}:f)})).toThrow("CLAIM_BINDING");
+ });
+});

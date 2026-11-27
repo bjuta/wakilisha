@@ -45,7 +45,7 @@ const schema=(properties:Record<string,unknown>)=>({type:"object",additionalProp
 const QUERY={query:{type:"string"}},LEAD={lead_id:{type:"string"}};
 const TOOL_SPECS=[
  ["search_registry","Find possible canonical Registry subjects; not an identity decision.",QUERY],
- ["recall_evidence",'Retrieve one previously examined native source from this same case using the exact query "case evidence".',QUERY],
+ ["recall_evidence",'Retrieve one previously examined native source or unexamined reference from this same case using the exact query "case evidence". A reference is not evidence.',QUERY],
  ["search_web","Discover public web leads using an authorized research query.",QUERY],
  ["search_news","Discover public reporting leads using an authorized research query.",QUERY],
  ["read_page","Acquire and interpret a previously returned public source lead.",LEAD],
@@ -301,7 +301,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    ids.add(block.id);
    const typedLeads=result.leads as DeskToolLeadV1[],sources=result.sources as SourceExcerptV1[];
    const visual=result.visual as {sourceId:string;sha256:string;contentType:string}|null;
-   if(call.name==="recall_evidence"&&(typedLeads.length||sources.length!==1||visual||unavailable))return false;
+   if(call.name==="recall_evidence"&&(visual||unavailable||!((typedLeads.length===0&&sources.length===1)||(typedLeads.length===1&&typedLeads[0].kind==="reference"&&sources.length===0))))return false;
    for(const lead of typedLeads){if(!UUID.test(lead.id)||leads.has(lead.id))return false;leads.set(lead.id,lead);}
    for(const s of sources){if(!UUID.test(s.source.sourceId)||sourceIds.includes(s.source.sourceId))return false;sourceIds.push(s.source.sourceId);}
    const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
@@ -636,7 +636,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    if(!raw||!UUID.test(raw.receiptId)||receipts.some(r=>r.receiptId===raw.receiptId)||
      !Array.isArray(raw.leads)||!Array.isArray(raw.sources)||raw.leads.length>20||
      raw.sources.length>MAX_SOURCES)fail("TOOL_RESULT_INVALID");
-   if(call.name==="recall_evidence"&&(raw.leads.length||raw.sources.length!==1||raw.visual||raw.unavailable))fail("RECALL_RESULT_INVALID");
+   if(call.name==="recall_evidence"&&(raw.visual||raw.unavailable||!((raw.leads.length===0&&raw.sources.length===1)||(raw.leads.length===1&&raw.leads[0].kind==="reference"&&raw.sources.length===0))))fail("RECALL_RESULT_INVALID");
    const newLeads=raw.leads.map(l=>{
     if(!l||!UUID.test(l.id)||!["reference","document","render","visual","browser_action"].includes(l.kind)||
      (l.kind==="browser_action"&&call.name!=="browse_page")||

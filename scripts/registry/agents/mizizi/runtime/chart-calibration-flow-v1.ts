@@ -175,6 +175,38 @@ export async function runChartCalibrationJobV1(input:Readonly<{
  });
 }
 
+/** Drive only confirmed productive yields of the same existing job. A failed,
+ * zero-claim or ambiguous cycle is a stop, not retry authority. Every cycle
+ * receives a durable checkpoint before another lease can be claimed. The
+ * worker independently revalidates the case, originals, policy and finance.
+ */
+export async function driveProductiveChartResearchV1(input:Readonly<{
+ receipt:TrustedResearchJobReceiptV1;maxLeases:number;
+ cycle:(receipt:TrustedResearchJobReceiptV1)=>Promise<Awaited<ReturnType<typeof runChartCalibrationJobV1>>>;
+ checkpoint:(ordinal:number,result:Awaited<ReturnType<typeof runChartCalibrationJobV1>>)=>Promise<void>;
+}>){
+ const {receipt,maxLeases,cycle,checkpoint}=input;
+ if(!receipt||receipt.caseId!==receipt.resourceId||![receipt.caseId,receipt.workspaceId,receipt.jobId,receipt.commandReceiptId].every(x=>UUID.test(x))||
+  !["queued","retry_wait"].includes(receipt.jobStatus)||!Number.isSafeInteger(maxLeases)||maxLeases<1||maxLeases>20||
+  typeof cycle!=="function"||typeof checkpoint!=="function")fail("DRIVE_SCOPE");
+ const results:Awaited<ReturnType<typeof runChartCalibrationJobV1>>[]=[];
+ let next=receipt;
+ for(let ordinal=1;ordinal<=maxLeases;ordinal++){
+  const result=await cycle(next);
+  const continued=result?.continued??0;
+  if(!result||result.contract!=="mizizi.research_worker_cycle.v1"||
+   ![result.claimed,result.succeeded,result.failed,continued].every(n=>Number.isSafeInteger(n)&&n>=0&&n<=1)||
+   result.claimed!==result.succeeded+result.failed+continued)fail("DRIVE_RECEIPT");
+  await checkpoint(ordinal,result);
+  results.push(result);
+  if(continued!==1)break;
+  next=Object.freeze({...receipt,jobStatus:"retry_wait" as const});
+ }
+ const last=results.at(-1)!;
+ return Object.freeze({cycles:Object.freeze(results),disposition:last.continued===1?"lease_limit":
+  last.failed===1?"failed":last.succeeded===1?"completed":"not_claimed"});
+}
+
 /** One exact selected case, from fresh or replayed admission to the existing
  * leased worker. Each authoritative receipt is handed to the caller's durable
  * control-plane checkpoint before the next mutation. A thrown RPC/checkpoint

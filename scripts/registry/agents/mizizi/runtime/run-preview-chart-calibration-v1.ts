@@ -10,7 +10,7 @@ import {fileURLToPath} from "node:url";
 import {createClient} from "@supabase/supabase-js";
 import pg from "pg";
 import {prepareChartCalibrationV1,admitChartCalibrationV1,beginChartCalibrationCaseV1,
- dispatchChartCalibrationCaseV1,runChartCalibrationJobV1,type ChartCalibrationAdmissionV1}
+ dispatchChartCalibrationCaseV1,runChartCalibrationJobV1,driveProductiveChartResearchV1,type ChartCalibrationAdmissionV1}
  from "./chart-calibration-flow-v1.ts";
 import {discoverAnthropicResearchModelV1} from "./anthropic-investigation-analyst-v1.ts";
 import {createDockerDeskBrowserHostV1} from "./desk-docker-browser-host-v1.mjs";
@@ -122,7 +122,7 @@ async function requirePrivateOutput(prefix:string){
  if(!parent.isDirectory()||(parent.mode&0o077)!==0)fail("PRIVATE_OUTPUT_REQUIRED");
  // Checkpoint files are not overwritten even on retry. SQL remains the
  // authoritative state if a process stops after mutation and before fsync.
- for(const stage of ["admission","transition","dispatch","worker"]){
+ for(const stage of ["admission","transition","dispatch","worker",...Array.from({length:20},(_,i)=>"worker."+String(i+1).padStart(2,"0"))]){
   try{await lstat(prefix+"."+stage+".json");fail("CHECKPOINT_ALREADY_EXISTS");}
   catch(e){if((e as NodeJS.ErrnoException)?.code!=="ENOENT")throw e;}
  }
@@ -210,7 +210,9 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
   const job=await dispatchChartCalibrationCaseV1(query,transition);
   await checkpoint(outputPrefix+".dispatch.json",job);
   if(job.jobStatus==="running"||job.jobStatus==="succeeded")return {stage:job.jobStatus,jobId:job.jobId};
-  const result=await runChartCalibrationJobV1({receipt:job,serviceRpc,storage:service.storage,
+  const result=await driveProductiveChartResearchV1({receipt:job,maxLeases:c.maxTotalPasses,
+   checkpoint:async(ordinal,cycle)=>{await checkpoint(outputPrefix+".worker."+String(ordinal).padStart(2,"0")+".json",cycle);},
+   cycle:async receipt=>runChartCalibrationJobV1({receipt,serviceRpc,storage:service.storage,
    registryClient:service,preflight:async r=>live(m.validUntil)&&r.caseId===c.caseId&&r.workspaceId===m.workspaceId&&
     r.caseRevision===transition.expectedRevision,
    runtime:{credentials:{anthropic:{apiKey,workspaceId},nativeAccountFingerprint:c.nativeAccountFingerprint,discovery:c.discovery},
@@ -221,7 +223,7 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
     // Calibration gathers hypotheses; human adjudication remains separate.
     // Never mark a model's finding verified merely because it cited sources.
     verifyFinding:async()=>({verified:false,verificationRef:null}),
-    maxTotalPasses:c.maxTotalPasses,costBudgetUnits:c.costBudgetUnits,leaseSeconds:300}});
+    maxTotalPasses:c.maxTotalPasses,costBudgetUnits:c.costBudgetUnits,leaseSeconds:300}})});
   await checkpoint(outputPrefix+".worker.json",result);
   return {stage:"worker_returned",jobId:job.jobId,result};
  }finally{await pool.end();}

@@ -183,7 +183,7 @@ export function createDeskResearchDispatcherV1(options:Options){
  if(!discovery.size)fail("DISCOVERY_CONFIGURATION_REQUIRED");
  const discoveryHosts=Object.freeze(Object.fromEntries([...discovery].map(([op,value])=>[op,value.host])));
  const unavailableHosts=new Set<string>();
- let recallCandidate:Readonly<{sourceReceiptId:string;sourceResultSha256:string}>|null=null;
+ let recallCandidate:Readonly<{sourceReceiptId:string;sourceResultSha256:string;originLeadId?:string}>|null=null;
  if(options.localBrowser&&(options.browser||typeof options.authorizeInteractiveCall!=="function"||
   typeof options.localBrowser.authorizeAccess!=="function"||typeof options.localBrowser.authorizeQuery!=="function"))
   fail("LOCAL_BROWSER_CONFIGURATION_DENIED");
@@ -440,14 +440,21 @@ export function createDeskResearchDispatcherV1(options:Options){
     fail("RECALL_AUTHORITY_DENIED");
    const origin=recallCandidate!;
    const prior=await readReceipt(origin.sourceReceiptId);
-   if(!prior||prior.row.resultSha256!==origin.sourceResultSha256||prior.result.sources.length!==1||
-    prior.result.unavailable||prior.result.visual||prior.result.sources[0].source.sourceId!==origin.sourceReceiptId)
+   if(!prior||prior.row.resultSha256!==origin.sourceResultSha256||prior.result.unavailable||prior.result.visual)
     fail("RECALL_ORIGIN_DENIED");
-   const entry=prior!.result.sources[0];
-   verifyInvestigationSourceV1(entry.source,identity,now());
-   if(!entry.source.externalModelProcessingAllowed)fail("RECALL_DISCLOSURE_DENIED");
    const receiptId=randomUUID();
-   const result:DeskToolResultV1={receiptId,leads:[],sources:[{source:{...entry.source,sourceId:receiptId},excerpt:entry.excerpt,citation:entry.citation}]};
+   let result:DeskToolResultV1;
+   if(origin.originLeadId){
+    const lead=prior!.result.leads.find(l=>l.id===origin.originLeadId&&l.kind==="reference");
+    if(!lead||prior!.result.sources.length||!text(lead.label,500))fail("RECALL_LEAD_DENIED");
+    result={receiptId,leads:[{id:randomUUID(),kind:"reference",label:lead!.label}],sources:[]};
+   }else{
+    if(prior!.result.sources.length!==1||prior!.result.sources[0].source.sourceId!==origin.sourceReceiptId)fail("RECALL_ORIGIN_DENIED");
+    const entry=prior!.result.sources[0];
+    verifyInvestigationSourceV1(entry.source,identity,now());
+    if(!entry.source.externalModelProcessingAllowed)fail("RECALL_DISCLOSURE_DENIED");
+    result={receiptId,leads:[],sources:[{source:{...entry.source,sourceId:receiptId},excerpt:entry.excerpt,citation:entry.citation}]};
+   }
    const resultText=bodyOf(result),resultSha256=hash(resultText);
    const admitted=await rpc("mizizi_admit_desk_same_case_recall_v1",{p_call_text:callText,p_call_sha256:callSha256,
     p_receipt_id:receiptId,p_origin_id:origin.sourceReceiptId,p_result_text:resultText,p_result_sha256:resultSha256}) as
@@ -784,12 +791,19 @@ export function createDeskResearchDispatcherV1(options:Options){
   live();
   if(options.allowSameCaseRecall&&history.length){
    const raw=await rpc("mizizi_read_desk_same_case_recall_candidate_v1",{p_scope:scope}) as
-    {sourceReceiptId:string;sourceResultSha256:string}|null;
+    {sourceReceiptId:string;sourceResultSha256:string;originLeadId?:string}|null;
    if(raw!==null){
-    if(!raw||Object.keys(raw).length!==2||!UUID.test(raw.sourceReceiptId)||!SHA.test(raw.sourceResultSha256)||
-     !history.some(p=>p.sourceReceipts.some(s=>s.sourceId===raw.sourceReceiptId&&s.modelDisclosed===true)&&
+    if(!raw||Object.keys(raw).sort().join(",")!==(raw.originLeadId===undefined?"sourceReceiptId,sourceResultSha256":"originLeadId,sourceReceiptId,sourceResultSha256")||
+     !UUID.test(raw.sourceReceiptId)||!SHA.test(raw.sourceResultSha256)||(raw.originLeadId!==undefined&&!UUID.test(raw.originLeadId))||
+     !history.some(p=>(raw.originLeadId!==undefined||p.sourceReceipts.some(s=>s.sourceId===raw.sourceReceiptId&&s.modelDisclosed===true))&&
       p.deskToolReceipts?.some(r=>r.receiptId===raw.sourceReceiptId&&r.resultSha256===raw.sourceResultSha256)))
      fail("RECALL_CANDIDATE_DENIED");
+    if(raw.originLeadId!==undefined){
+     const original=await readReceipt(raw.sourceReceiptId);
+     if(!original||original.row.resultSha256!==raw.sourceResultSha256||original.result.sources.length||
+      original.result.unavailable||original.result.visual||!original.result.leads.some(l=>l.id===raw.originLeadId&&l.kind==="reference"))
+      fail("RECALL_CANDIDATE_DENIED");
+    }
     recallCandidate=Object.freeze({...raw});
    }
   }

@@ -1,6 +1,6 @@
 -- CLI 2.107.0 mint #46024796517. Issue #1441.
--- Same-case native-text recall only. No entitlement, new provider, old transcript,
--- unexamined lead, browser state, cross-case reuse, or canonical assertion.
+-- Same-case native-text and unexamined public-reference recall. No entitlement,
+-- new provider, old transcript, browser state, cross-case reuse or canonical assertion.
 begin;
 set local lock_timeout='5s';
 set local statement_timeout='90s';
@@ -16,10 +16,15 @@ end $guard$;
 alter table mizizi_private.desk_tool_receipts_v1
  drop constraint desk_tool_receipts_v1_operation_check,
  add constraint desk_tool_receipts_v1_operation_check check(operation in ('search_web','search_news','read_page','read_document','render_page','inspect_visual','browse_page','recall_evidence'));
+alter table mizizi_private.desk_operational_policy_versions_v1
+ drop constraint desk_operational_policy_versions_v1_tool_names_check,
+ add constraint desk_operational_policy_versions_v1_tool_names_check check(cardinality(tool_names) between 1 and 7);
 -- One recall of each original source in this investigation; never issue a second
 -- copy to make repeated evidence look like independent observations.
 create unique index mz_desk_same_case_recall_origin_once on mizizi_private.desk_tool_receipts_v1(case_id,parent_receipt_id)
- where operation='recall_evidence';
+ where operation='recall_evidence' and source_id is not null;
+create unique index mz_desk_same_case_recall_lead_once on mizizi_private.desk_tool_receipts_v1(case_id,(provenance->'sameCaseRecall'->>'originLeadId'))
+ where operation='recall_evidence' and source_id is null;
 
 create or replace function mizizi_private.guard_desk_operational_policy_v1()
 returns trigger language plpgsql set search_path=pg_catalog as $guard$
@@ -105,23 +110,54 @@ begin
   item||jsonb_build_object('source',a||jsonb_build_object('sourceId',p_id))),'visual',null);
 end $f$;
 
+-- A retained search result is a reference only. Bind the exact old lead and
+-- label, but create a fresh opaque ID; URL stays in the private lead table.
+create function mizizi_private.desk_same_case_lead_projection_v1(r mizizi_private.desk_tool_receipts_v1,
+ l mizizi_private.desk_reference_leads_v1,p_id uuid,p_new_lead uuid)
+returns jsonb language plpgsql stable set search_path=pg_catalog as $f$
+begin
+ if r.id is null or l.id is null or p_id is null or p_new_lead is null or p_id=r.id or p_new_lead=l.id
+ or r.operation not in ('search_web','search_news') or r.source_id is not null or r.parent_receipt_id is not null
+ or r.provenance ? 'sharedNativeSearch' or l.receipt_id<>r.id or l.kind<>'reference'
+ or r.result_sha256 is distinct from encode(sha256(convert_to(r.result_text,'UTF8')),'hex')
+ or r.result_text::jsonb ? 'unavailable' or r.result_text::jsonb->'sources' is distinct from '[]'::jsonb
+ or r.result_text::jsonb->'visual' is distinct from 'null'::jsonb
+ or not(r.result_text::jsonb->'leads' @> jsonb_build_array(jsonb_build_object('id',l.id,'kind','reference','label',l.label)))
+ or mizizi_private.desk_custody_url_host_v1(l.url) is null then return null;end if;
+ return jsonb_build_object('receiptId',p_id,'leads',jsonb_build_array(jsonb_build_object('id',p_new_lead,'kind','reference','label',l.label)),
+  'sources','[]'::jsonb,'visual',null);
+end $f$;
+
 -- Called by current custody ancestry traversal, without recursively invoking
 -- that traversal here. The parent is independently checked on the next loop.
 create function mizizi_private.desk_same_case_recall_current_v1(r mizizi_private.desk_tool_receipts_v1,c jsonb)
 returns boolean language plpgsql security definer set search_path=pg_catalog as $f$
-declare origin mizizi_private.desk_tool_receipts_v1;m jsonb;
+declare origin mizizi_private.desk_tool_receipts_v1;m jsonb;old_lead mizizi_private.desk_reference_leads_v1;new_lead mizizi_private.desk_reference_leads_v1;meta jsonb;
 begin
- if r.operation<>'recall_evidence' or r.source_id is distinct from r.id or r.parent_receipt_id is null
+ if r.operation<>'recall_evidence' or (r.source_id is not null and r.source_id is distinct from r.id) or r.parent_receipt_id is null
  or r.result_sha256 is distinct from encode(sha256(convert_to(r.result_text,'UTF8')),'hex') then return false;end if;
  select * into origin from mizizi_private.desk_tool_receipts_v1 where id=r.parent_receipt_id;
  if not found or origin.job_id is distinct from r.job_id or origin.case_id is distinct from r.case_id
  or origin.workspace_id is distinct from r.workspace_id or origin.expected_revision is distinct from r.expected_revision
  or origin.lease_expires_at is not distinct from r.lease_expires_at or origin.recorded_at>=r.recorded_at
  or origin.host is distinct from r.host or origin.policy_revision is distinct from r.policy_revision
- or origin.operational_revision is distinct from r.operational_revision
- or r.provenance is distinct from jsonb_build_object('sameCaseRecall',jsonb_build_object(
-  'originReceiptId',origin.id,'originResultSha256',origin.result_sha256)) then return false;end if;
- m:=mizizi_private.desk_same_case_recall_result_v1(origin,r.id);
+ or origin.operational_revision is distinct from r.operational_revision then return false;end if;
+ meta:=r.provenance->'sameCaseRecall';
+ if r.source_id is not null then
+  if r.provenance is distinct from jsonb_build_object('sameCaseRecall',jsonb_build_object(
+   'originReceiptId',origin.id,'originResultSha256',origin.result_sha256)) then return false;end if;
+  m:=mizizi_private.desk_same_case_recall_result_v1(origin,r.id);
+ else
+  if coalesce(meta->>'originLeadId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+   or coalesce(r.result_text::jsonb->'leads'->0->>'id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' then return false;end if;
+  select * into old_lead from mizizi_private.desk_reference_leads_v1 where id=(meta->>'originLeadId')::uuid;
+  select * into new_lead from mizizi_private.desk_reference_leads_v1 where id=(r.result_text::jsonb->'leads'->0->>'id')::uuid;
+  if old_lead.id is null or new_lead.id is null or new_lead.receipt_id<>r.id or new_lead.url<>old_lead.url
+   or new_lead.label<>old_lead.label or new_lead.kind<>'reference'
+   or r.provenance is distinct from jsonb_build_object('sameCaseRecall',jsonb_build_object(
+    'originReceiptId',origin.id,'originResultSha256',origin.result_sha256,'originLeadId',old_lead.id)) then return false;end if;
+  m:=mizizi_private.desk_same_case_lead_projection_v1(origin,old_lead,r.id,new_lead.id);
+ end if;
  return coalesce(m is not null and m=r.result_text::jsonb,false);
 end $f$;
 
@@ -291,7 +327,7 @@ begin
   if receipt_expiry is null then return null;end if;
   expiry:=least(expiry,receipt_expiry);
   select * into r from mizizi_private.desk_tool_receipts_v1 where id=rid;
-  if r.provenance ? 'sharedNative' or r.provenance ? 'sameCaseRecall' then
+  if r.provenance ? 'sharedNative' or (r.provenance ? 'sameCaseRecall' and r.source_id is not null) then
    expiry:=least(expiry,(r.result_text::jsonb->'sources'->0->'source'->>'expiresAt')::timestamptz);
   elsif r.provenance ? 'sharedNativeSearch' then
    expiry:=least(expiry,(r.provenance->'sharedNativeSearch'->>'validUntil')::timestamptz);
@@ -354,25 +390,76 @@ begin
  return null;
 end $f$;
 
+-- Only original, journal-bound search leads never examined or attempted in
+-- this case are eligible. Revalidate current target native-access standing
+-- policy; acquisition itself still requires its own exact grant and budget.
+create function mizizi_private.desk_same_case_lead_candidate_v1(c jsonb)
+returns mizizi_private.desk_reference_leads_v1 language plpgsql security definer set search_path=pg_catalog as $f$
+declare o mizizi_private.desk_operational_policy_versions_v1;j platform_private.jobs%rowtype;
+ l mizizi_private.desk_reference_leads_v1;r mizizi_private.desk_tool_receipts_v1;
+ p mizizi_private.desk_custody_policy_versions_v1;h text;
+begin
+ if c is null then return null;end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if not coalesce(mizizi_private.desk_operational_policy_live_v1(o,c),false) or not o.adaptive_followups_allowed
+ or not('recall_evidence'=any(o.tool_names)) or not('read_page'=any(o.tool_names)) then return null;end if;
+ select * into j from platform_private.jobs where id=(c->>'jobId')::uuid;
+ if not found or j.status<>'running' or j.locked_at is null then return null;end if;
+ perform mizizi_private.assert_desk_journal_current_v1(j.id,j.locked_by,o.case_id,null);
+ if (select count(*) from mizizi_private.desk_tool_receipts_v1 d where d.case_id=o.case_id)>=200 then return null;end if;
+ for l in select lead.* from mizizi_private.desk_reference_leads_v1 lead
+  join mizizi_private.desk_tool_receipts_v1 d on d.id=lead.receipt_id
+  where d.case_id=o.case_id and d.workspace_id=o.workspace_id and d.job_id=j.id
+   and d.expected_revision=o.expected_revision and d.operational_revision=o.revision
+   and d.lease_expires_at is distinct from j.lease_expires_at and d.operation in ('search_web','search_news')
+   and lead.kind='reference' and not(d.provenance ? 'sharedNativeSearch') and not(d.result_text::jsonb ? 'unavailable')
+   and exists(select 1 from mizizi_private.research_passes p where p.case_id=d.case_id and p.workspace_id=d.workspace_id and p.job_id=j.id
+    and p.body_text::jsonb->'deskToolReceipts' @> jsonb_build_array(jsonb_build_object('receiptId',d.id,'callSha256',d.call_sha256,'resultSha256',d.result_sha256)))
+   and not exists(select 1 from mizizi_private.desk_tool_receipts_v1 q where q.case_id=d.case_id and
+    (q.operation='recall_evidence' and q.provenance->'sameCaseRecall'->>'originLeadId'=lead.id::text
+     or q.operation in ('read_page','browse_page') and (q.provenance->>'requestedUrl'=lead.url or q.provenance->>'finalUrl'=lead.url)))
+   and not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q where q.case_id=d.case_id
+    and q.operation in ('native_acquire','browser_render','browser_request') and q.url_sha256=encode(sha256(convert_to(lead.url,'UTF8')),'hex'))
+  order by d.recorded_at,d.id,lead.id limit 200
+ loop
+  select * into r from mizizi_private.desk_tool_receipts_v1 where id=l.receipt_id;
+  h:=mizizi_private.desk_custody_url_host_v1(l.url);
+  p:=mizizi_private.current_desk_custody_policy_v1(o.workspace_id,h);
+  if h is not null and coalesce(mizizi_private.desk_custody_policy_live_v1(p),false) and p.source_family='public_web'
+   and mizizi_private.desk_operational_url_allowed_v1(o,h,l.url,'native_acquire',p.revision)
+   and not exists(select 1 from mizizi_private.desk_tool_receipts_v1 d where d.case_id=o.case_id
+    and d.result_text::jsonb->'unavailable'->>'host'=h)
+   and coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false)
+   and mizizi_private.desk_same_case_lead_projection_v1(r,l,'00000000-0000-4000-8000-000000000000','00000000-0000-4000-8000-000000000001') is not null
+  then return l;end if;
+ end loop;
+ return null;
+end $f$;
+
 -- Pre-inference inventory exposes only an exact receipt identity and digest to
 -- the trusted service executor; no old excerpt/lead is sent to a model here.
 create function public.mizizi_read_desk_same_case_recall_candidate_v1(p_scope jsonb)
 returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
-declare c jsonb;r mizizi_private.desk_tool_receipts_v1;
+declare c jsonb;r mizizi_private.desk_tool_receipts_v1;l mizizi_private.desk_reference_leads_v1;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  perform pg_advisory_xact_lock(214781521,61431);
  c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null or exists(select 1 from mizizi_private.desk_tool_receipts_v1 q where q.job_id=(p_scope->>'jobId')::uuid
+  and q.lease_expires_at=(p_scope->>'leaseExpiresAt')::timestamptz and q.operation='recall_evidence') then return null;end if;
  r:=mizizi_private.desk_same_case_recall_candidate_v1(c);
- if r.id is null then return null;end if;
- return jsonb_build_object('sourceReceiptId',r.id,'sourceResultSha256',r.result_sha256);
+ if r.id is not null then return jsonb_build_object('sourceReceiptId',r.id,'sourceResultSha256',r.result_sha256);end if;
+ l:=mizizi_private.desk_same_case_lead_candidate_v1(c);
+ if l.id is null then return null;end if;
+ select * into r from mizizi_private.desk_tool_receipts_v1 where id=l.receipt_id;
+ return jsonb_build_object('sourceReceiptId',r.id,'sourceResultSha256',r.result_sha256,'originLeadId',l.id);
 end $f$;
 
 create function public.mizizi_admit_desk_same_case_recall_v1(p_call_text text,p_call_sha256 text,p_receipt_id uuid,
  p_origin_id uuid,p_result_text text,p_result_sha256 text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
 declare b jsonb;s jsonb;c jsonb;r mizizi_private.desk_tool_receipts_v1;fresh mizizi_private.desk_tool_receipts_v1;
- m jsonb;o mizizi_private.desk_operational_policy_versions_v1;
+ m jsonb;o mizizi_private.desk_operational_policy_versions_v1;l mizizi_private.desk_reference_leads_v1;new_lead uuid;meta jsonb;new_source uuid;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  if p_call_text is null or octet_length(p_call_text) not between 1 and 4096
@@ -394,8 +481,20 @@ begin
  if exists(select 1 from mizizi_private.desk_tool_receipts_v1 q where q.job_id=(s->>'jobId')::uuid
   and q.lease_expires_at=(s->>'leaseExpiresAt')::timestamptz and q.operation='recall_evidence') then return null;end if;
  r:=mizizi_private.desk_same_case_recall_candidate_v1(c);
- if r.id is distinct from p_origin_id then return null;end if;
- m:=mizizi_private.desk_same_case_recall_result_v1(r,p_receipt_id);
+ if r.id is not null then
+  if r.id is distinct from p_origin_id then return null;end if;
+  new_source:=p_receipt_id;
+  m:=mizizi_private.desk_same_case_recall_result_v1(r,p_receipt_id);
+  meta:=jsonb_build_object('originReceiptId',r.id,'originResultSha256',r.result_sha256);
+ else
+  l:=mizizi_private.desk_same_case_lead_candidate_v1(c);
+  if l.id is null or l.receipt_id is distinct from p_origin_id
+   or coalesce(p_result_text::jsonb->'leads'->0->>'id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' then return null;end if;
+  select * into r from mizizi_private.desk_tool_receipts_v1 where id=l.receipt_id;
+  new_lead:=(p_result_text::jsonb->'leads'->0->>'id')::uuid;
+  m:=mizizi_private.desk_same_case_lead_projection_v1(r,l,p_receipt_id,new_lead);
+  meta:=jsonb_build_object('originReceiptId',r.id,'originResultSha256',r.result_sha256,'originLeadId',l.id);
+ end if;
  if m is null or m is distinct from p_result_text::jsonb
  or public.mizizi_authorize_desk_model_operation_v1(s,'tool_execute',p_call_text,p_call_sha256)->>'allowed' is distinct from 'true'
  then return null;end if;
@@ -403,8 +502,10 @@ begin
   membership_sha256,observation_sha256,operation,call_sha256,result_sha256,host,policy_revision,result_text,provenance,source_id,parent_receipt_id,operational_revision)
  values(p_receipt_id,(s->>'jobId')::uuid,r.case_id,r.workspace_id,r.expected_revision,s->>'workerId',
   (s->>'leaseExpiresAt')::timestamptz,r.membership_sha256,r.observation_sha256,'recall_evidence',p_call_sha256,p_result_sha256,
-  r.host,r.policy_revision,p_result_text,jsonb_build_object('sameCaseRecall',jsonb_build_object('originReceiptId',r.id,
-   'originResultSha256',r.result_sha256)),p_receipt_id,r.id,o.revision) returning * into fresh;
+  r.host,r.policy_revision,p_result_text,jsonb_build_object('sameCaseRecall',meta),new_source,r.id,o.revision) returning * into fresh;
+ if new_lead is not null then
+  insert into mizizi_private.desk_reference_leads_v1(id,receipt_id,url,kind,label) values(new_lead,fresh.id,l.url,'reference',l.label);
+ end if;
  if not coalesce(mizizi_private.desk_custody_receipt_current_v1(fresh,c),false) then
   raise exception 'Recall custody changed' using errcode='42501';end if;
  return jsonb_build_object('receiptId',fresh.id,'resultSha256',fresh.result_sha256,'outcome','created');
@@ -413,6 +514,8 @@ end $f$;
 revoke all on function mizizi_private.desk_same_case_recall_result_v1(mizizi_private.desk_tool_receipts_v1,uuid),
  mizizi_private.desk_same_case_recall_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb),
  mizizi_private.desk_same_case_recall_candidate_v1(jsonb),
+ mizizi_private.desk_same_case_lead_candidate_v1(jsonb),
+ mizizi_private.desk_same_case_lead_projection_v1(mizizi_private.desk_tool_receipts_v1,mizizi_private.desk_reference_leads_v1,uuid,uuid),
  public.mizizi_read_desk_same_case_recall_candidate_v1(jsonb),
  public.mizizi_admit_desk_same_case_recall_v1(text,text,uuid,uuid,text,text)
  from public,anon,authenticated,service_role,mizizi_executor;

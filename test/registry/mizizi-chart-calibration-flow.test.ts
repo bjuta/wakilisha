@@ -1,7 +1,7 @@
 import {describe,it,expect,vi} from "vitest";
 import {
  prepareChartCalibrationV1,admitChartCalibrationV1,beginChartCalibrationCaseV1,
- dispatchChartCalibrationCaseV1,runChartCalibrationFlowV1,runChartCalibrationJobV1,
+ dispatchChartCalibrationCaseV1,runChartCalibrationFlowV1,runChartCalibrationJobV1,driveProductiveChartResearchV1,
 } from "../../scripts/registry/agents/mizizi/runtime/chart-calibration-flow-v1";
 import type {WorkerRpc} from "../../scripts/registry/agents/mizizi/runtime/research-worker-cycle-v1";
 import type {ExactResearchQueryV1} from "../../scripts/registry/agents/mizizi/runtime/run-exact-case-research-job";
@@ -139,6 +139,32 @@ describe("MIZIZI receipt-bound calibration composition",()=>{
   const before=h.order.length;
   await expect(runChartCalibrationJobV1({...h.worker,receipt,preflight:async()=>false})).rejects.toThrow("PREFLIGHT_DENIED");
   expect(h.order.length).toBe(before);
+ });
+});
+
+describe("MIZIZI productive investigation driver",()=>{
+ const cycleResult=(continued:number,succeeded=0,failed=0)=>({contract:"mizizi.research_worker_cycle.v1" as const,
+  recovered:0,claimed:continued+succeeded+failed,succeeded,failed,continued});
+ it("continues the exact job only after durable checkpoint and stops on completion",async()=>{
+  const events:string[]=[];
+  const cycle=vi.fn(async r=>{events.push(r.jobStatus);expect(r.jobId).toBe(receipt.jobId);
+   expect(r.commandReceiptId).toBe(receipt.commandReceiptId);return cycleResult(events.length===1?1:0,events.length===1?0:1);});
+  const result=await driveProductiveChartResearchV1({receipt,maxLeases:3,cycle,
+   checkpoint:async n=>{events.push("checkpoint:"+n);}});
+  expect(events).toEqual(["queued","checkpoint:1","retry_wait","checkpoint:2"]);
+  expect(result).toMatchObject({disposition:"completed"});
+ });
+ it("never retries a failure, zero claim, or unconfirmed checkpoint and respects the lease bound",async()=>{
+  for(const outcome of [cycleResult(0,0,1),cycleResult(0)]){
+   const cycle=vi.fn(async()=>outcome);
+   await driveProductiveChartResearchV1({receipt,maxLeases:3,cycle,checkpoint:async()=>{}});
+   expect(cycle).toHaveBeenCalledTimes(1);
+  }
+  const cycle=vi.fn(async()=>cycleResult(1));
+  await expect(driveProductiveChartResearchV1({receipt,maxLeases:3,cycle,checkpoint:async()=>{throw Error("CHECKPOINT");}})).rejects.toThrow("CHECKPOINT");
+  expect(cycle).toHaveBeenCalledTimes(1);cycle.mockClear();
+  expect(await driveProductiveChartResearchV1({receipt,maxLeases:2,cycle,checkpoint:async()=>{}})).toMatchObject({disposition:"lease_limit"});
+  expect(cycle).toHaveBeenCalledTimes(2);
  });
 });
 
