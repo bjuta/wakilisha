@@ -1832,9 +1832,9 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
  it("explicitly selects Haiku 5.5 ordinary tool mode and rejects unexpected blocks without executing a tool",async()=>{
   const h=fixture(),model="claude-haiku-5-5";
   const readModelInventory=async()=>[{...models[2],model}];
-  const observed:unknown[]=[];
+  const observed:unknown[]=[],choices:unknown[]=[];
   h.send.mockImplementation(async(_url,req)=>{
-   const body=JSON.parse(String(req.body));observed.push(body.thinking);
+   const body=JSON.parse(String(req.body));observed.push(body.thinking);choices.push(body.tool_choice);
    const reply=h.replies.shift()!;
    return providerResponse({...reply,model});
   });
@@ -1854,6 +1854,14 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
   await createCostRoutedDeskAnthropicPassV1({...h.config,readModelInventory,...authority})(identity,question,[]);
   expect(observed).toEqual(Array(3).fill({type:"disabled"}));
+  expect(choices).toEqual([{type:"tool",name:"search_web",disable_parallel_tool_use:true},
+   {type:"any",disable_parallel_tool_use:true},{type:"auto",disable_parallel_tool_use:true}]);
+  const noResearch=fixture();
+  const abstention={hypotheses:[],leads:[{question:"Run search_web next",rationale:"No sources were retrieved.",expectedInformationGain:.8,importance:.9,estimatedCostUnits:2}],passFinding:"No authorized evidence was located.",requestedDisposition:"continue"};
+  noResearch.send.mockImplementationOnce(async()=>providerResponse({model,stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify(abstention)}],usage:{input_tokens:500,output_tokens:100}}));
+  await expect(createCostRoutedDeskAnthropicPassV1({...noResearch.config,readModelInventory})(identity,question,[])).rejects.toThrow("RESEARCH_TOOL_REQUIRED");
+  expect(noResearch.executeTool).not.toHaveBeenCalled();
+  expect(noResearch.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["send_pending","response_metered"]);
   const bad=fixture();
   bad.send.mockImplementationOnce(async()=>providerResponse({...nextTool("search_web",{query:"Nairobi recording archive"},"toolu_search"),model,
    content:[{type:"thinking",thinking:"not admissible",signature:"fixture"},{type:"tool_use",id:"toolu_search",name:"search_web",input:{query:"Nairobi recording archive"}}]}));
@@ -2189,13 +2197,14 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,now:()=>NOW,
    authorizeEnvelope:async b=>({requestSha256:b.requestSha256,policyRef:"fixture:host-envelope",validUntil:expiry,modelDisclosureAllowed:true}),
    authorizeTool:async()=>true});
-  const model="fixture-haiku",events:string[]=[],passes:InvestigationPassV1[]=[];
+  const model="claude-haiku-5-5",events:string[]=[],passes:InvestigationPassV1[]=[];
   let round=0;
   const transport=vi.fn(async(_url:string,init:RequestInit)=>{
    const body=JSON.parse(String(init.body));round++;
    const result=(value:unknown)=>new Response(JSON.stringify({model,usage:{input_tokens:500,output_tokens:100},...value as object}),{headers:{"content-type":"application/json"}});
    const tool=(name:string,input:unknown)=>result({stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_"+round,name,input}]});
-   if(round===1)return tool("search_web",{query:"Nairobi recording archive"});
+   if(round===1){expect(body.tool_choice).toEqual({type:"tool",name:"search_web",disable_parallel_tool_use:true});return tool("search_web",{query:"Nairobi recording archive"});}
+   expect(body.tool_choice).toEqual({type:round===2?"any":"auto",disable_parallel_tool_use:true});
    const latest=JSON.parse(body.messages.at(-1).content[0].content[0].text);
    if(round===2)return tool("read_page",{lead_id:latest.leads[0].id});
    if(round===3){
