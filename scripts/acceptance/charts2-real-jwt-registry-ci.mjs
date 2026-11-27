@@ -1227,6 +1227,121 @@ export async function verifyCharts2RealJwtRegistryV1({
   if sqlerrm<>'ROLLBACK_CONTINUATION_FIXTURE' then raise;end if;
  end;
  end $standing$;
+ -- Independently authorized event admission is a NEW command, not a reset.
+ -- The local JWT role and JIT session simulation follow the existing fixtures.
+ reset role;
+ savepoint reopening_fixture;
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ set local request.jwt.claims='{"role":"service_role"}';
+ do $reopen_terminal$
+ declare v record;s jsonb;p text;fp text;reply jsonb;
+ begin
+  if ${continuationSql(j(scope),continuationFingerprint)}->>'job_status' is distinct from 'retry_wait'
+   then raise exception 'STOP_REOPEN_TEST_YIELD';end if;
+  select * into strict v from public.mizizi_claim_exact_chart_research_job_v1(
+   ${q(job.job_id)}::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(losingWorker)},300);
+  s:=public.mizizi_read_leased_chart_research_context_v1(v.job_id,${q(losingWorker)});
+  p:=(${q(journalBodyFor(deps))}::jsonb||jsonb_build_object('ordinal',2,'question',${q(nextQuestion)},
+   'predecessorFingerprint',${q(continuationFingerprint)},'sourceReceipts','[]'::jsonb,'deskToolReceipts','[]'::jsonb,
+   'decision',jsonb_build_object('action','pause','nextQuestion',null,'revisitTrigger','New independently reviewed source'),
+   'costUnits',0))::text;
+  fp:=encode(sha256(convert_to(p,'UTF8')),'hex');
+  if (select outcome from public.mizizi_append_research_pass_v1(v.job_id,${q(losingWorker)},p,fp,${q(continuationFingerprint)})) is distinct from 'created'
+   then raise exception 'STOP_REOPEN_TEST_PAUSE';end if;
+  reply:=public.mizizi_complete_case_research_job_v1(v.job_id,${q(losingWorker)},jsonb_build_object(
+   'contract','mizizi.read_only_research_result.v1','caseId',${q(pairedId)},'status','evidence_recorded',
+   'sourceReferences',jsonb_build_array(${q(standingPageId)}),'investigation',jsonb_build_object(
+    'disposition','paused','totalPasses',2,'lastFingerprint',fp,'sourceReferenceCount',1)));
+  if reply->>'job_status' is distinct from 'succeeded' then raise exception 'STOP_REOPEN_TEST_TERMINAL';end if;
+  perform set_config('wk.reopen_head',fp,true);
+  perform set_config('wk.reopen_event',gen_random_uuid()::text,true);
+  perform set_config('wk.reopen_observed',clock_timestamp()::text,true);
+  perform set_config('wk.reopen_expiry',(clock_timestamp()+interval '3 minutes')::text,true);
+ end $reopen_terminal$;
+ reset role;
+ set local role authenticated;
+ set local request.jwt.claim.role='authenticated';
+ set local request.jwt.claim.sub=${q(first.id)};
+ set local request.jwt.claims=${q(JSON.stringify({role:"authenticated",sub:first.id}))};
+ do $reopen_approve$ declare e jsonb;begin
+ begin
+  perform public.admin_mizizi_authorize_desk_reopening_v1(${q(pairedId)}::uuid,2,${q(job.job_id)}::uuid,
+   current_setting('wk.reopen_head'),current_setting('wk.reopen_event')::uuid,${q(hash("independently reviewed new archive"))},
+   'new_source',current_setting('wk.reopen_observed')::timestamptz,'Unapproved question for an unrelated recording',
+   current_setting('wk.reopen_expiry')::timestamptz,
+   'I reviewed this new event and authorize bounded read-only continuation under existing permissions and budget.');
+  raise exception 'STOP_REOPEN_UNAPPROVED_QUESTION';
+ exception when sqlstate '42501' then null;end;
+ e:=public.admin_mizizi_authorize_desk_reopening_v1(${q(pairedId)}::uuid,2,${q(job.job_id)}::uuid,
+   current_setting('wk.reopen_head'),current_setting('wk.reopen_event')::uuid,${q(hash("independently reviewed new archive"))},
+   'new_source',current_setting('wk.reopen_observed')::timestamptz,${q(question)},current_setting('wk.reopen_expiry')::timestamptz,
+   'I reviewed this new event and authorize bounded read-only continuation under existing permissions and budget.');
+ if e->>'jobsDispatched' is distinct from '0' or e->>'previousJobId' is distinct from ${q(job.job_id)}
+ then raise exception 'STOP_REOPEN_APPROVAL_RECEIPT';end if;
+ raise notice 'WK_AUTH_MIZIZI_REOPEN_REVIEWED_EVENT=PASS';
+ end $reopen_approve$;
+ reset role;
+ set session authorization mizizi_executor;
+ do $reopen_dispatch$ declare v record;again record;begin
+ begin perform * from mizizi_private.admit_desk_reopening_job_v1(current_setting('wk.reopen_event')::uuid,${q(hash("forged event"))});
+  raise exception 'STOP_REOPEN_FORGED_EVENT';exception when sqlstate '42501' then null;end;
+ select * into strict v from mizizi_private.admit_desk_reopening_job_v1(current_setting('wk.reopen_event')::uuid,${q(hash("independently reviewed new archive"))});
+ select * into strict again from mizizi_private.admit_desk_reopening_job_v1(current_setting('wk.reopen_event')::uuid,${q(hash("independently reviewed new archive"))});
+ if v.outcome<>'created' or v.job_status<>'queued' or v.job_id=${q(job.job_id)}::uuid
+ or v.command_receipt_id=${q(job.command_receipt_id)}::uuid or again.outcome<>'replayed' or again.job_id<>v.job_id
+ then raise exception 'STOP_REOPEN_DISTINCT_COMMAND';end if;
+ perform set_config('wk.reopen_job',v.job_id::text,true);
+ raise notice 'WK_AUTH_MIZIZI_REOPEN_DISTINCT_COMMAND=PASS';
+ end $reopen_dispatch$;
+ reset session authorization;
+ do $reopen_preserved$ begin
+ if not exists(select 1 from platform_private.jobs where id=${q(job.job_id)}::uuid and status='succeeded' and attempt_count=2)
+ or not exists(select 1 from platform_private.command_receipts where id=${q(job.command_receipt_id)}::uuid and status='succeeded')
+ then raise exception 'STOP_REOPEN_OLD_JOB_MUTATED';end if;
+ end $reopen_preserved$;
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ set local request.jwt.claims='{"role":"service_role"}';
+ do $reopen_claim$
+ declare v record;c jsonb;s jsonb;e jsonb;offer jsonb;rid uuid:=gen_random_uuid();ct text;ch text;rt text;rh text;p text;fp text;bad text;
+ begin
+ select * into strict v from public.mizizi_claim_exact_chart_research_job_v1(current_setting('wk.reopen_job')::uuid,${q(pairedId)}::uuid,${q(ws)}::uuid,2,${q(activeWorker)},300);
+ if v.attempt_count<>1 or v.max_attempts<>23 then raise exception 'STOP_REOPEN_CUMULATIVE_ATTEMPTS';end if;
+ c:=public.mizizi_read_leased_chart_research_context_v1(v.job_id,${q(activeWorker)});
+ s:=${j(scope)}||jsonb_build_object('jobId',v.job_id,'leaseExpiresAt',c->'leaseExpiresAt');
+ e:=public.mizizi_read_desk_reopening_event_v1(s);
+ if e->>'sourceEventRef' is distinct from current_setting('wk.reopen_event') or e->>'predecessorFingerprint' is distinct from current_setting('wk.reopen_head')
+ or e->>'question' is distinct from ${q(question)} or (select count(*) from public.mizizi_read_research_passes_v1(v.job_id,${q(activeWorker)}))<>2
+ then raise exception 'STOP_REOPEN_CURRENT_EVENT';end if;
+ offer:=public.mizizi_read_desk_same_case_recall_candidate_v1(s);
+ if offer->>'sourceReceiptId' is distinct from ${q(standingPageId)} then raise exception 'STOP_REOPEN_HISTORIC_SOURCE';end if;
+ ct:=jsonb_build_object('scope',s,'call',jsonb_build_object('name','recall_evidence','input',jsonb_build_object('query','case evidence')))::text;
+ ch:=encode(sha256(convert_to(ct,'UTF8')),'hex');
+ rt:=jsonb_build_object('receiptId',rid,'leads','[]'::jsonb,'sources',jsonb_build_array(
+  ${j(standingExcerpt)}||jsonb_build_object('source',${j(standingSource)}||jsonb_build_object('sourceId',rid))),'visual',null)::text;
+ rh:=encode(sha256(convert_to(rt,'UTF8')),'hex');
+ if public.mizizi_admit_desk_same_case_recall_v1(ct,ch,rid,${q(standingPageId)}::uuid,rt,rh)->>'outcome' is distinct from 'created'
+ or public.mizizi_read_desk_tool_receipt_v1(s,rid)->>'resultSha256' is distinct from rh
+ then raise exception 'STOP_REOPEN_FRESH_RECEIPT';end if;
+ p:=(${q(journalBodyFor(deps))}::jsonb||jsonb_build_object('ordinal',3,'question',${q(question)},
+  'predecessorFingerprint',current_setting('wk.reopen_head'),'sourceReceipts',jsonb_build_array(${j(journalRef)}||jsonb_build_object('sourceId',rid)),
+  'deskToolReceipts',jsonb_build_array(jsonb_build_object('receiptId',rid,'callSha256',ch,'resultSha256',rh)),
+  'reopenEvent',e-'question','decision',jsonb_build_object('action','pause','nextQuestion',null),'costUnits',1))::text;
+ fp:=encode(sha256(convert_to(p,'UTF8')),'hex');
+ bad:=(p::jsonb-'reopenEvent')::text;
+ begin perform * from public.mizizi_append_research_pass_v1(v.job_id,${q(activeWorker)},bad,encode(sha256(convert_to(bad,'UTF8')),'hex'),current_setting('wk.reopen_head'));
+  raise exception 'STOP_REOPEN_MISSING_EVENT_POINTER';exception when sqlstate '42501' then null;end;
+ if (select outcome from public.mizizi_append_research_pass_v1(v.job_id,${q(activeWorker)},p,fp,current_setting('wk.reopen_head'))) is distinct from 'created'
+ or public.mizizi_read_desk_reopening_event_v1(s) is not null then raise exception 'STOP_REOPEN_CONSUMED_EVENT';end if;
+ raise notice 'WK_AUTH_MIZIZI_REOPEN_CROSS_JOB_JOURNAL=PASS';
+ end $reopen_claim$;
+ reset role;
+ rollback to savepoint reopening_fixture;
+ release savepoint reopening_fixture;
+ set local role service_role;
+ set local request.jwt.claim.role='service_role';
+ set local request.jwt.claims='{"role":"service_role"}';
  -- A valid receiving lease does not itself grant shared evidence.
  do $shared_default$ begin
  if ${sharedRead()} is not null then raise exception 'STOP_SHARED_RECEIVER_DEFAULT_DENY';end if;

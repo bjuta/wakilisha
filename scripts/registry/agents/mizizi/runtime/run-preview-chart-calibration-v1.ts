@@ -214,7 +214,9 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
   }
   if(!live(m.validUntil))fail("REVIEW_EXPIRED");
   const expectedRevision=event?.expectedRevision??transition!.expectedRevision;
-  const job=event?await admitReviewedDeskReopeningViaTrustedGatewayV1({query},event):await dispatchChartCalibrationCaseV1(query,transition!);
+  const executor={query:async<T=Record<string,unknown>>(sql:string,values:readonly unknown[])=>{
+   const result=await query(sql,values);return {rows:result.rows as T[],rowCount:result.rowCount};}};
+  const job=event?await admitReviewedDeskReopeningViaTrustedGatewayV1(executor,event):await dispatchChartCalibrationCaseV1(query,transition!);
   await checkpoint(outputPrefix+".dispatch.json",job);
   if(job.jobStatus==="running"||job.jobStatus==="succeeded")return {stage:job.jobStatus,jobId:job.jobId};
   const result=await driveProductiveChartResearchV1({receipt:job,maxLeases:c.maxTotalPasses,

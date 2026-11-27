@@ -149,7 +149,7 @@ begin
  perform 1 from mizizi_private.cases where id=e.case_id for update;
  select * into d from mizizi_private.desk_reopening_dispatches_v1 x where x.event_id=e.event_id;
  if found then
-  select * into strict j from platform_private.jobs where id=d.job_id and resource_id=e.case_id and command_receipt_id=d.command_receipt_id;
+  select q.* into strict j from platform_private.jobs q where q.id=d.job_id and q.resource_id=e.case_id and q.command_receipt_id=d.command_receipt_id;
   return query select e.case_id,e.workspace_id,e.case_id,e.expected_revision,j.command_receipt_id,j.id,j.status,'replayed'::text;return;
  end if;
  if (select h.fingerprint from mizizi_private.research_passes h where h.case_id=e.case_id order by h.ordinal desc limit 1) is distinct from e.predecessor_fingerprint

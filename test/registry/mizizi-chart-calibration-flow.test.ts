@@ -238,3 +238,29 @@ describe("MIZIZI Preview executable runtime scope",()=>{
   }finally{await rm(dir,{recursive:true,force:true});}
  });
 });
+
+
+describe("MIZIZI reviewed reopening dispatch",()=>{
+ it("binds a new exact job to the independently reviewed event and never reuses the old job",async()=>{
+  const {admitReviewedDeskReopeningViaTrustedGatewayV1}=await import("../../scripts/registry/agents/mizizi/runtime/shared-job-adapter");
+  const {readCurrentDeskReopeningEventV1}=await import("../../scripts/registry/agents/mizizi/runtime/adaptive-research-worker-handler-v1");
+  const event={eventId:uuid(91),caseId:CASE,workspaceId:WS,previousJobId:JOB,expectedRevision:2,
+   eventSha256:HASH,predecessorFingerprint:"b".repeat(64),validUntil:new Date(Date.now()+60000).toISOString(),jobsDispatched:0 as const};
+  const row={case_id:CASE,workspace_id:WS,resource_id:CASE,case_revision:2,command_receipt_id:uuid(92),
+   job_id:uuid(93),job_status:"queued",outcome:"created"};
+  const query=vi.fn(async(_sql:string,values:readonly unknown[])=>{expect(values).toEqual([event.eventId,event.eventSha256]);return {rows:[row],rowCount:1};});
+  const executor={query:async<T>(sql:string,values:readonly unknown[])=>{const r=await query(sql,values);return {rows:r.rows as T[],rowCount:r.rowCount};}};
+  expect(await admitReviewedDeskReopeningViaTrustedGatewayV1(executor,event)).toMatchObject({jobId:row.job_id,caseId:CASE});
+  await expect(admitReviewedDeskReopeningViaTrustedGatewayV1(executor,{...event,validUntil:new Date(0).toISOString()})).rejects.toThrow("REOPEN_REVIEW_RECEIPT_INVALID");
+  query.mockResolvedValueOnce({rows:[{...row,job_id:JOB}],rowCount:1});
+  await expect(admitReviewedDeskReopeningViaTrustedGatewayV1(executor,event)).rejects.toThrow("REOPEN_JIT_RECEIPT_UNCONFIRMED");
+  const scope={jobId:row.job_id,caseId:CASE,workspaceId:WS,expectedRevision:2,workerId:"mizizi-chart:"+uuid(94),leaseExpiresAt:event.validUntil};
+  const read={sourceEventRef:event.eventId,eventSha256:event.eventSha256,predecessorFingerprint:event.predecessorFingerprint,
+   question:"Which newly reviewed archive confirms the recording?"};
+  const rpc=vi.fn<WorkerRpc>().mockResolvedValueOnce({data:read,error:null}).mockResolvedValueOnce({data:{...read,sourceEventRef:uuid(95)},error:null})
+   .mockResolvedValueOnce({data:null,error:null});
+  expect(await readCurrentDeskReopeningEventV1(rpc,scope,event.eventId)).toEqual(read);
+  await expect(readCurrentDeskReopeningEventV1(rpc,scope,event.eventId)).rejects.toThrow("REOPEN_SCOPE_DENIED");
+  expect(await readCurrentDeskReopeningEventV1(rpc,scope,event.eventId)).toBeUndefined();
+ });
+});
