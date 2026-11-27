@@ -2320,6 +2320,50 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   h.disabled.add("archive.org");
   await expect(restart().restoreJournalHistory(passes)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
  },20000);
+ it("recovers an unexamined original reference with a fresh opaque lead and no search replay",async()=>{
+  const h=fixture(),identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:"Which original sources establish the recording credits?"};
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"})),old=h.receipts.get(first.receiptId)!;
+  const passes:InvestigationPassV1[]=[];
+  const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_n,_prior,p)=>{passes.push(p);}},h.dispatch.verifyJournalPass);
+  await runAdaptiveInvestigationV1({identity,store,maxNewPasses:1,maxTotalPasses:4,costBudgetUnits:20,now:()=>NOW,
+   readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
+   authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:async()=>({verified:false,verificationRef:null}),
+   prepareDeskPass:async()=>({method:"discovery_only",sources:[],deskToolReceipts:[{receiptId:first.receiptId,callSha256:String(old.callSha256),
+    resultSha256:String(old.resultSha256)}],costUnits:0,analysis:{hypotheses:[],leads:[],passFinding:"Unexamined discovery candidate retained.",
+    requestedDisposition:"pause",modelVersion:"mizizi.deterministic_discovery_only.v1",promptFingerprint:hash("fixture:lead-recall")}})});
+  const nextScope={...scope,workerId:"mizizi-chart:"+EVENT,leaseExpiresAt:new Date(NOW+600000).toISOString()};
+  let candidate:unknown={sourceReceiptId:first.receiptId,sourceResultSha256:old.resultSha256,originLeadId:first.leads[0].id};
+  const rpc:WorkerRpc=async(fn,args)=>{
+   if(fn==="mizizi_read_desk_same_case_recall_candidate_v1")return {data:candidate,error:null};
+   if(fn==="mizizi_admit_desk_same_case_recall_v1"){
+    expect(args.p_origin_id).toBe(first.receiptId);
+    const body=JSON.parse(String(args.p_result_text)),id=String(args.p_receipt_id);
+    expect(body.sources).toEqual([]);expect(body.leads[0].id).not.toBe(first.leads[0].id);
+    expect(body.leads[0].label).toBe(first.leads[0].label);
+    h.receipts.set(id,{receiptId:id,callSha256:args.p_call_sha256,resultSha256:args.p_result_sha256,
+     resultText:args.p_result_text,host:"api.search.brave.com",provenance:{sameCaseRecall:{originReceiptId:first.receiptId,
+      originResultSha256:old.resultSha256,originLeadId:first.leads[0].id}}});
+    h.leadRows.set(body.leads[0].id,{...body.leads[0],url,receiptId:id});
+    candidate=null;
+    return {data:{receiptId:id,resultSha256:args.p_result_sha256,outcome:"created"},error:null};
+   }
+   return h.rpc(fn,args);
+  };
+  const fresh=createDeskResearchDispatcherV1({...h.dispatchOptions,scope:nextScope,rpc,allowSameCaseRecall:true});
+  const legitimate=candidate;
+  candidate={...candidate as object,originLeadId:RECEIPT};
+  await expect(fresh.restoreJournalHistory(passes)).rejects.toThrow("RECALL_CANDIDATE_DENIED");
+  candidate=legitimate;
+  expect(await fresh.restoreJournalHistory(passes)).toContain("recall_evidence");
+  const recall={name:"recall_evidence" as const,input:{query:"case evidence"}};
+  const result=await fresh.executeTool(nextScope,recall,hash(JSON.stringify({scope:nextScope,call:recall})));
+  expect(result.sources).toEqual([]);expect(result.leads).toHaveLength(1);
+  expect(JSON.stringify(result)).not.toContain(url);
+  expect(h.provider).toHaveBeenCalledTimes(1);expect(h.native).not.toHaveBeenCalled();
+  const read=call("read_page",{lead_id:result.leads[0].id});
+  const examined=await fresh.executeTool(nextScope,read,hash(JSON.stringify({scope:nextScope,call:read})));
+  expect(examined.sources).toHaveLength(1);expect(h.native).toHaveBeenCalledTimes(1);expect(h.provider).toHaveBeenCalledTimes(1);
+ },20000);
  it("preserves a consumed unavailable discovery result, denies same-host replay, and does not confuse failure with absence",async()=>{
   const h=fixture(textBytes,"text/plain",{},true),query="Nairobi recording archive";
   h.tavily.mockResolvedValueOnce({status:429,contentType:"application/json",body:new Uint8Array(),headers:{}});
