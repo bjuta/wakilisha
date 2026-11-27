@@ -1,53 +1,33 @@
-name: MIZIZI Preview Management Transport Readback
+name: MIZIZI Source First Focused Acceptance
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
+concurrency:
+  group: mizizi-preview-schema-qualification
+  cancel-in-progress: false
 jobs:
-  readback:
+  worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     steps:
-      - name: Read approved Preview key metadata and JIT state only
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          ref: dc772b1c14cdbd71217787807e508853de7f33e3
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os,json,urllib.request,urllib.error
-          ref="ehkmjrjjhzyjkxdfsqdc"
-          root="https://api.supabase.com/v1/projects/"+ref
-          token=os.environ.get("SUPABASE_ACCESS_TOKEN","")
-          if not token: raise SystemExit("MANAGEMENT_CREDENTIAL=MISSING")
-          class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self,*a,**k): return None
-          opener=urllib.request.build_opener(NoRedirect())
-          def read(path,label):
-              try:
-                  req=urllib.request.Request(root+path,headers={"Authorization":"Bearer "+token,"Accept":"application/json"},method="GET")
-                  with opener.open(req,timeout=20) as response:
-                      raw=response.read(200001)
-                      if len(raw)>200000: raise ValueError()
-                      out=json.loads(raw)
-                  print(label+"_HTTP=200")
-                  return out
-              except urllib.error.HTTPError as e:
-                  print(label+"_HTTP="+str(e.code))
-              except Exception:
-                  print(label+"_UNCONFIRMED")
-              return None
-          keys=read("/api-keys?reveal=false","PREVIEW_KEY_METADATA")
-          if isinstance(keys,list):
-              for name in ("anon","service_role"):
-                  print("PREVIEW_"+name.upper()+"_METADATA_COUNT="+str(sum(isinstance(x,dict) and x.get("name")==name for x in keys)))
-          state=read("/jit-access","PREVIEW_JIT_STATE")
-          if isinstance(state,dict):
-              value=state.get("state") or (state.get("data") or {}).get("state") or (state.get("config") or {}).get("state")
-              print("PREVIEW_JIT_STATE="+(value if value in ("disabled","enabled") else "UNCONFIRMED"))
-          selfmap=read("/database/jit","PREVIEW_JIT_SELF_MAPPING")
-          if isinstance(selfmap,dict) and isinstance(selfmap.get("user_roles"),list):
-              print("PREVIEW_JIT_EXECUTOR_MAPPING_PRESENT="+str(any(isinstance(x,dict) and x.get("role")=="mizizi_executor" for x in selfmap["user_roles"])).lower())
-          print("GET_ONLY_NO_KEY_REVEAL_NO_JIT_CHANGE=PASS")
-          PY
+          test "$(git rev-parse HEAD)" = dc772b1c14cdbd71217787807e508853de7f33e3
+          test -z "$(printenv MIZIZI_PREVIEW_OPERATOR_JWT || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_SERVICE_ROLE_KEY || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_JIT_DATABASE_URL || true)"
+          test -z "$(printenv MIZIZI_PREVIEW_ANTHROPIC_API_KEY || true)"
+          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
