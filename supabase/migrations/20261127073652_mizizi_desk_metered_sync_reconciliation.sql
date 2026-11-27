@@ -39,7 +39,7 @@ begin
     if p_detail<>'{}'::jsonb then return false;end if;
    elsif p_state='response_metered' then
     if not(p_detail ?& array['inputTokens','outputTokens','cacheCreationTokens','cacheReadTokens'])
-     or (select count(*) from jsonb_object_keys(p_detail))<>case when p_detail ? 'responseModel' then 5 else 4 end
+     or (select count(*) from jsonb_object_keys(p_detail))<>(case when p_detail ? 'responseModel' then 5 else 4 end)
      then return false;end if;
     -- Only an exact ordinary Messages response may qualify for sync settlement.
     -- Legacy and asynchronous four-field usage receipts retain their existing semantics.
