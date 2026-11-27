@@ -1,4 +1,4 @@
-name: MIZIZI Preview Bounded Session Qualification
+name: MIZIZI Preview Executor Cleanup Regression
 on:
   push:
     branches:
@@ -11,14 +11,44 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
+  cleanup-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Offline exact cleanup contract and runner syntax
+        run: |
+          set -euo pipefail
+          node --test scripts/control-plane/mizizi-preview-executor-residue.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/mizizi-preview-qualification-preflight-temporary.yml').read_text().splitlines()
+          start=next(i for i,l in enumerate(s) if "cat > .mizizi-integrated-run.mjs <<'MIZIZI_RUNNER'" in l)
+          end=next(i for i in range(start+1,len(s)) if s[i].strip()=='MIZIZI_RUNNER')
+          Path('/tmp/mizizi-runner-syntax.mjs').write_text('\n'.join(l[10:] for l in s[start+1:end])+'\n')
+          PY
+          node --check /tmp/mizizi-runner-syntax.mjs
+          echo MIZIZI_EXECUTOR_CLEANUP_OFFLINE=PASS
   integrated:
-    if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
+    # Preserve the corrected runner for the independently reviewed live execution.
+    # This offline increment must never issue another hosted credential.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           ref: c903c786dc37f15869c4bbc093c4a5896a58f3c3
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .mizizi-ops
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -122,6 +152,7 @@ jobs:
           import {readFileSync,writeFileSync,mkdtempSync,rmSync} from "node:fs";
           import {createClient} from "@supabase/supabase-js";
           import pg from "pg";
+          import {captureExecutorIdentity,cleanupExecutorResidue,executorIdentitySql} from "./.mizizi-ops/scripts/control-plane/mizizi-preview-executor-residue.mjs";
           import {validatePreviewCalibrationJitUrlV1} from "./scripts/registry/agents/mizizi/runtime/run-preview-chart-calibration-v1.ts";
           const ref="ehkmjrjjhzyjkxdfsqdc", root="https://"+ref+".supabase.co",api="https://api.supabase.com/v1/projects/"+ref;
           const ws="70555b3d-07b6-41a2-b1b9-7d88f9a5a3ea";
@@ -133,7 +164,7 @@ jobs:
           const token=process.env.SUPABASE_ACCESS_TOKEN,key=process.env.MIZIZI_PREVIEW_ANTHROPIC_API_KEY,imageId=process.env.MIZIZI_IMAGE_ID;
           const dir=mkdtempSync(process.cwd()+"/.mizizi-private-");const opts={auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
           const mask=x=>{if(x)console.log("::add-mask::"+x)};
-          let stage="PREFLIGHT",uid=null,issued=null,operator=null,admin=null,email=null,expiry=null,failed=false;
+          let stage="PREFLIGHT",uid=null,issued=null,operator=null,admin=null,email=null,expiry=null,failed=false,executorIdentity=null;
           const request=async(url,headers,body,method)=>{
            const res=await fetch(url,{headers,method:method??(body===undefined?"GET":"POST"),...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:"error",signal:AbortSignal.timeout(30000)});
            if(!res.ok)throw Object.assign(Error("HTTP"),{httpStatus:res.status});
@@ -168,13 +199,13 @@ jobs:
            await sql("do $g$ begin if not (select allowed from ("+roleGuard+") q) then raise exception 'STOP_ROLE_PREIMAGE';end if; alter role mizizi_executor password '"+verifier+"' valid until '"+expiry+"';end $g$;");
            check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword='"+verifier+"' and rolvaliduntil='"+expiry+"'::timestamptz) as ok")).ok===true);
            url.username="mizizi_executor."+ref;url.password=password;url.port="5432";url.search="";url.searchParams.set("options","-c jit=true");url.hash="";mask(url.href);validatePreviewCalibrationJitUrlV1(url.href,url.hostname,5432);
-           stage="EXECUTOR_TLS";for(let n=0;n<2;n++){const pool=new pg.Pool({connectionString:url.href,ssl:{rejectUnauthorized:true},max:1,connectionTimeoutMillis:10000,query_timeout:30000,statement_timeout:30000});try{const l=await pool.query("select session_user::text as role,current_database() as db");check(l.rowCount===1&&l.rows[0].role==="mizizi_executor"&&l.rows[0].db==="postgres");await pool.query("select mizizi_private.assert_executor_v1()");break}catch(e){if(n!==0||e.code!=="28P01")throw e;await new Promise(r=>setTimeout(r,15000))}finally{await pool.end()}}note("NARROW_EXECUTOR_TLS");
+           stage="EXECUTOR_TLS";for(let n=0;n<2;n++){const pool=new pg.Pool({connectionString:url.href,ssl:{rejectUnauthorized:true},max:1,connectionTimeoutMillis:10000,query_timeout:30000,statement_timeout:30000});let client=null;try{client=await pool.connect();const l=await client.query(executorIdentitySql);check(l.rowCount===1);executorIdentity=captureExecutorIdentity(l.rows[0]);await client.query("select mizizi_private.assert_executor_v1()");break}catch(e){if(n!==0||e.code!=="28P01"||executorIdentity)throw e;await new Promise(r=>setTimeout(r,15000))}finally{if(client)client.release();await pool.end()}}note("NARROW_EXECUTOR_TLS");
            stage="AUTH_READBACK";const current=await operator.auth.getUser(jwt);check(!current.error&&current.data.user?.id===uid);note("GENUINE_OPERATOR_READBACK");
            stage="NO_RESEARCH_MUTATION";check((await one(preimage)).ok===true);note("NO_RESEARCH_MUTATION");
            // No case admission, policy grant, model call, or provider search.
           }catch(e){failed=true;const code=String(e?.message??"");console.log("MIZIZI_STOP_STAGE="+stage);if(/^MIZIZI_[A-Z0-9_]+$/.test(code))console.log("MIZIZI_STOP_CODE="+code);if(Number.isInteger(e?.httpStatus))console.log("MIZIZI_STOP_HTTP="+e.httpStatus);if(/^[A-Z0-9_]{3,40}$/.test(String(e?.code??"")))console.log("MIZIZI_STOP_LAYER_CODE="+e.code)}
           finally{
-           if(issued){try{await sql("do $g$ begin if exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolvaliduntil='"+issued.expiry+"'::timestamptz and (rolpassword='"+issued.verifier+"' or rolpassword is null)) then alter role mizizi_executor password null valid until '1970-01-01 00:00:00+00'; elsif not exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) then raise exception 'STOP_CREDENTIAL_CHANGED';end if;end $g$;");check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) as ok")).ok===true);note("EXECUTOR_REVOKED")}catch{failed=true;console.log("MIZIZI_EXECUTOR_REVOKED=UNCONFIRMED")}}
+           if(issued){try{await sql("do $g$ begin if exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolvaliduntil='"+issued.expiry+"'::timestamptz and (rolpassword='"+issued.verifier+"' or rolpassword is null)) then alter role mizizi_executor password null valid until '1970-01-01 00:00:00+00'; elsif not exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) then raise exception 'STOP_CREDENTIAL_CHANGED';end if;end $g$;");check((await one("select exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp()) as ok")).ok===true);note("EXECUTOR_REVOKED");await cleanupExecutorResidue({query:sql,identity:executorIdentity});note("EXECUTOR_RESIDUE_CLEANUP")}catch{failed=true;console.log("MIZIZI_EXECUTOR_REVOCATION_OR_RESIDUE=UNCONFIRMED")}}
            if(uid&&/^[a-f0-9-]{36}$/.test(uid)){try{await sql("begin; update public.user_role_assignments set status='revoked' where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active'; update mizizi_private.workspace_memberships set revoked_at=clock_timestamp(),revision=revision+1,last_changed_by='"+uid+"',change_reason='Integrated technical run ended; revoke temporary steward' where user_id='"+uid+"' and workspace_id='"+ws+"' and revoked_at is null;commit;");check((await one("select not exists(select 1 from public.user_role_assignments where user_id='"+uid+"' and role_key='mizizi_preview_calibration' and status='active') and not exists(select 1 from mizizi_private.workspace_memberships where user_id='"+uid+"' and revoked_at is null) as ok")).ok===true);note("STEWARD_REVOKED")}catch{failed=true;console.log("MIZIZI_STEWARD_REVOKED=UNCONFIRMED")}}
            if(operator){try{const out=await operator.auth.signOut({scope:"global"});check(!out.error);note("SESSION_SIGNED_OUT")}catch{failed=true;console.log("MIZIZI_SESSION_SIGNED_OUT=UNCONFIRMED")}}
            for(const k of ["MIZIZI_PREVIEW_ANON_KEY","MIZIZI_PREVIEW_SERVICE_ROLE_KEY","MIZIZI_PREVIEW_OPERATOR_JWT","MIZIZI_PREVIEW_JIT_DATABASE_URL","MIZIZI_PREVIEW_ANTHROPIC_API_KEY","SUPABASE_ACCESS_TOKEN"])delete process.env[k];rmSync(dir,{recursive:true,force:true});
