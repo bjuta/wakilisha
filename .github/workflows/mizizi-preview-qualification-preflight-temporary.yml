@@ -58,12 +58,17 @@ jobs:
               stage="KEY_SELECTION"
               if len(selected)!=1: raise ValueError("service credential")
               if not isinstance(selected[0].get("id"),str) or not selected[0]["id"]: raise ValueError("key id")
-              stage="KEY_DETAIL"
-              kid=urllib.parse.quote(selected[0]["id"],safe="")
-              detail=json.loads(request(api+"/api-keys/"+kid+"?reveal=true",mgmt,100000))
-              stage="KEY_FORMAT"
+              stage="KEY_LIST_REVEAL"
+              # Legacy keys are returned by the documented project list
+              # endpoint. The individual detail endpoint rejects the legacy ID.
+              revealed=json.loads(request(api+"/api-keys?reveal=true",mgmt,100000))
+              found=[x for x in revealed if isinstance(x,dict) and x.get("name")=="service_role" and x.get("id")==selected[0]["id"]]
+              if len(found)!=1: raise ValueError("legacy key selection")
+              detail=found[0]
               key=detail.get("api_key","")
-              if detail.get("name")!="service_role" or not isinstance(key,str) or len(key.split("."))!=3: raise ValueError("role")
+              del revealed,found,detail
+              stage="KEY_FORMAT"
+              if not isinstance(key,str) or len(key.split("."))!=3: raise ValueError("role")
               part=key.split(".")[1]
               claims=json.loads(base64.urlsafe_b64decode(part+"="*((4-len(part)%4)%4)))
               stage="KEY_SCOPE"
