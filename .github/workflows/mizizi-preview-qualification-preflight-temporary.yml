@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 3c6841078c9f9f0db4d0b7d3a80a8bdf3fdcb2af
+          ref: 0ee971d3a99ee8bf46f996c0b14ba5b5d6a93ecd
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 3c6841078c9f9f0db4d0b7d3a80a8bdf3fdcb2af
+          test "$(git rev-parse HEAD)" = 0ee971d3a99ee8bf46f996c0b14ba5b5d6a93ecd
           image=mcr.microsoft.com/playwright:v1.63.0-noble
           docker pull "$image"
           export MIZIZI_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$image")"
