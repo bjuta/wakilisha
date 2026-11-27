@@ -1,4 +1,4 @@
-name: MIZIZI Factual Note Readback Focused Regression
+name: MIZIZI Factual Note Context Focused Regression
 on:
   push:
     branches:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 26388540e4a6c231a188b38d8f2ada0bbb2869fd
+          ref: fa2a8a3bbd7d22152b478fadc1e47419ee273b0f
           fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -26,7 +26,7 @@ jobs:
       - name: Exact offline runtime and worker checks
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 26388540e4a6c231a188b38d8f2ada0bbb2869fd
+          test "$(git rev-parse HEAD)" = fa2a8a3bbd7d22152b478fadc1e47419ee273b0f
           for name in MIZIZI_PREVIEW_OPERATOR_JWT MIZIZI_PREVIEW_SERVICE_ROLE_KEY MIZIZI_PREVIEW_JIT_DATABASE_URL MIZIZI_PREVIEW_ANTHROPIC_API_KEY SUPABASE_ACCESS_TOKEN; do
             test -z "${!name:-}"
           done
