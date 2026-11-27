@@ -21,7 +21,7 @@ let stage="ISOLATION",server;
 try {
  if (process.getuid()===0 || Object.keys(os.networkInterfaces()).some(n=>n!=="lo")) throw Error("isolation");
  stage="IMPORT";
- const {chromium}=await import("/deps/playwright/index.mjs");
+ const {chromium}=await import("/opt/mizizi/node_modules/playwright/index.mjs");
  stage="LAUNCH";
  server=await chromium.launchServer({host:"127.0.0.1",port:0,headless:true});
 } catch(error) {
@@ -113,7 +113,7 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
    s.create=docker(["create","--name",s.name,"--pull","never","--network","none","--cap-drop","ALL",
     "--security-opt","no-new-privileges","--user",uid+":"+gid,"--read-only",
     "--tmpfs","/tmp:rw,nosuid,nodev,size=512m","--shm-size","256m","--pids-limit","256","--memory","1536m",
-    "-e","HOME=/tmp","--mount","type=bind,source="+dependencies+",target=/deps,readonly",
+    "-e","HOME=/tmp","--mount","type=bind,source="+dependencies+",target=/opt/mizizi/node_modules,readonly",
     imageId,"node","--input-type=module","-e",SERVER],15000);
    await s.create;live();
    stage="ISOLATION";
