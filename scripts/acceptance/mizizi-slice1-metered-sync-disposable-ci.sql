@@ -67,7 +67,7 @@ begin
      then raise exception 'STOP_SYNC_INVALID_METER';end if;
   end case;
   actual:=public.mizizi_read_desk_resource_encumbrance_v1(rid,req,account);
-  if actual is distinct from case when i=1 then 100::bigint else 1750::bigint end
+  if actual is distinct from (case when i=1 then 100::bigint else 1750::bigint end)
    then raise exception 'STOP_SYNC_CHARGE_%_%',i,actual;end if;
   if public.mizizi_read_desk_resource_encumbrance_v1(rid,req,repeat('f',64)) is not null
    or public.mizizi_read_desk_resource_encumbrance_v1(rid,repeat('f',64),account) is not null
