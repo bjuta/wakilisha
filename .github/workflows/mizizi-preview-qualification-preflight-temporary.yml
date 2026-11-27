@@ -1,126 +1,90 @@
-name: MIZIZI Preview Exact Candidate Schema Qualification
+name: MIZIZI Preview Isolated Chromium Host Qualification
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
 concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  preflight:
+  host:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      PREVIEW_REF: ehkmjrjjhzyjkxdfsqdc
-      PROD_REF: pgzizndxdyhqmtyywjmt
-      EXPECTED_HEAD: a716e9dcbd51f38d36c53da01401285ea7f4f637
+    timeout-minutes: 10
     steps:
-      - name: Check out exact approved integration candidate
+      - name: Check out accepted browser implementation
         uses: actions/checkout@v4
         with:
           ref: a716e9dcbd51f38d36c53da01401285ea7f4f637
           persist-credentials: false
-      - name: Set up pinned Supabase CLI
-        uses: supabase/setup-cli@v1
+      - name: Prepare exact locked browser dependencies
+        uses: actions/setup-node@v4
         with:
-          version: 2.107.0
-          github-token: ${{ github.token }}
-      - name: Reverify exact protected acceptance and open integration PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request
-          def get(path):
-              request=urllib.request.Request("https://api.github.com/repos/bjuta/wakilisha/"+path,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"})
-              with urllib.request.urlopen(request,timeout=15) as f: return json.load(f)
-          h=os.environ["EXPECTED_HEAD"]
-          pr=get("pulls/1442")
-          if pr.get("state")!="open" or pr.get("merged") or pr["head"]["sha"]!=h: raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
-          for number in (45952927214,45952927153):
-              run=get("actions/runs/"+str(number))
-              if run.get("head_sha")!=h or run.get("status")!="completed" or run.get("conclusion")!="success" or run.get("event")!="pull_request":
-                  raise SystemExit("MIZIZI_PROTECTED_GATE=STOP")
-          print("MIZIZI_EXACT_PROTECTED_ACCEPTANCE=PASS")
-          PY
-      - name: Non-secret availability and migration preflight, exact Preview forward apply
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          REPO_ANTHROPIC_PRESENT: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY != '' }}
+          node-version: "22"
+          cache: npm
+      - name: Install accepted dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Prove actual disposable host network boundary and real Chromium interaction
         shell: bash
         run: |
           set -euo pipefail
-          umask 077
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          test "$(find supabase/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')" = 300
-          test "$(sha256sum supabase/migrations/20261127060705_mizizi_desk_async_batch.sql | cut -d ' ' -f1)" = "1ce9d5857aed591ad5f693b6dd14d6cd4725698c3d2d0c2ac0dc8007a76085e7"
-          echo "MIZIZI_PREFLIGHT_EXACT_CANDIDATE=PASS"
-          echo "MIZIZI_REPO_ANTHROPIC_SECRET_PRESENT=$REPO_ANTHROPIC_PRESENT"
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "MIZIZI_MANAGEMENT_CREDENTIAL=MISSING"
-            exit 1
-          fi
-          echo "MIZIZI_MANAGEMENT_CREDENTIAL=PRESENT"
+          test "$(git rev-parse HEAD)" = a716e9dcbd51f38d36c53da01401285ea7f4f637
+          image=mcr.microsoft.com/playwright:v1.63.0-noble
+          docker pull "$image"
+          name="mizizi-browser-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
           scratch="$(mktemp -d)"
-          trap 'rm -rf "$scratch"' EXIT
-          # CLI-native forward plan. Only the approved Preview database may
-          # change; no secret mutation, provider calls, or runtime fixtures.
-          if ! supabase link --project-ref "$PREVIEW_REF" >"$scratch/link" 2>&1; then
-            echo "MIZIZI_PREVIEW_LINK=UNCONFIRMED"; exit 1
-          fi
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          echo "MIZIZI_PREVIEW_LINK=PASS"
-          if ! supabase db push --dry-run --linked >"$scratch/dry" 2>&1; then
-            echo "MIZIZI_PREVIEW_DRY_RUN=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/dry" <<'PY'
-          import pathlib,re,sys
-          actual=sorted(set(re.findall(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",pathlib.Path(sys.argv[1]).read_text())))
-          expected=sorted(p.name for p in pathlib.Path("supabase/migrations").glob("*.sql") if p.name > "20261127052839_mizizi_engine_convergence.sql")
-          if len(expected)!=1 or actual!=expected:
-              print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=STOP")
-              print("expected_count="+str(len(expected))+" actual_count="+str(len(actual)))
-              raise SystemExit(1)
-          print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=PASS")
-          print("MIZIZI_PREVIEW_DRY_RUN_COUNT=1")
-          PY
-          echo "MIZIZI_PREVIEW_EXACT_DELTA=PASS"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          test "$PREVIEW_REF" = "ehkmjrjjhzyjkxdfsqdc"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          export SUPABASE_PROJECT_REF="$PREVIEW_REF"
-          # Explicitly discover the noninteractive CLI contract before write.
-          supabase db push --help >"$scratch/push-help" 2>&1
-          grep -q -- '--yes' "$scratch/push-help"
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=START"
-          if ! supabase db push --linked --yes >"$scratch/apply" 2>&1; then
-            python3 - "$scratch/apply" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          print("MIZIZI_PREVIEW_FORWARD_APPLY=STOP")
-          for m in re.findall(r"Applying migration ([0-9]{14}_[A-Za-z0-9_-]+\.sql)",data): print("MIZIZI_ATTEMPTED_MIGRATION="+m)
-          for state in set(re.findall(r"SQLSTATE ([A-Z0-9]{5})",data)): print("MIZIZI_SQLSTATE="+state)
-          PY
-            exit 1
-          fi
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=COMMAND_SUCCEEDED"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          if ! supabase db push --dry-run --linked >"$scratch/post" 2>&1; then
-            echo "MIZIZI_PREVIEW_POSTFLIGHT=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/post" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text()
-          if re.search(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",data):
-              raise SystemExit("MIZIZI_PREVIEW_POSTFLIGHT_PENDING=STOP")
-          print("MIZIZI_PREVIEW_POSTFLIGHT_ZERO_PENDING=PASS")
-          PY
-          echo "MIZIZI_PREVIEW_SCHEMA_QUALIFICATION=PASS"
-
+          chmod 755 "$scratch"
+          cat >"$scratch/probe.mjs" <<'JS'
+          import assert from "node:assert/strict";
+          import os from "node:os";
+          import net from "node:net";
+          import {createHash} from "node:crypto";
+          import {chromium} from "/repo/node_modules/playwright/index.mjs";
+          import {withDeskInteractiveBrowserV1} from "/repo/scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
+          assert.ok(Object.keys(os.networkInterfaces()).every(k=>k==="lo"));
+          assert.equal(process.getuid(),1000);
+          for(const key of Object.keys(process.env)) assert.ok(!/ANTHROPIC|SUPABASE|GH_TOKEN|GITHUB_TOKEN/i.test(key));
+          const reachable=await new Promise(resolve=>{
+            const socket=net.createConnection({host:"1.1.1.1",port:443});
+            socket.once("connect",()=>{socket.destroy();resolve(true)});
+            socket.once("error",()=>resolve(false));
+            socket.setTimeout(1500,()=>{socket.destroy();resolve(false)});
+          });
+          assert.equal(reachable,false);
+          console.log("MIZIZI_HOST_NO_DIRECT_EGRESS=PASS");
+          const hash=x=>createHash("sha256").update(x).digest("hex");
+          const browser=await chromium.launch({headless:true});
+          try {
+            const scope={jobId:"11111111-1111-4111-8111-111111111111",caseId:"22222222-2222-4222-8222-222222222222",workspaceId:"33333333-3333-4333-8333-333333333333",expectedRevision:1,workerId:"mizizi-isolation-probe",leaseExpiresAt:new Date(Date.now()+90000).toISOString()};
+            const url="https://archive.org/catalogue";
+            const body=new TextEncoder().encode('<html><body><main><button aria-expanded="false" onclick="this.setAttribute(\'aria-expanded\',\'true\');document.getElementById(\'credit\').hidden=false">Reveal credits</button><p id="credit" hidden>Host isolation fixture</p></main></body></html>');
+            const evidence=await withDeskInteractiveBrowserV1({browser,scope,authorizeAction:async b=>b.operation!=="navigate"||b.url===url,authorizeRequest:async b=>b.url===url,readResource:async(b,digest)=>b.url===url?{requestSha256:digest,status:200,contentType:"text/html",body,sha256:hash(body)}:null},async session=>{
+              let o=await session.navigate(url);
+              assert.ok(!o.visibleText.includes("Host isolation fixture"));
+              const button=o.elements.find(e=>e.kind==="expand"&&e.label==="Reveal credits");
+              assert.ok(button);
+              o=await session.expand(button.ref,o.generation);
+              assert.ok(o.visibleText.includes("Host isolation fixture"));
+              return session.capture({visual:true});
+            });
+            assert.equal(evidence.sha256,hash(evidence.body));
+            assert.equal(evidence.visual.sha256,hash(evidence.visual.body));
+            console.log("MIZIZI_HOST_REAL_CHROMIUM_CAPTURE=PASS");
+          } finally {await browser.close();}
+          assert.equal(browser.isConnected(),false);
+          console.log("MIZIZI_HOST_BROWSER_CLOSED=PASS");
+          JS
+          chmod 644 "$scratch/probe.mjs"
+          docker create --name "$name" --network none --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 --read-only --tmpfs /tmp:rw,nosuid,nodev,size=512m --shm-size 256m -e HOME=/tmp -v "$PWD:/repo:ro" -v "$scratch/probe.mjs:/probe.mjs:ro" "$image" node /probe.mjs >/dev/null
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$name")" = none
+          echo "MIZIZI_HOST_DOCKER_NETWORK_NONE=PASS"
+          timeout --kill-after=5s 120s docker start -a "$name"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
+          docker rm "$name" >/dev/null
+          if docker inspect "$name" >/dev/null 2>&1; then exit 1; fi
+          rm -rf "$scratch"
+          echo "MIZIZI_HOST_CONTAINER_CLEANUP=PASS"
+          echo "MIZIZI_HOST_PROBE_SYNTHETIC_NO_PROVIDER_OR_DATABASE_CALL=PASS"
