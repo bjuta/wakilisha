@@ -57,6 +57,20 @@ Complete receipt-bound candidate coverage and resolution, actual reviewed privat
 
 These six work packages are execution scope, not six new approval gates. Implement, test, repair and document cohesively; involve the founder only for genuinely indispensable access, explicit release or expenditure authority, or consequential product choices. No ceremonial progress reports, no fresh architecture for a problem the existing system can solve. Use protected workflows already in place; no unnecessary CI growth.
 
+## Consolidated completion direction (founder instruction, 27 November 2026)
+
+The founder requires acceleration, documentation in this repository, and continued execution until Slice 1 meets its existing exit criteria. No additional phase, approval gate, or programme. Engineering progress estimates (not measured acceptance) at this checkpoint: roughly 40–45% of the remaining two-slice delivery programme; neither slice closed. The offline gap planner has passed protected CI, but ordering work is not autonomous shared execution. Individual migrations and isolated green tests are not delivery milestones.
+
+Three cohesive implementation blocks, within the existing two slices:
+
+1. **Complete the engine (Slice 1):** integrate qualified bulk source ingestion, shared acquisition and independently verified per-subject/field attribution, deterministic gap resolution, compact asynchronous Anthropic batch inference, shared cost allocation and durable recovery into the existing worker, custody, journal and finance authority. Deliver executable end-to-end capability, not another disconnected planner or contract.
+2. **Qualify the engine (Slice 1 exit):** qualify the actual isolated browser host, live permitted providers, credentials, tariffs, and source retention; execute the frozen representative 1,000-recording benchmark, independent adjudication, measured coverage/precision/cost and antifragility checks. Close Slice 1 only on the original exit gate. Synthetic replay is not operational qualification.
+3. **Operational convergence (Slice 2):** complete Headquarters/Decision Stream and Registry integration, reviewed private 100-recording chart, scoring/freeze, exact Preview acceptance and approved production readiness. Preserve the prior manual baseline and canonical authority.
+
+Execution changes: consolidate related implementation, tests and documentation into substantial changes; use focused development verification and existing protected workflows at meaningful integration boundaries. Preserve exact CLI-minted migration filenames, clean replay seals, security/finance/authority boundaries and the release hold. Do not add a second scheduler, duplicate framework, permanent workflow per increment, or require founder approval for normal bounded research actions. Resolve faults, document actual evidence, and proceed without routine founder checkpoints. Do not disguise missing runtime access, real inference costs, or independent adjudication as success. Escalate together only genuinely indispensable operational credentials, qualified isolated capacity, expenditure/release authorization or consequential product decisions. This does not authorize hosted changes, merge, paid usage or release.
+
+At direction change: exact head 3c3ac973a2570ae2f7269864c44a0a65b7e460e0, protected Critical #45945142448 and disposable #45945142508 SUCCESS; migration baseline 298 sealed. No live 1,000-recording qualification, bulk archive custody, asynchronous inference ledger, or production-ready engine established. Last recorded Preview credential, browser entitlement and live-spend requirements must be verified rather than assumed. No claim of savings or closure.
+
 ## Current baseline and implementation direction
 
 - Migration 293 sealed and protected checks passed on 24a6aa066d6916f59d9ac29ffaea15763914b7c2. Native-only standing authority is a historical baseline, not Slice 1 completion.
