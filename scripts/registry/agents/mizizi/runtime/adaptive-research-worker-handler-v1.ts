@@ -357,6 +357,7 @@ type OperationalNativeDeskPolicyV1=Readonly<{
  revision:number;scope:DeskSearchScopeV1;credentialSha256:string;modelIds:readonly string[];
  questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
  adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];sharedNativeAutoAllowed?:boolean;
+ publicWebTransientAllowed?:boolean;
  accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
  validUntil:string;
 }>;
@@ -371,6 +372,7 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   !Array.isArray(p.modelIds)||p.modelIds.length<1||p.modelIds.length>5||p.modelIds.some(m=>! /^[A-Za-z0-9._:-]{3,100}$/.test(m))||
   !Array.isArray(p.questionSha256s)||p.questionSha256s.length<1||p.questionSha256s.length>8||p.questionSha256s.some(q=>!sha.test(q))||
   (p.sharedNativeAutoAllowed!==undefined&&typeof p.sharedNativeAutoAllowed!=="boolean")||
+  (p.publicWebTransientAllowed!==undefined&&typeof p.publicWebTransientAllowed!=="boolean")||
   typeof p.adaptiveFollowupsAllowed!=="boolean"||!Array.isArray(p.publicQueryTerms)||
   p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
   p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||
@@ -417,6 +419,14 @@ export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
     try{
      const u=new URL(url);
      const browserOperation=operation.startsWith("browser_");
+     // No source permission is synthesized here. The independent access RPC,
+     // pinned resolver, transport, resource budget and custody checks remain.
+     if(p.publicWebTransientAllowed===true&&["native_acquire","native_text","browser_request","browser_render","browser_text"].includes(operation)){
+      return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&
+       url.length<=2048&&!/[\\\p{Cc}\p{Cf}]/u.test(url)&&
+       !/%(?:2e|2f|5c|25)/i.test(u.pathname)&&
+       ![...u.searchParams.keys()].some(k=>/(?:token|signature|password|passwd|secret|credential|session|api[-_]?key|authorization|^sig$|^auth$|^key$|^x-amz-|^x-goog-)/i.test(k));
+     }
      return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&
       (browserOperation?/^\/[A-Za-z0-9_./~%:-]+$/.test(u.pathname)&&!/%(?:2e|2f|5c|25)/i.test(u.pathname):
        !u.search&&/^\/[A-Za-z0-9_./~-]+$/.test(u.pathname))&&
