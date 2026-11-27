@@ -141,3 +141,52 @@ describe("MIZIZI receipt-bound calibration composition",()=>{
   expect(h.order.length).toBe(before);
  });
 });
+
+describe("MIZIZI Preview executable runtime scope",()=>{
+ it("requires independently digest-bound private configuration and rejects another project, expired authority and excess calibration allowance",async()=>{
+  const {mkdtemp,writeFile,chmod,rm}=await import("node:fs/promises");
+  const {tmpdir}=await import("node:os");
+  const {join}=await import("node:path");
+  const {createHash}=await import("node:crypto");
+  const {readPreviewCalibrationManifestV1,runPreviewCalibrationCommandV1}=await import(
+   "../../scripts/registry/agents/mizizi/runtime/run-preview-chart-calibration-v1");
+  const dir=await mkdtemp(join(tmpdir(),"mizizi-runtime-review-"));
+  try{
+   const manifestPath=join(dir,"manifest.json"),out=join(dir,"checkpoint");
+   const validUntil=new Date(Date.now()+120000).toISOString();
+   const model={model:"fixture-haiku",family:"haiku",active:true,toolUse:true,structuredOutput:true,
+    vision:true,ordinaryToolTranscript:true,qualityGateRef:"fixture:review",pricingRef:"fixture:price",
+    maxInputTokens:1000000,maxOutputTokens:128000,worstCaseInputMicrousdPerMillion:500000,
+    worstCaseOutputMicrousdPerMillion:2500000,batchEligible:false,validUntil};
+   const m={contract:"mizizi-preview-calibration-runtime/v1",projectRef:"ehkmjrjjhzyjkxdfsqdc",
+    inputSha256:HASH,operatorUserId:uuid(90),workspaceId:WS,validUntil,
+    targets:[{title:"Unresolved song",artist:"Artist A"}],
+    case:{caseId:CASE,membershipSha256:HASH,admissionSha256:HASH,question:"Investigate the recording identity.",
+     policyReviewRef:"fixture:policy",sourceReviewRef:"fixture:source",financeReviewRef:"fixture:finance",
+     runtimeReviewRef:"fixture:runtime",model,credentialSha256:HASH,nativeAccountFingerprint:HASH,
+     maximumCostMicrousd:600000,costBudgetUnits:20,maxTotalPasses:3,
+     executorHost:"db.ehkmjrjjhzyjkxdfsqdc.supabase.co",executorPort:5432}};
+   const put=async(value:unknown)=>{
+    const b=JSON.stringify(value);await writeFile(manifestPath,b,{mode:0o600});await chmod(manifestPath,0o600);
+    return createHash("sha256").update(b).digest("hex");};
+   const digest=await put(m);
+   await expect(readPreviewCalibrationManifestV1(manifestPath,digest,"execute")).resolves.toEqual(m);
+   await expect(readPreviewCalibrationManifestV1(manifestPath,"f".repeat(64),"execute")).rejects.toThrow("REVIEW_DIGEST_MISMATCH");
+   await chmod(manifestPath,0o644);
+   await expect(readPreviewCalibrationManifestV1(manifestPath,digest,"execute")).rejects.toThrow("PRIVATE_FILE_REQUIRED");
+   for(const [bad,code] of [
+    [{...m,projectRef:"other-project"},"MANIFEST_SCOPE"],
+    [{...m,validUntil:new Date(Date.now()-1).toISOString()},"MANIFEST_SCOPE"],
+    [{...m,case:{...m.case,maximumCostMicrousd:600001}},"CASE_RUNTIME_SCOPE"],
+    [{...m,case:{...m.case,executorHost:"db.other-project.supabase.co"}},"CASE_RUNTIME_SCOPE"],
+    [{...m,case:{...m.case,model:{...model,batchEligible:true}}},"MODEL_REVIEW_REQUIRED"],
+   ] as const){
+    const d=await put(bad);
+    await expect(readPreviewCalibrationManifestV1(manifestPath,d,"execute")).rejects.toThrow(code);
+   }
+   const d=await put(m);
+   await writeFile(out+".admission.json","{}",{mode:0o600});
+   await expect(runPreviewCalibrationCommandV1(["admit",manifestPath,d,out])).rejects.toThrow("CHECKPOINT_ALREADY_EXISTS");
+  }finally{await rm(dir,{recursive:true,force:true});}
+ });
+});
