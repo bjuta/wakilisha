@@ -1,4 +1,4 @@
-name: MIZIZI Preview Original Source Intake Qualification
+name: MIZIZI Preview Connected Browser and Provider Protocol Qualification
 on:
   push:
     branches:
@@ -9,100 +9,103 @@ concurrency:
   group: mizizi-preview-schema-qualification
   cancel-in-progress: false
 jobs:
-  originals:
+  browser:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Verify actual private original bytes in approved Preview only
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          ref: 74aa794ed66758a0d091b6be546f1aa0c55ccae2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Exercise actual host adapter and existing interactive browser
         shell: bash
         run: |
           set -euo pipefail
-          umask 077
+          test "$(git rev-parse HEAD)" = 74aa794ed66758a0d091b6be546f1aa0c55ccae2
+          image=mcr.microsoft.com/playwright:v1.63.0-noble
+          docker pull "$image"
+          export MIZIZI_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$image")"
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import {createHash,randomUUID} from "node:crypto";
+          import {createDockerDeskBrowserHostV1} from "./scripts/registry/agents/mizizi/runtime/desk-docker-browser-host-v1.mjs";
+          import {withDeskInteractiveBrowserV1} from "./scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
+          const hash=x=>createHash("sha256").update(x).digest("hex");
+          const fingerprint=hash("synthetic qualification only:"+process.env.MIZIZI_IMAGE_ID);
+          const scope={jobId:randomUUID(),caseId:randomUUID(),workspaceId:randomUUID(),expectedRevision:1,workerId:"mizizi-chart:"+randomUUID(),leaseExpiresAt:new Date(Date.now()+110000).toISOString()};
+          const host=await createDockerDeskBrowserHostV1({accountFingerprint:fingerprint,imageId:process.env.MIZIZI_IMAGE_ID,dependenciesDirectory:process.cwd()+"/node_modules",authorizeHost:async()=>null,captureVisual:true});
+          // No operational grant is fabricated. Direct adapter transport test
+          // with synthetic source only, never the durable worker or finance.
+          const binding={scope,accountFingerprint:fingerprint,reserveSeconds:120,mode:"interactive"};
+          const id=randomUUID(),control=new AbortController();
+          const url="https://archive.org/catalogue";
+          const body=new TextEncoder().encode('<html><body><main><button aria-expanded="false" onclick="this.setAttribute(\'aria-expanded\',\'true\');document.getElementById(\'credit\').hidden=false">Reveal credits</button><p id="credit" hidden>Connected host evidence</p></main></body></html>');
+          try {
+            const browser=await host.open(binding,id,control.signal);
+            console.log("MIZIZI_CONNECTED_HOST_OPEN=PASS");
+            await assert.rejects(host.open(binding,randomUUID(),control.signal));
+            const evidence=await withDeskInteractiveBrowserV1({browser,scope,authorizeAction:async b=>b.operation!=="navigate"||b.url===url,authorizeRequest:async b=>b.url===url,readResource:async(b,digest)=>b.url===url?{requestSha256:digest,status:200,contentType:"text/html",body,sha256:hash(body)}:null},async session=>{
+              let o=await session.navigate(url);
+              const button=o.elements.find(e=>e.kind==="expand"&&e.label==="Reveal credits");
+              assert.ok(button);
+              o=await session.expand(button.ref,o.generation);
+              assert.ok(o.visibleText.includes("Connected host evidence"));
+              return session.capture({visual:true});
+            });
+            assert.equal(evidence.sha256,hash(evidence.body));
+            assert.equal(evidence.visual.sha256,hash(evidence.visual.body));
+            console.log("MIZIZI_CONNECTED_HOST_INTERACTION_AND_CAPTURE=PASS");
+          } finally {
+            assert.equal(await host.close(id,AbortSignal.timeout(10000)),true);
+          }
+          assert.equal(await host.close(id,AbortSignal.timeout(5000)),true);
+          console.log("MIZIZI_CONNECTED_HOST_CLEANUP=PASS");
+          const abortId=randomUUID(),abort=new AbortController();
+          const opening=host.open(binding,abortId,abort.signal);
+          abort.abort();
+          await assert.rejects(opening);
+          assert.equal(await host.close(abortId,AbortSignal.timeout(10000)),true);
+          console.log("MIZIZI_CONNECTED_HOST_ABORT_CLEANUP=PASS");
+          JS
+          test -z "$(docker ps -a --filter name=mizizi-browser- --format '{{.Names}}')"
+          echo MIZIZI_CONNECTED_HOST_NO_RESIDUE=PASS
+  protocol:
+    if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Test documented free token counting for public synthetic text only
+        env:
+          MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
-          import base64, hashlib, json, os, re, urllib.request, urllib.error, urllib.parse
-          ref="ehkmjrjjhzyjkxdfsqdc"
-          api="https://api.supabase.com/v1/projects/"+ref
-          storage="https://ehkmjrjjhzyjkxdfsqdc.supabase.co/storage/v1/object/authenticated/"
-          token=os.environ.get("SUPABASE_ACCESS_TOKEN","")
-          if not token: raise SystemExit("MIZIZI_PREVIEW_MANAGEMENT_CREDENTIAL=STOP")
+          import json,os,urllib.request,urllib.error
+          key=os.environ.get("MIZIZI_PREVIEW_ANTHROPIC_API_KEY","")
+          if not key or key.strip()!=key: raise SystemExit("MIZIZI_TOKEN_PROTOCOL_CREDENTIAL=STOP")
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,*args,**kwargs): raise ValueError("redirect denied")
           opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-          def request(url,headers,limit,body=None):
-              req=urllib.request.Request(url,headers=headers,data=body,method="POST" if body is not None else "GET")
-              with opener.open(req,timeout=25) as resp:
-                  if resp.status not in (200,201): raise ValueError("HTTP")
-                  result=resp.read(limit+1)
-              if len(result)>limit: raise ValueError("bound")
-              return result
-          mgmt={"Authorization":"Bearer "+token,"Content-Type":"application/json","Accept":"application/json"}
-          q="select source_key, original_bucket, original_object_key, original_sha256, original_byte_length, original_content_type, observed_depth, (original_verified_at is not null) as verified from platform_private.charts2_capture_receipts_v1 order by source_key"
+          data=json.dumps({"model":"claude-haiku-5-5","messages":[{"role":"user","content":"Public synthetic token counting qualification."}]}).encode()
+          req=urllib.request.Request("https://api.anthropic.com/v1/messages/count_tokens",headers={"x-api-key":key,"anthropic-version":"2023-06-01","Content-Type":"application/json","Accept":"application/json"},data=data,method="POST")
           try:
-              rows=json.loads(request(api+"/database/query",mgmt,100000,json.dumps({"query":q,"read_only":True}).encode()))
-              allowed={"apple_ke":("text/html",100),"audiomack_ke":("text/html",100),"mdundo_ke":("text/html",100),"shazam_ke":("text/csv",200),"youtube_ke":("application/json",100)}
-              if not isinstance(rows,list) or len(rows)!=5 or {r.get("source_key") for r in rows}!=set(allowed): raise ValueError("receipt population")
-              print("MIZIZI_ORIGINAL_RECEIPT_INVENTORY=PASS",flush=True)
+              with opener.open(req,timeout=20) as response:
+                  if response.status!=200: raise ValueError("status")
+                  body=response.read(100001)
+              if len(body)>100000: raise ValueError("bound")
+              count=json.loads(body).get("input_tokens")
+              if type(count) is not int or count<1 or count>1000: raise ValueError("shape")
+              print("MIZIZI_TOKEN_PROTOCOL_COUNT="+str(count))
+              print("MIZIZI_TOKEN_PROTOCOL_FREE_COUNT=PASS")
+              print("MIZIZI_NO_BILLABLE_INFERENCE_REQUEST=PASS")
+          except urllib.error.HTTPError as e:
+              raise SystemExit("MIZIZI_TOKEN_PROTOCOL_HTTP="+str(e.code))
           except Exception:
-              raise SystemExit("MIZIZI_ORIGINAL_RECEIPT_INVENTORY=STOP")
-          try:
-              # Fetch only the selected existing server credential. Never log
-              # management results, credentials, URLs or original bytes.
-              stage="KEY_LIST"
-              keys=json.loads(request(api+"/api-keys?reveal=false",mgmt,100000))
-              if not isinstance(keys,list): raise ValueError("shape")
-              selected=[x for x in keys if isinstance(x,dict) and x.get("name")=="service_role"]
-              print("MIZIZI_PREVIEW_LEGACY_SERVICE_KEY_COUNT="+str(len(selected)),flush=True)
-              stage="KEY_SELECTION"
-              if len(selected)!=1: raise ValueError("service credential")
-              if not isinstance(selected[0].get("id"),str) or not selected[0]["id"]: raise ValueError("key id")
-              stage="KEY_LIST_REVEAL"
-              # Legacy keys are returned by the documented project list
-              # endpoint. The individual detail endpoint rejects the legacy ID.
-              revealed=json.loads(request(api+"/api-keys?reveal=true",mgmt,100000))
-              found=[x for x in revealed if isinstance(x,dict) and x.get("name")=="service_role" and x.get("id")==selected[0]["id"]]
-              if len(found)!=1: raise ValueError("legacy key selection")
-              detail=found[0]
-              key=detail.get("api_key","")
-              del revealed,found,detail
-              stage="KEY_FORMAT"
-              if not isinstance(key,str) or len(key.split("."))!=3: raise ValueError("role")
-              part=key.split(".")[1]
-              claims=json.loads(base64.urlsafe_b64decode(part+"="*((4-len(part)%4)%4)))
-              stage="KEY_SCOPE"
-              print("MIZIZI_PREVIEW_SERVICE_ROLE_CLAIM_MATCH="+str(claims.get("role")=="service_role").lower(),flush=True)
-              print("MIZIZI_PREVIEW_PROJECT_CLAIM_PRESENT="+str(isinstance(claims.get("ref"),str)).lower(),flush=True)
-              print("MIZIZI_PREVIEW_PROJECT_CLAIM_MATCH="+str(claims.get("ref")==ref).lower(),flush=True)
-              if claims.get("role")!="service_role" or claims.get("ref")!=ref: raise ValueError("scope")
-              print("MIZIZI_PREVIEW_STORAGE_CREDENTIAL_SCOPE=PASS",flush=True)
-          except urllib.error.HTTPError as error:
-              raise SystemExit("MIZIZI_PREVIEW_STORAGE_CREDENTIAL_"+stage+"_HTTP="+str(error.code))
-          except Exception:
-              raise SystemExit("MIZIZI_PREVIEW_STORAGE_CREDENTIAL_"+stage+"=STOP")
-          total=0
-          for r in rows:
-              s=r["source_key"]
-              try:
-                  mime,depth=allowed[s]
-                  digest=r["original_sha256"]
-                  size=r["original_byte_length"]
-                  actual_type=r["original_content_type"]
-                  if s=="youtube_ke" and actual_type=="text/csv": mime="text/csv"
-                  ext={"text/html":"html","text/csv":"csv","application/json":"json"}[mime]
-                  expected=s+"/"+digest[:2]+"/"+digest+"."+ext
-                  if not re.fullmatch("[a-f0-9]{64}",digest) or type(size) is not int or not 0<size<=4000000 or r["verified"] is not True or r["original_bucket"]!="charts2-evidence-private-v1" or r["original_object_key"]!=expected or actual_type!=mime or r["observed_depth"]!=depth: raise ValueError("coordinate")
-                  headers={"apikey":key,"Authorization":"Bearer "+key,"Accept-Encoding":"identity"}
-                  data=request(storage+"charts2-evidence-private-v1/"+expected,headers,size)
-                  if len(data)!=size or hashlib.sha256(data).hexdigest()!=digest: raise ValueError("bytes")
-                  total+=depth
-                  del data
-                  print("MIZIZI_ORIGINAL_"+s.upper()+"_BYTES=PASS",flush=True)
-              except Exception:
-                  raise SystemExit("MIZIZI_ORIGINAL_"+s.upper()+"_BYTES=STOP")
-          if total!=600: raise SystemExit("MIZIZI_ORIGINAL_POPULATION=STOP")
-          print("MIZIZI_ORIGINAL_VERIFIED_FILES=5")
-          print("MIZIZI_ORIGINAL_OBSERVED_POSITIONS=600")
-          print("MIZIZI_ORIGINAL_NO_DB_MUTATION_OR_PROVIDER_DISCLOSURE=PASS")
+              raise SystemExit("MIZIZI_TOKEN_PROTOCOL=STOP")
           PY
