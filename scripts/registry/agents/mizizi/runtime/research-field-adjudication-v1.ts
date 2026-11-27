@@ -4,6 +4,9 @@
  * the answers nor the review packet belongs in a model request.
  */
 import {createHash} from "node:crypto";
+import {lstat,readFile,open} from "node:fs/promises";
+import {resolve,dirname} from "node:path";
+import {fileURLToPath} from "node:url";
 import {verifyInvestigationHistoryV1,type InvestigationIdentityV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -84,4 +87,45 @@ export function adjudicateRecordingFieldsV1(input:Readonly<{
   correct,incorrect,unresolved,unreviewable,precision:correct+incorrect?correct/(correct+incorrect):null,
   reviewedCoverage:(correct+incorrect)/fields.length,recordingFullyCorrect:correct===fields.length,
   journalCostUnits:history.reduce((sum,p)=>{if(!Number.isSafeInteger(p.costUnits)||p.costUnits<0)fail("COST");return sum+p.costUnits;},0)});
+}
+
+/** Separately run evaluator executable. Never invoked by the research
+ * runner; no credentials, network or model. The caller supplies independently
+ * authorized private journal export and independently reviewed packet digests.
+ * This verifies the review binding, not the reviewer's identity or the
+ * continued legal right to retain the exported bytes.
+ */
+export async function runPrivateFieldAdjudicationV1(args:readonly string[]){
+ const [journalPath,journalSha256,reviewPath,reviewSha256,outputPath]=args;
+ if(args.length!==5||![journalSha256,reviewSha256].every(x=>SHA.test(x))||
+  ![journalPath,reviewPath,outputPath].every(x=>typeof x==="string"&&x.length>0))fail("CLI_ARGS");
+ const exactPrivate=async(path:string,digest:string,max:number)=>{
+  const file=await lstat(path),parent=await lstat(dirname(resolve(path)));
+  if(!file.isFile()||!parent.isDirectory()||(file.mode&0o077)!==0||(parent.mode&0o077)!==0||file.size<2||file.size>max)
+   fail("PRIVATE_INPUT");
+  const bytes=await readFile(path);
+  if(createHash("sha256").update(bytes).digest("hex")!==digest)fail("FILE_DIGEST");
+  const raw=bytes.toString("utf8");if(!Buffer.from(raw,"utf8").equals(bytes))fail("FILE_ENCODING");
+  return raw;
+ };
+ const raw=await exactPrivate(journalPath,journalSha256,4_000_000);
+ const journal=JSON.parse(raw);
+ if(!shape(journal,["contract","identity","subjectVersionSha256","rubricSha256","history"])||
+  journal.contract!=="mizizi.private_recording_journal_export.v1"||!Array.isArray(journal.history)||journal.history.length>100)
+  fail("JOURNAL_EXPORT");
+ const reviewText=await exactPrivate(reviewPath,reviewSha256,128000);
+ const score=adjudicateRecordingFieldsV1({identity:journal.identity,history:journal.history,
+  subjectVersionSha256:journal.subjectVersionSha256,rubricSha256:journal.rubricSha256,reviewText,reviewSha256});
+ const parent=await lstat(dirname(resolve(outputPath)));
+ if(!parent.isDirectory()||(parent.mode&0o077)!==0)fail("PRIVATE_OUTPUT");
+ const output=await open(outputPath,"wx",0o600);
+ try{await output.writeFile(JSON.stringify(score)+"\n");await output.sync();}finally{await output.close();}
+ return {contract:score.contract,correct:score.correct,incorrect:score.incorrect,unresolved:score.unresolved,unreviewable:score.unreviewable};
+}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ runPrivateFieldAdjudicationV1(process.argv.slice(2)).then(result=>console.log(JSON.stringify(result))).catch(error=>{
+  const message=error instanceof Error?error.message:"";
+  console.error(/^MIZIZI_FIELD_REVIEW_[A-Z_]+$/.test(message)?message:"MIZIZI_FIELD_REVIEW_UNCONFIRMED");
+  process.exitCode=1;
+ });
 }
