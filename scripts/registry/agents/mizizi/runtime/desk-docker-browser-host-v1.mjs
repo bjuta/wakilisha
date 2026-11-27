@@ -16,6 +16,7 @@ const SHA=/^[a-f0-9]{64}$/;
 const IMAGE=/^sha256:[a-f0-9]{64}$/;
 const SERVER=String.raw`
 import os from "node:os";
+import {writeSync} from "node:fs";
 let stage="ISOLATION",server;
 try {
  if (process.getuid()===0 || Object.keys(os.networkInterfaces()).some(n=>n!=="lo")) throw Error("isolation");
@@ -32,7 +33,7 @@ try {
   /profile|read.only|EROFS/i.test(msg)?"PROFILE":
   /resource temporarily unavailable|pthread|out of memory/i.test(msg)?"RESOURCE":
   /ENOTFOUND|EADDR|listen/i.test(msg)?"LISTEN":"OTHER";
- process.stdout.write("MIZIZI_BROWSER_START_FAILURE "+stage+"_"+category+"\n");
+ writeSync(1,"MIZIZI_BROWSER_START_FAILURE "+stage+"_"+category+"\n");
  process.exitCode=41;
  process.exit(41);
 }
@@ -126,7 +127,12 @@ export async function createDockerDeskBrowserHostV1({accountFingerprint,imageId,
     const failure=log.split("\n").find(line=>/^MIZIZI_BROWSER_START_FAILURE [A-Z_]+$/.test(line));
     if(failure)fail("SERVER_"+failure.split(" ")[1]);
     const state=await docker(["inspect","--format","{{.State.Running}}|{{.State.ExitCode}}",s.name],2500);
-    if(/^false\|[0-9]+$/.test(state))fail("SERVER_EXIT_"+state.split("|")[1]);
+    if(/^false\|[0-9]+$/.test(state)){
+     const final=await docker(["logs",s.name],2500);
+     const reason=final.split("\n").find(line=>/^MIZIZI_BROWSER_START_FAILURE [A-Z_]+$/.test(line));
+     if(reason)fail("SERVER_"+reason.split(" ")[1]);
+     fail("SERVER_EXIT_"+state.split("|")[1]);
+    }
     const match=log.split("\n").find(line=>line.startsWith("MIZIZI_BROWSER_READY "));
     if(match){
      const u=new URL(match.slice("MIZIZI_BROWSER_READY ".length));
