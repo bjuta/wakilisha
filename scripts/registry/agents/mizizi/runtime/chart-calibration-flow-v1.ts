@@ -174,3 +174,52 @@ export async function runChartCalibrationJobV1(input:Readonly<{
   maxTotalPasses:runtime.maxTotalPasses,costBudgetUnits:runtime.costBudgetUnits,leaseSeconds:runtime.leaseSeconds,
  });
 }
+
+/** One exact selected case, from fresh or replayed admission to the existing
+ * leased worker. Each authoritative receipt is handed to the caller's durable
+ * control-plane checkpoint before the next mutation. A thrown RPC/checkpoint
+ * is an ambiguous stop, not permission to replay a human decision.
+ *
+ * The reviewed admission plan and operator acknowledgement are explicit.
+ * The host must independently verify the proposed case policy and runtime
+ * before transition/dispatch; no self-issued entitlement is accepted here.
+ * To resume after a transition or dispatch, use the corresponding receipt
+ * with dispatchChartCalibrationCaseV1 or runChartCalibrationJobV1 respectively.
+ * Productive continuation remains the existing durable job's retry_wait state.
+ */
+export async function runChartCalibrationFlowV1(input:Readonly<{
+ plan:ChartCalibrationPlanV1;selectedGroupIndex:number;workspaceId:string;
+ acknowledgement:string;operatorRpc:WorkerRpc;executorQuery:ExactResearchQueryV1;
+ worker:Omit<Parameters<typeof runChartCalibrationJobV1>[0],"receipt">;
+ preflightCase:(candidate:Readonly<{caseId:string;workspaceId:string;
+  expectedRevision:number;membershipSha256:string;inputSha256:string}>)=>Promise<boolean>;
+ checkpoint:(event:
+  |Readonly<{stage:"admitted";receipt:ChartCalibrationAdmissionV1}>
+  |Readonly<{stage:"transitioned";receipt:Awaited<ReturnType<typeof beginChartCalibrationCaseV1>>}>
+  |Readonly<{stage:"dispatched";receipt:TrustedResearchJobReceiptV1}>
+  |Readonly<{stage:"worker_returned";receipt:Awaited<ReturnType<typeof runChartCalibrationJobV1>>}>
+ )=>Promise<void>;
+}>){
+ if(input.acknowledgement!==ACK||!UUID.test(input.workspaceId)||
+  !input.plan.selectedGroupIndices.includes(input.selectedGroupIndex)||
+  input.plan.groups[input.selectedGroupIndex]?.disposition!=="research"||
+  typeof input.preflightCase!=="function"||typeof input.checkpoint!=="function")fail("FLOW_SCOPE");
+ const admission=await admitChartCalibrationV1(input.operatorRpc,input.plan);
+ await input.checkpoint({stage:"admitted",receipt:admission});
+ const candidate=admission.cases[input.selectedGroupIndex];
+ if(!candidate||candidate.stage!=="triage"||candidate.state!=="open")fail("FLOW_RESUME_REQUIRED");
+ if(await input.preflightCase({caseId:candidate.caseId,workspaceId:input.workspaceId,
+  expectedRevision:candidate.revision+1,membershipSha256:candidate.membershipSha256,
+  inputSha256:admission.inputSha256})!==true)fail("FLOW_POLICY_DENIED");
+ const transition=await beginChartCalibrationCaseV1({
+  operatorRpc:input.operatorRpc,admission,caseId:candidate.caseId,
+  workspaceId:input.workspaceId,acknowledgement:input.acknowledgement});
+ await input.checkpoint({stage:"transitioned",receipt:transition});
+ const job=await dispatchChartCalibrationCaseV1(input.executorQuery,transition);
+ await input.checkpoint({stage:"dispatched",receipt:job});
+ if(job.jobStatus==="running"||job.jobStatus==="succeeded")
+  return Object.freeze({admission,transition,job,worker:null});
+ const result=await runChartCalibrationJobV1({...input.worker,receipt:job});
+ await input.checkpoint({stage:"worker_returned",receipt:result});
+ return Object.freeze({admission,transition,job,worker:result});
+}
