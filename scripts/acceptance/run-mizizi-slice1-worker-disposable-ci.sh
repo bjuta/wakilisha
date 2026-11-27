@@ -24,6 +24,16 @@ CONTAINER="$DB_NAMES"
   echo 'STOP_DISPOSABLE_DB_NOT_RUNNING'; exit 21;
 }
 echo 'WK_CI_DISPOSABLE_DATABASE_CONTEXT=PASS'
+METER="$ROOT/scripts/acceptance/mizizi-slice1-metered-sync-disposable-ci.sql"
+[ "$(git hash-object "$METER")" = "$(git rev-parse HEAD:scripts/acceptance/mizizi-slice1-metered-sync-disposable-ci.sql)" ] || {
+  echo 'STOP_SYNC_METER_NOT_EXACT_GIT_BLOB'; exit 20;
+}
+docker exec -i "$CONTAINER" psql -X -q -v ON_ERROR_STOP=1 -U supabase_admin -d postgres < "$METER"
+[ "$(docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c "select (select count(*) from mizizi_private.desk_resource_policy_versions_v1)+(select count(*) from mizizi_private.desk_resource_reservations_v1)+(select count(*) from mizizi_private.desk_resource_events_v1)")" = "0" ] || {
+  echo 'STOP_SYNC_METER_FIXTURE_RESIDUE'; exit 23;
+}
+echo 'MIZIZI_SYNC_METER_FIXTURE_ROLLBACK=PASS'
+
 snapshot() {
   docker exec -i "$CONTAINER" psql -X -q -At -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c \
     "SELECT (SELECT count(*) FROM supabase_migrations.schema_migrations)::text||'|'||
