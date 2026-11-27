@@ -143,6 +143,28 @@ describe("MIZIZI receipt-bound calibration composition",()=>{
 });
 
 describe("MIZIZI Preview executable runtime scope",()=>{
+ it("accepts only the reviewed Preview session pooler JIT login and exact option",async()=>{
+  const {validatePreviewCalibrationJitUrlV1}=await import(
+   "../../scripts/registry/agents/mizizi/runtime/run-preview-chart-calibration-v1");
+  const host="fixture-region.pooler.supabase.com";
+  const u=new URL("postgresql://mizizi_executor.ehkmjrjjhzyjkxdfsqdc:fixture-only@"+host+":5432/postgres");
+  u.searchParams.set("options","-c jit=true");
+  expect(()=>validatePreviewCalibrationJitUrlV1(u.toString(),host,5432)).not.toThrow();
+  for(const change of [
+   (x:URL)=>{x.username="mizizi_executor.pgzizndxdyhqmtyywjmt";},
+   (x:URL)=>{x.username="postgres.ehkmjrjjhzyjkxdfsqdc";},
+   (x:URL)=>{x.hostname="other-region.pooler.supabase.com";},
+   (x:URL)=>{x.port="6543";},
+   (x:URL)=>{x.searchParams.delete("options");},
+   (x:URL)=>{x.searchParams.set("sslmode","disable");},
+   (x:URL)=>{x.searchParams.append("options","-c jit=true");},
+   (x:URL)=>{x.password="";},
+  ]){
+   const bad=new URL(u);change(bad);
+   expect(()=>validatePreviewCalibrationJitUrlV1(bad.toString(),host,5432)).toThrow("JIT_ENDPOINT_SCOPE");
+  }
+ });
+
  it("requires independently digest-bound private configuration and rejects another project, expired authority and excess calibration allowance",async()=>{
   const {mkdtemp,writeFile,chmod,rm}=await import("node:fs/promises");
   const {tmpdir}=await import("node:os");
@@ -165,7 +187,7 @@ describe("MIZIZI Preview executable runtime scope",()=>{
      policyReviewRef:"fixture:policy",sourceReviewRef:"fixture:source",financeReviewRef:"fixture:finance",
      runtimeReviewRef:"fixture:runtime",model,credentialSha256:HASH,nativeAccountFingerprint:HASH,
      maximumCostMicrousd:600000,costBudgetUnits:20,maxTotalPasses:3,
-     executorHost:"db.ehkmjrjjhzyjkxdfsqdc.supabase.co",executorPort:5432}};
+     executorHost:"fixture-region.pooler.supabase.com",executorPort:5432}};
    const put=async(value:unknown)=>{
     const b=JSON.stringify(value);await writeFile(manifestPath,b,{mode:0o600});await chmod(manifestPath,0o600);
     return createHash("sha256").update(b).digest("hex");};

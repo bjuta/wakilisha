@@ -25,6 +25,21 @@ const hash=(b:string|Uint8Array)=>createHash("sha256").update(b).digest("hex");
 const fail=(s:string):never=>{throw Error("MIZIZI_PREVIEW_CALIBRATION_"+s);};
 const text=(s:unknown,min=8,max=500):s is string=>typeof s==="string"&&s.length>=min&&s.length<=max&&s.trim()===s&&!/[\p{Cc}\p{Cf}]/u.test(s);
 const live=(expiry:string)=>Number.isFinite(Date.parse(expiry))&&Date.parse(expiry)>Date.now();
+const isSessionPoolerHost=(host:unknown):host is string=>typeof host==="string"&&
+ /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.pooler\.supabase\.com$/.test(host);
+/** The existing JIT runtime obtains this URL from the CLI-linked project.
+ * This executable accepts only the independently reviewed pooler destination
+ * and exact project-scoped narrow executor login. It never derives a token,
+ * enables JIT, or modifies mappings. */
+export function validatePreviewCalibrationJitUrlV1(dsn:string,executorHost:string,executorPort:number):void{
+ let url:URL;
+ try{url=new URL(dsn);}catch{fail("JIT_ENDPOINT_SCOPE");}
+ if(!isSessionPoolerHost(executorHost)||executorPort!==5432||
+  !["postgres:","postgresql:"].includes(url.protocol)||url.hostname!==executorHost||
+  url.port!=="5432"||url.username!=="mizizi_executor."+REF||url.pathname!=="/postgres"||
+  url.hash||!url.password||[...url.searchParams].length!==1||
+  url.searchParams.get("options")!=="-c jit=true")fail("JIT_ENDPOINT_SCOPE");
+}
 const env=(name:string)=>{const v=process.env[name];if(!v||v.trim()!==v)fail("RUNTIME_INPUT_REQUIRED");return v!;};
 type Target={title:string;artist:string|null};
 type Manifest=Readonly<{
@@ -60,8 +75,7 @@ export async function readPreviewCalibrationManifestV1(path:string,digest:string
    !Number.isSafeInteger(c.maximumCostMicrousd)||c.maximumCostMicrousd<1||c.maximumCostMicrousd>600000||
    !Number.isSafeInteger(c.costBudgetUnits)||c.costBudgetUnits<1||c.costBudgetUnits>1000||
    !Number.isSafeInteger(c.maxTotalPasses)||c.maxTotalPasses<1||c.maxTotalPasses>3||
-   c.executorHost!=="db."+REF+".supabase.co"||!Number.isSafeInteger(c.executorPort)||
-   c.executorPort<1||c.executorPort>65535)fail("CASE_RUNTIME_SCOPE");
+   !isSessionPoolerHost(c.executorHost)||c.executorPort!==5432)fail("CASE_RUNTIME_SCOPE");
   if(!c.model||c.model.batchEligible===true||c.model.family!=="haiku"||
    !Number.isSafeInteger(c.model.maxInputTokens)||c.model.maxInputTokens<1||c.model.maxInputTokens>1000000)
    fail("MODEL_REVIEW_REQUIRED");
@@ -170,10 +184,8 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
     validUntil:new Date(Math.min(Date.parse(m.validUntil),Date.parse(browser.validUntil),Date.parse(binding.scope.leaseExpiresAt))).toISOString(),
     egressIsolationVerified:true as const,localCapacityVerified:true as const,zeroIncrementalSpendAllowed:true as const};
   }}):undefined;
- const dsn=env("MIZIZI_PREVIEW_JIT_DATABASE_URL"),url=new URL(dsn);
- if(!["postgres:","postgresql:"].includes(url.protocol)||url.hostname!==c.executorHost||
-  url.port!==String(c.executorPort)||url.username!=="mizizi_executor"||url.pathname!=="/postgres"||url.search||url.hash||!url.password)
-  fail("JIT_ENDPOINT_SCOPE");
+ const dsn=env("MIZIZI_PREVIEW_JIT_DATABASE_URL");
+ validatePreviewCalibrationJitUrlV1(dsn,c.executorHost,c.executorPort);
  // The reviewed exact host is required; no guessed port, role switching,
  // disabled TLS verification or fallback to a management connection.
  const pool=new pg.Pool({connectionString:dsn,ssl:{rejectUnauthorized:true},max:1,
