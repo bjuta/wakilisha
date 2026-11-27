@@ -499,13 +499,20 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
      requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
     costUnits:totalUnits};
   };
-  const alternateDiscovery=()=> (["search_web","search_news"] as const).some(op=>{
+  const alternateDiscovery=()=> (["search_web","search_news"] as const).find(op=>{
    const host=options.discoveryHosts?.[op];
    return enabled.has(op)&&!failedOperations.has(op)&&!!host&&!failedHosts.has(host);
   });
   for(let round=1;round<=MAX_CALLS;round++){
    live();await checkSources();live();
-   const choice=deskToolChoice(model,enabled,round,leads,sources.size);
+   // Once a verified unavailable result leaves no leads or evidence, choose
+   // the distinct configured discovery operation on the qualified Haiku path.
+   // This is scheduling only: existing authorization, budget, custody and
+   // host fences still apply to the exact subsequent call.
+   const alternate=lastUnavailable&&!sources.size&&!leads.size?alternateDiscovery():undefined;
+   const choice:DeskToolChoiceV1=model==="claude-haiku-5-5"&&alternate&&round<MAX_CALLS?
+    {type:"tool",name:alternate,disable_parallel_tool_use:true}:
+    deskToolChoice(model,enabled,round,leads,sources.size);
    const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system,...ordinaryThinking(model),
     tools,tool_choice:choice,
     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});

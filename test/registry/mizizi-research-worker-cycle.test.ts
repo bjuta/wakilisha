@@ -2025,9 +2025,11 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   expect(bad.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["send_pending","response_metered"]);
  });
  it("continues through a distinct authorized discovery avenue after an exact unavailable receipt, but defers without another avenue",async()=>{
-  for(const mode of ["absent","distinct","same_host","replay"]){
-   const alternate=mode!=="absent";
+  for(const mode of ["absent","distinct","same_host","replay","distinct_haiku","same_host_haiku"]){
+   const alternate=mode!=="absent",haiku=mode.endsWith("_haiku");
    const h=fixture(),code="MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429" as const;
+   const model="claude-haiku-5-5";
+   if(haiku)h.send.mockImplementation(async()=>providerResponse({...h.replies.shift()!,model}));
    const unavailable={code,host:"api.tavily.com"};
    const initial=h.executeTool.getMockImplementation()!;
    h.executeTool.mockImplementation(async(s,c)=>c.name==="search_web"?
@@ -2037,7 +2039,8 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    h.replies.splice(1,2,nextTool("search_news",{query:"Nairobi archive reporting"},"toolu_news"),nextTool("read_page",{lead_id:leadId},"toolu_read"),final());
    if(mode==="replay")h.replies[1]=nextTool("search_web",{query:"Nairobi different query"},"toolu_repeat");
    const options={...h.config,enabledTools:alternate?["search_web","search_news","read_page"] as const:["search_web","read_page"] as const,
-    discoveryHosts:alternate?{search_web:"api.tavily.com",search_news:mode==="same_host"?"api.tavily.com":"api.gdeltproject.org"}:{search_web:"api.tavily.com"},
+    discoveryHosts:alternate?{search_web:"api.tavily.com",search_news:mode.startsWith("same_host")?"api.tavily.com":"api.gdeltproject.org"}:{search_web:"api.tavily.com"},
+    ...(haiku?{readModelInventory:async()=>[{...models[2],model}]}:{}),
     assessRequirement:async()=>({...requirement,maximumCostMicrousd:10000})};
    const rpc:WorkerRpc=async(fn,args)=>{
     if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
@@ -2053,10 +2056,12 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    };
    const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
    const out=await createCostRoutedDeskAnthropicPassV1({...options,...authority})(identity,question,[]);
-   if(mode==="distinct"){
+   if(mode.startsWith("distinct")){
     expect(out.sources).toHaveLength(1);expect(out.deskToolReceipts).toHaveLength(3);
     expect(h.send).toHaveBeenCalledTimes(4);
-    expect(JSON.stringify(JSON.parse(String(h.send.mock.calls[1][1].body)).messages)).toContain(code);
+    const recoveryEnvelope=JSON.parse(String(h.send.mock.calls[1][1].body));
+    expect(JSON.stringify(recoveryEnvelope.messages)).toContain(code);
+    if(haiku)expect(recoveryEnvelope.tool_choice).toEqual({type:"tool",name:"search_news",disable_parallel_tool_use:true});
     expect(h.executeTool.mock.calls.map(c=>c[1].name)).toEqual(["search_web","search_news","read_page"]);
    }else{
     expect(out).toMatchObject({method:"interrupted",interruptionCode:code,costUnits:mode==="replay"?2:1,analysis:{hypotheses:[],requestedDisposition:"pause"}});
