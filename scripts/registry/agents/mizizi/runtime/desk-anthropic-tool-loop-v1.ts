@@ -602,7 +602,10 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    const block=calls[0],call=canonicalTool(block.name,block.input,enabled,leads);
    if(choice.type==="tool"&&call.name!==choice.name)fail("RESEARCH_TOOL_REQUIRED");
    if(failedOperations.has(call.name)||((call.name==="search_web"||call.name==="search_news")&&
-    failedHosts.has(options.discoveryHosts?.[call.name]??"")))fail("DISCOVERY_AVENUE_UNAVAILABLE");
+    failedHosts.has(options.discoveryHosts?.[call.name]??""))){
+    if(!lastUnavailable)fail("DISCOVERY_AVENUE_UNAVAILABLE");
+    return interrupted(lastUnavailable!.code);
+   }
    const callSha256=hash(JSON.stringify({scope:boundScope,call}));
    if(callHashes.has(callSha256))fail("DUPLICATE_TOOL_CALL");
    callHashes.add(callSha256);toolIds.add(block.id as string);

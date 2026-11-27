@@ -5,7 +5,7 @@
  */
 import {createHash} from "node:crypto";
 import {isDeskAvailabilityFailureV1,type DeskAvailabilityFailureV1} from "./adaptive-investigation-v1.ts";
-import {createDeskBrowserResourceReaderV1,createDeskTavilyDiscoveryReaderV1} from "./desk-native-reader-v1.ts";
+import {createDeskBrowserResourceReaderV1,createDeskTavilyDiscoveryReaderV1,DeskNativeHttpUnavailableV1} from "./desk-native-reader-v1.ts";
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const SHA=/^[0-9a-f]{64}$/;
 const MAX_BODY=256000;
@@ -363,7 +363,7 @@ export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
   try{response=await read(binding,bindingSha256,AbortSignal.timeout(Math.min(20000,Math.max(1,lease-now()))));}
   catch(error){
    const code=error instanceof Error?error.message:null;
-   if(!consumed||!isDeskAvailabilityFailureV1(code)||now()>=lease)throw error;
+   if(!consumed||!(error instanceof DeskNativeHttpUnavailableV1)||!isDeskAvailabilityFailureV1(code)||now()>=lease)throw error;
    // No upstream response body is retained or disclosed. The exact consumed
    // reservation and the bounded transport diagnostic must enter custody.
    return Object.freeze({contract:"mizizi.desk_search.v1",requestSha256,reservationId:reservation.reservationId,

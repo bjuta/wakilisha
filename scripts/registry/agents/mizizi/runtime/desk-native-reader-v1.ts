@@ -33,6 +33,13 @@ type NativeReadOptions=Readonly<{
  readPinned?:(target:Target,signal:AbortSignal)=>Promise<HopResponse>;
 }>;
 function fail(code:string):never{throw Error("MIZIZI_DESK_NATIVE_"+code);}
+/** Created at the checked pinned HTTP response boundary. An arbitrary
+ * transport exception with the same message is not a confirmed response. */
+export class DeskNativeHttpUnavailableV1 extends Error{
+ constructor(readonly status:number){
+  super("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_"+status);
+ }
+}
 
 /** Deliberately IPv4-only until equally strong IPv6 handling is proven.
  * Reject non-global, special-use, documentation, benchmarking and multicast
@@ -222,8 +229,10 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
     redirects.push(url.href);
     url=publicUrl(response.location,url.href);continue;
    }
-   if(response.status!==200)fail(Number.isInteger(response.status)&&response.status>=100&&response.status<=599?
-    "SOURCE_UNAVAILABLE_HTTP_"+response.status:"SOURCE_UNAVAILABLE");
+   if(response.status!==200){
+   if(Number.isInteger(response.status)&&response.status>=100&&response.status<=599)throw new DeskNativeHttpUnavailableV1(response.status);
+   fail("SOURCE_UNAVAILABLE");
+  }
    const type=contentType(response.contentType);
    const body=Uint8Array.from(response.body);
    if(body.length===0||(type==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-"))
@@ -325,8 +334,10 @@ export function createDeskBrowserResourceReaderV1(options:BrowserResourceReadOpt
    const location=publicUrl(response.location,url.href).href;
    return Object.freeze({requestSha256,status:response.status,location});
   }
-  if(response.status!==200)fail(Number.isInteger(response.status)&&response.status>=100&&response.status<=599?
-    "SOURCE_UNAVAILABLE_HTTP_"+response.status:"SOURCE_UNAVAILABLE");
+  if(response.status!==200){
+   if(Number.isInteger(response.status)&&response.status>=100&&response.status<=599)throw new DeskNativeHttpUnavailableV1(response.status);
+   fail("SOURCE_UNAVAILABLE");
+  }
   const type=browserContentType(response.contentType,exact.resourceType),body=Uint8Array.from(response.body);
   if(body.length<1)fail("BODY_UNCONFIRMED");
   const headers:Record<string,string>={};

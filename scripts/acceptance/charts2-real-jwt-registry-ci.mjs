@@ -1817,7 +1817,8 @@ export async function verifyCharts2RealJwtRegistryV1({
  };
  const alternate=JSON.stringify({...JSON.parse(requestText),count:5});
  sql(`begin; set local role service_role;
- select set_config('request.jwt.claims','{"role":"service_role"}',true);
+ set local request.jwt.claim.role='service_role';
+ set local request.jwt.claims='{"role":"service_role"}';
  do $failure$ begin
  if ${appendFailure({...failure,unavailable:{...failure.unavailable,host:"en.wikipedia.org"}})} is not null
  or ${appendFailure({...failure,leads:[{id:leadId,kind:"reference",label:"Forged lead"}]},appendArgs.p_provenance,[{id:leadId,url}])} is not null

@@ -1896,7 +1896,8 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   expect(bad.recordModelEvent.mock.calls.map(c=>(c[0] as {state:string}).state)).toEqual(["send_pending","response_metered"]);
  });
  it("continues through a distinct authorized discovery avenue after an exact unavailable receipt, but defers without another avenue",async()=>{
-  for(const alternate of [false,true]){
+  for(const mode of ["absent","distinct","same_host","replay"]){
+   const alternate=mode!=="absent";
    const h=fixture(),code="MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429" as const;
    const unavailable={code,host:"api.tavily.com"};
    const initial=h.executeTool.getMockImplementation()!;
@@ -1905,8 +1906,9 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
     {receiptId:CASE,leads:[{id:leadId,kind:"reference" as const,label:"Independent archive"}],sources:[]}:
     initial(s,c));
    h.replies.splice(1,2,nextTool("search_news",{query:"Nairobi archive reporting"},"toolu_news"),nextTool("read_page",{lead_id:leadId},"toolu_read"),final());
+   if(mode==="replay")h.replies[1]=nextTool("search_web",{query:"Nairobi different query"},"toolu_repeat");
    const options={...h.config,enabledTools:alternate?["search_web","search_news","read_page"] as const:["search_web","read_page"] as const,
-    discoveryHosts:alternate?{search_web:"api.tavily.com",search_news:"api.gdeltproject.org"}:{search_web:"api.tavily.com"},
+    discoveryHosts:alternate?{search_web:"api.tavily.com",search_news:mode==="same_host"?"api.tavily.com":"api.gdeltproject.org"}:{search_web:"api.tavily.com"},
     assessRequirement:async()=>({...requirement,maximumCostMicrousd:10000})};
    const rpc:WorkerRpc=async(fn,args)=>{
     if(fn==="mizizi_authorize_desk_model_operation_v1")return {data:{operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
@@ -1922,14 +1924,15 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    };
    const authority=createDurableDeskModelAuthorityV1({rpc,scope,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
    const out=await createCostRoutedDeskAnthropicPassV1({...options,...authority})(identity,question,[]);
-   if(alternate){
+   if(mode==="distinct"){
     expect(out.sources).toHaveLength(1);expect(out.deskToolReceipts).toHaveLength(3);
     expect(h.send).toHaveBeenCalledTimes(4);
     expect(JSON.stringify(JSON.parse(String(h.send.mock.calls[1][1].body)).messages)).toContain(code);
     expect(h.executeTool.mock.calls.map(c=>c[1].name)).toEqual(["search_web","search_news","read_page"]);
    }else{
-    expect(out).toMatchObject({method:"interrupted",interruptionCode:code,costUnits:1,analysis:{hypotheses:[],requestedDisposition:"pause"}});
-    expect(out.deskToolReceipts).toHaveLength(1);expect(h.send).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({method:"interrupted",interruptionCode:code,costUnits:mode==="replay"?2:1,analysis:{hypotheses:[],requestedDisposition:"pause"}});
+    expect(out.deskToolReceipts).toHaveLength(1);expect(h.send).toHaveBeenCalledTimes(mode==="replay"?2:1);
+    expect(h.executeTool).toHaveBeenCalledTimes(1);
    }
   }
  });
@@ -2783,6 +2786,9 @@ describe("MIZIZI keyless provider discovery through existing durable search budg
   const error=fixture(config,{error:{code:"maxlag"}});
   await expect(createDurableDeskPublicDiscoveryGatewayV1(error.options)(request)).rejects.toThrow("SEARCH_PROVIDER_UNCONFIRMED");
   expect(error.readPinned).toHaveBeenCalledTimes(1);
+  const counterfeit=fixture();
+  counterfeit.readPinned.mockRejectedValueOnce(Error("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429"));
+  await expect(createDurableDeskPublicDiscoveryGatewayV1(counterfeit.options)(request)).rejects.toThrow("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_429");
   // A real HTTP error is not a successful empty search. It remains
   // precharged and distinguishable without retaining a body. A permission denial remains terminal.
   for(const status of [403,429,503]){

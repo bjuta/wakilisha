@@ -144,6 +144,7 @@ export function createDeskResearchDispatcherV1(options:Options){
  let activeCallSha256:string|null=null;
  async function accessGrant(operation:string,url:string,descriptor:Readonly<Record<string,unknown>>,hopSha256?:string){
   const canonical=urlOf(url).href;
+  if(["native_acquire","browser_request","browser_render"].includes(operation)&&unavailableHosts.has(new URL(canonical).hostname))return null;
   const bindingText=JSON.stringify({url:canonical,descriptor,...(activeCallSha256?{callSha256:activeCallSha256}:{}),
    ...(hopSha256?{hopSha256}:{})}),bindingSha256=hash(bindingText);
   const result=await rpc("mizizi_authorize_desk_access_v1",{p_scope:scope,p_operation:operation,
@@ -724,15 +725,17 @@ export function createDeskResearchDispatcherV1(options:Options){
   }
   if(pass.deskToolReceipts!==undefined){
    if(!Array.isArray(pass.deskToolReceipts)||pass.deskToolReceipts.length>4)return false;
-   const deps=new Set<string>(),depSources=new Set<string>();
+   const deps=new Set<string>(),depSources=new Set<string>(),unavailableCodes=new Set<string>();
    for(const ref of pass.deskToolReceipts){
     if(!ref||!UUID.test(ref.receiptId)||deps.has(ref.receiptId))return false;
     const read=await readReceipt(ref.receiptId);
     if(!read||read.row.callSha256!==ref.callSha256||read.row.resultSha256!==ref.resultSha256)return false;
     deps.add(ref.receiptId);
+    if(read.result.unavailable)unavailableCodes.add(read.result.unavailable.code);
     for(const s of read.result.sources)depSources.add(s.source.sourceId);
    }
    if(depSources.size!==seen.size||[...depSources].some(id=>!seen.has(id)))return false;
+   if(pass.costUnits===0&&pass.interruptionCode&&!unavailableCodes.has(pass.interruptionCode))return false;
   }
   return true;
  };
