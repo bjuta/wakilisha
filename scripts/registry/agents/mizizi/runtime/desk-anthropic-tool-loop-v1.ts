@@ -31,11 +31,11 @@ const PROMPT=[
  "Never invent citations, independence, identities or rights. Separate Recording, Work, Artist and Person.",
  "Write original factual research notes in your own words; do not reproduce source articles, transcripts, or catalogue descriptions.",
  "Separate directly observed facts, attributed source claims, and your own inferences; preserve recording version, citation, uncertainty and contradictions.",
- "Any factualNotes are unverified human research context, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.",
  "An unavailable discovery outcome is not an empty result or evidence. Do not repeat the failed discovery operation or evade its host restriction. Use another independently available authorized avenue, or preserve uncertainty and pause.",
  "When evidence is insufficient, propose meaningful follow-up questions or pause. Do not perform writes.",
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
 ].join(" ");
+const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified human research context, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
 const hash=(value:string|Uint8Array)=>createHash("sha256").update(value).digest("hex");
 const fail=(code:string):never=>{throw Error("MIZIZI_DESK_TOOL_"+code);};
 const record=(v:unknown):Record<string,unknown>=>{
@@ -262,7 +262,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
   const thinking=ordinaryThinking(b.model);
   if(JSON.stringify(parsed)!==body||Object.keys(parsed).length!==7+Object.keys(thinking).length||parsed.model!==b.model||
    JSON.stringify(parsed.thinking)!==JSON.stringify("thinking" in thinking?thinking.thinking:undefined)||
-   parsed.max_tokens!==MAX_OUTPUT||parsed.system!==PROMPT||
+   parsed.max_tokens!==MAX_OUTPUT||parsed.system!==(b.factualNoteReadbackSha256===undefined?PROMPT:NOTE_PROMPT)||
    JSON.stringify(parsed.output_config)!==JSON.stringify({format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}})||
    !Array.isArray(parsed.tools)||!Array.isArray(parsed.messages))return false;
   const names=parsed.tools.map(t=>record(t).name),enabled=new Set(names as string[]);
@@ -459,7 +459,8 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
  const credentialSha256=hash(JSON.stringify(["mizizi:anthropic:credential:v1",workspace??null,apiKey]));
  const enabled=new Set(options.enabledTools),tools=TOOL_SPECS.filter(t=>enabled.has(t[0]))
   .map(([name,description,properties])=>({name,description,strict:true,input_schema:schema(properties)}));
- const promptFingerprint=hash(JSON.stringify({system:PROMPT,tools,schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}));
+ const system=options.factualNoteReadback?NOTE_PROMPT:PROMPT;
+ const promptFingerprint=hash(JSON.stringify({system,tools,schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}));
  return async(identity,question,history)=>{
   if(identity.caseId!==boundScope.caseId||identity.workspaceId!==boundScope.workspaceId||!text(question,1000,8))
    fail("CASE_OR_QUESTION_DENIED");
@@ -505,7 +506,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   for(let round=1;round<=MAX_CALLS;round++){
    live();await checkSources();live();
    const choice=deskToolChoice(model,enabled,round,leads,sources.size);
-   const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system:PROMPT,...ordinaryThinking(model),
+   const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system,...ordinaryThinking(model),
     tools,tool_choice:choice,
     output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});
    const requestBytes=Buffer.byteLength(body,"utf8");

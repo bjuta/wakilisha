@@ -31,7 +31,7 @@ concurrency:
 jobs:
   disposable-worker-sql:
     name: disposable-worker-sql
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false || (github.event.pull_request.number == 1442 && github.event.pull_request.head.ref == 'work/mizizi-charts-candidate-resolution-20261126') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -123,7 +123,7 @@ jobs:
 
   disposable-operator-jwt:
     name: disposable-operator-jwt
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false || (github.event.pull_request.number == 1442 && github.event.pull_request.head.ref == 'work/mizizi-charts-candidate-resolution-20261126') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

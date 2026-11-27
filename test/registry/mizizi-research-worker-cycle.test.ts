@@ -1801,6 +1801,61 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   return {config,send,replies,authorizeEnvelope,quote,reserve,consume,recordModelEvent,
    authorizeTool,executeTool,verifyToolReceipt,authorizeSource};
  }
+ it("binds independently reconstructed original note context to metered model envelopes and the journal, never to source claims",async()=>{
+  const hash=(s:string)=>createHash("sha256").update(s).digest("hex");
+  const subject={membershipSha256:"a".repeat(64),observationSha256:"b".repeat(64)};
+  const noteId="77777777-7777-4777-8777-777777777777",noteText="The researcher found a possible release credit that requires corroboration.";
+  const locator="https://example.org/research/credits";
+  const note={noteId,noteSha256:"d".repeat(64),reviewRevision:2,caseId:CASE,workspaceId:WORKSPACE,
+   expectedRevision:2,...subject,authorId:JOB,reviewerId:EVENT,fieldKey:"performer",noteKind:"attributed_claim",
+   consultationMethod:"manual_public_consultation",sourceLocator:locator,noteText,noteTextSha256:hash(noteText),
+   locatorSha256:hash(locator),observedAt:new Date(NOW-1000).toISOString(),reviewRef:"fixture:note-review",
+   validUntil:expiry,representation:"original_factual_note",verified:false,modelUseEligible:true};
+  const packet=(notes:unknown[])=>{const bodyText=JSON.stringify({contract:"mizizi.desk_factual_note_readback.v1",scope,...subject,notes});return {bodyText,bodySha256:hash(bodyText)};};
+  for(const mode of ["valid","revoked","forged-citation"] as const){
+   const h=fixture(),rows:InvestigationPassV1[]=[];let reads=0,modelGrants=0;
+   if(mode==="forged-citation")h.replies[2]=final({...conclusion,hypotheses:[{...conclusion.hypotheses[0],sourceIds:[noteId]}]});
+   const rpc:WorkerRpc=async(fn,args)=>{
+    if(fn==="mizizi_read_desk_factual_notes_v1")return {data:packet(mode==="revoked"&&++reads>=3?[]:[note]),error:null};
+    if(fn==="mizizi_authorize_desk_model_operation_v1"){
+     if(args.p_operation==="model_disclose"){
+      modelGrants++;expect(JSON.parse(String(args.p_binding_text)).factualNoteReadbackSha256).toBe(packet([note]).bodySha256);
+     }
+     return {data:{operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true},error:null};
+    }
+    expect(fn).toBe("mizizi_read_desk_tool_receipt_v1");
+    for(let i=0;i<h.executeTool.mock.results.length;i++){
+     const raw=await h.executeTool.mock.results[i].value;
+     if(raw.receiptId!==args.p_receipt_id)continue;
+     const resultText=JSON.stringify({receiptId:raw.receiptId,leads:raw.leads,sources:raw.sources,visual:null});
+     return {data:{receiptId:raw.receiptId,callSha256:hash(JSON.stringify({scope,call:h.executeTool.mock.calls[i][1]})),
+      resultSha256:hash(resultText),resultText},error:null};
+    }return {data:null,error:null};
+   };
+   const factualNoteReadback=await readDeskFactualNotesV1(rpc,scope,subject,()=>NOW);
+   const authority=createDurableDeskModelAuthorityV1({rpc,scope,factualNoteSubject:subject,authorizeEnvelope:h.authorizeEnvelope,authorizeTool:h.authorizeTool,now:()=>NOW});
+   const run=runAdaptiveInvestigationV1({identity,prepareDeskPass:createCostRoutedDeskAnthropicPassV1({...h.config,...authority,factualNoteReadback}),
+    store:{read:async()=>rows.slice(),append:async(_id,_n,_p,pass)=>{rows.push(pass);}},
+    readSources:async()=>{throw Error("legacy");},analyze:async()=>{throw Error("legacy");},authorizeModelProcessing:async()=>true,
+    verifyFinding:async()=>({verified:false,verificationRef:null}),maxNewPasses:1,maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW});
+   if(mode==="revoked"){
+    await expect(run).rejects.toThrow("ENVELOPE_AUTHORITY_CHANGED");
+    expect(h.send).not.toHaveBeenCalled();expect(rows).toHaveLength(0);continue;
+   }
+   if(mode==="forged-citation"){
+    await expect(run).rejects.toThrow("FINAL_CLAIM_INVALID");expect(rows).toHaveLength(0);continue;
+   }
+   await expect(run).resolves.toMatchObject({passesAdded:1,disposition:"paused"});
+   expect(h.send).toHaveBeenCalledTimes(3);expect(modelGrants).toBeGreaterThanOrEqual(9);
+   const opening=JSON.parse(JSON.parse(String(h.send.mock.calls[0][1].body)).messages[0].content);
+   expect(opening.factualNotes).toEqual([{noteId,fieldKey:note.fieldKey,noteKind:note.noteKind,
+    sourceLocator:locator,noteText,observedAt:note.observedAt,representation:"original_factual_note",verified:false}]);
+   expect(rows[0].factualNoteReferences).toEqual([{noteId,noteSha256:note.noteSha256,reviewRevision:2}]);
+   expect(rows[0].sourceReceipts.map(s=>s.sourceId)).toEqual([EVENT]);
+   expect(rows[0].findings[0].independentlyVerified).toBe(false);
+   expect(JSON.stringify(rows[0])).not.toContain(noteText);
+  }
+ });
  it("selects the cheapest currently qualified model and never treats price as quality authority",()=>{
   expect(selectCostEffectiveDeskModelV1(models,requirement,NOW).family).toBe("haiku");
   const complex={...requirement,tier:"complex" as const,maximumCostMicrousd:100000};

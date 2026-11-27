@@ -585,7 +585,7 @@ begin
    or jsonb_typeof(b->'sourceReceipts') is distinct from 'array'
    or jsonb_array_length(b->'sourceReceipts')>30 then
    raise exception 'Desk journal source shape denied' using errcode='42501';end if;
-  if b ? 'factualNoteReferences' and not coalesce(mizizi_private.desk_factual_note_references_current_v1(c,b),false) then
+  if b ? 'factualNoteReferences' and not coalesce(mizizi_private.desk_factual_note_references_current_v1(c||jsonb_build_object('workerId',p_worker_id),b),false) then
    raise exception 'Desk original factual note context denied' using errcode='42501';end if;
   batch_bound:=false;
   if b ? 'deskBatchReceipt' then

@@ -664,6 +664,7 @@ export async function verifyCharts2RealJwtRegistryV1({
      p.original_object_key===p.source_key+"/"+p.original_sha256.slice(0,2)+"/"+p.original_sha256+extension;
   }),"STOP_CHART_SCOPED_ORIGINAL_CONTEXT");
  // Genuine JWT note readback, scoped to this current worker lease.
+ let standingNoteRef;
  {
  const name="mizizi_read_desk_factual_notes_v1";
  const noteScope={jobId:job.job_id,caseId:pairedId,workspaceId:ws,expectedRevision:2,
@@ -704,6 +705,8 @@ export async function verifyCharts2RealJwtRegistryV1({
  await accept(first.user,review,{...rev,p_expected_review_revision:2,p_decision:"revoked",
   p_acknowledgement:"I revoke this exact factual note admission."},"STOP_NOTE_WORKER_REVOKE");
  fail((await readNotes()).length===0,"STOP_NOTE_WORKER_REVOKED");
+ await accept(second.user,review,{...rev,p_expected_review_revision:3,p_model_processing_allowed:true},"STOP_NOTE_WORKER_READMIT");
+ standingNoteRef={noteId:n.noteId,noteSha256:n.noteSha256,reviewRevision:4};
  console.log("WK_AUTH_MIZIZI_NOTE_EXACT_LEASE_READBACK_PRIVATE_REVOCATION=PASS");
  }
  // Durable desk-search budget: actual service JWTs and concurrent SQL
@@ -1128,6 +1131,40 @@ export async function verifyCharts2RealJwtRegistryV1({
  true,true,true,true,now()-interval '1 hour',now()+interval '1 hour',now()+interval '5 minutes',10,10,10,'wikimedia','en.wikipedia.org',1000);
  set local role service_role;
  set local request.jwt.claim.role='service_role';
+ do $note_context$ declare packet jsonb;b jsonb;t text;pass jsonb;bad jsonb;outcome text;begin
+ packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)});
+ if packet is null or jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>1 then raise exception 'STOP_NOTE_CONTEXT_PACKET';end if;
+ b:=${j(envelope(1,[],[]))}||jsonb_build_object('factualNoteReadbackSha256',packet->>'bodySha256');
+ t:=b::text;
+ if (public.mizizi_authorize_desk_model_operation_v1(${j(scope)},'model_disclose',t,encode(sha256(convert_to(t,'UTF8')),'hex'))->>'allowed') is distinct from 'true'
+ then raise exception 'STOP_NOTE_CONTEXT_MODEL_GRANT';end if;
+ t:=jsonb_set(b,'{factualNoteReadbackSha256}',to_jsonb(repeat('f',64)))::text;
+ if public.mizizi_authorize_desk_model_operation_v1(${j(scope)},'model_disclose',t,encode(sha256(convert_to(t,'UTF8')),'hex')) is not null
+ then raise exception 'STOP_NOTE_CONTEXT_FORGED_MODEL_GRANT';end if;
+ pass:=${j({...JSON.parse(journalBodyFor([])),sourceReceipts:[],deskToolReceipts:[],factualNoteReferences:[standingNoteRef],findings:[],decision:{action:"pause",nextQuestion:null}})};
+ bad:=jsonb_set(pass,'{factualNoteReferences,0,noteSha256}',to_jsonb(repeat('f',64)));
+ begin
+ t:=bad::text;
+ perform * from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,encode(sha256(convert_to(t,'UTF8')),'hex'),null);
+ raise exception 'STOP_NOTE_CONTEXT_FORGED_JOURNAL';
+ exception when insufficient_privilege then null;end;
+ bad:=jsonb_set(pass,'{findings}',jsonb_build_array(jsonb_build_object('sourceIds',jsonb_build_array(${q(standingNoteRef.noteId)}))));
+ begin
+ t:=bad::text;
+ perform * from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,encode(sha256(convert_to(t,'UTF8')),'hex'),null);
+ raise exception 'STOP_NOTE_CONTEXT_FALSE_CITATION';
+ exception when insufficient_privilege then null;end;
+ begin
+ t:=pass::text;
+ select r.outcome into strict outcome from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,encode(sha256(convert_to(t,'UTF8')),'hex'),null) r;
+ if outcome is distinct from 'created' then raise exception 'STOP_NOTE_CONTEXT_JOURNAL';end if;
+ if not exists(select 1 from public.mizizi_read_research_passes_v1(${q(job.job_id)}::uuid,${q(activeWorker)}) r where r.body_text=t)
+ then raise exception 'STOP_NOTE_CONTEXT_JOURNAL_READBACK';end if;
+ -- Preserve the original fixture's empty predecessor; test subtransaction only.
+ raise exception 'Fixture rollback' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;end;
+ raise notice 'WK_AUTH_MIZIZI_NOTE_CONTEXT_MODEL_AND_JOURNAL=PASS';
+ end $note_context$;
  do $standing$ begin
  if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->>'revision') is distinct from '1'
  or (${authority("model_disclose",envelope(1,[],[]))}->>'allowed') is distinct from 'true'
