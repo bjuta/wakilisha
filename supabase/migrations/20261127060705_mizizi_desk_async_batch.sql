@@ -508,7 +508,9 @@ begin
  select detail into u from mizizi_private.desk_resource_events_v1 where reservation_id=r.id and state='response_metered';
  select p.model_tariffs->r.model into tariff from mizizi_private.desk_resource_policy_versions_v1 p
  where p.resource=r.resource and p.revision=r.policy_revision;
- if u is null or tariff is null or tariff->>'pricingRef' is distinct from r.pricing_ref then return r.units;end if;
+ if u is null or tariff is null or tariff->>'pricingRef' is distinct from r.pricing_ref
+ or u->>'cacheCreationTokens' is distinct from '0' or u->>'cacheReadTokens' is distinct from '0'
+ then return r.units;end if;
  charge:=ceil(((u->>'inputTokens')::numeric+(u->>'cacheCreationTokens')::numeric+(u->>'cacheReadTokens')::numeric)
  *(tariff->>'inputRate')::numeric/1000000+(u->>'outputTokens')::numeric*(tariff->>'outputRate')::numeric/1000000);
  if charge is null or charge<1 or charge>r.units then return r.units;end if;
