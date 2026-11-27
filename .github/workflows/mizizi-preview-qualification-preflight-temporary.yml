@@ -1,164 +1,55 @@
-name: MIZIZI Preview Exact Candidate Schema Qualification
+name: MIZIZI Preview Credential and Model Inventory
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
-concurrency:
-  group: mizizi-preview-schema-qualification
-  cancel-in-progress: false
 jobs:
-  preflight:
+  inventory:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      PREVIEW_REF: ehkmjrjjhzyjkxdfsqdc
-      PROD_REF: pgzizndxdyhqmtyywjmt
-      EXPECTED_HEAD: e5d08c2fa96de4044e7409d05c331c6d0c7cf211
+    timeout-minutes: 5
     steps:
-      - name: Check out exact approved integration candidate
-        uses: actions/checkout@v4
-        with:
-          ref: e5d08c2fa96de4044e7409d05c331c6d0c7cf211
-          persist-credentials: false
-      - name: Set up pinned Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.107.0
-          github-token: ${{ github.token }}
-      - name: Reverify exact protected acceptance and open integration PR
+      - name: Verify Preview credential and read available model metadata only
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request
-          def get(path):
-              request=urllib.request.Request("https://api.github.com/repos/bjuta/wakilisha/"+path,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"})
-              with urllib.request.urlopen(request,timeout=15) as f: return json.load(f)
-          h=os.environ["EXPECTED_HEAD"]
-          pr=get("pulls/1442")
-          if pr.get("state")!="open" or pr.get("merged") or pr["head"]["sha"]!=h: raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
-          for number in (45947673635,45947673636):
-              run=get("actions/runs/"+str(number))
-              if run.get("head_sha")!=h or run.get("status")!="completed" or run.get("conclusion")!="success" or run.get("event")!="pull_request":
-                  raise SystemExit("MIZIZI_PROTECTED_GATE=STOP")
-          print("MIZIZI_EXACT_PROTECTED_ACCEPTANCE=PASS")
-          PY
-      - name: Non-secret availability and migration preflight, exact Preview forward apply
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          REPO_ANTHROPIC_PRESENT: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          MIZIZI_PREVIEW_ANTHROPIC_API_KEY: ${{ secrets.MIZIZI_PREVIEW_ANTHROPIC_API_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          umask 077
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          test "$(find supabase/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')" = 299
-          echo "MIZIZI_PREFLIGHT_EXACT_CANDIDATE=PASS"
-          echo "MIZIZI_REPO_ANTHROPIC_SECRET_PRESENT=$REPO_ANTHROPIC_PRESENT"
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "MIZIZI_MANAGEMENT_CREDENTIAL=MISSING"
-            exit 1
-          fi
-          echo "MIZIZI_MANAGEMENT_CREDENTIAL=PRESENT"
-          scratch="$(mktemp -d)"
-          trap 'rm -rf "$scratch"' EXIT
-          supabase secrets list --help >"$scratch/help" 2>&1
-          if ! grep -q -- '--project-ref' "$scratch/help"; then
-            echo "MIZIZI_SECRET_LIST_CLI_CONTRACT=UNCONFIRMED"; exit 1
-          fi
-          if ! supabase secrets list --project-ref "$PREVIEW_REF" --output json >"$scratch/preview.json" 2>"$scratch/preview.err"; then
-            echo "MIZIZI_PREVIEW_SECRET_LIST=UNCONFIRMED"; exit 1
-          fi
-          if ! supabase secrets list --project-ref "$PROD_REF" --output json >"$scratch/prod.json" 2>"$scratch/prod.err"; then
-            echo "MIZIZI_PRODUCTION_SECRET_METADATA=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/preview.json" "$scratch/prod.json" <<'PY'
-          import json, sys
-          def rows(p):
-              v=json.load(open(p))
-              if isinstance(v,dict):
-                  v=v.get("secrets")
-              if not isinstance(v,list):
-                  raise SystemExit("MIZIZI_SECRET_LIST_SHAPE=UNCONFIRMED")
-              result={}
-              for row in v:
-                  if not isinstance(row,dict):
-                      raise SystemExit("MIZIZI_SECRET_LIST_SHAPE=UNCONFIRMED")
-                  item={str(k).lower():v for k,v in row.items()}
-                  name=item.get("name")
-                  if not isinstance(name,str) or name in result:
-                      raise SystemExit("MIZIZI_SECRET_LIST_SHAPE=UNCONFIRMED")
-                  result[name]=item
-              return result
-          pre,prod=map(rows,sys.argv[1:])
-          print("MIZIZI_PREVIEW_SECRET_LIST=PASS")
-          print("MIZIZI_PRODUCTION_SECRET_METADATA=PASS")
-          for name in ("ANTHROPIC_API_KEY",):
-              p=name in pre; q=name in prod
-              print("MIZIZI_"+name+"_PREVIEW_PRESENT="+str(p).lower())
-              print("MIZIZI_"+name+"_PRODUCTION_PRESENT="+str(q).lower())
-              a=pre.get(name,{}).get("digest")
-              b=prod.get(name,{}).get("digest")
-              print("MIZIZI_"+name+"_DIGEST_PARITY="+(str(a==b).lower() if isinstance(a,str) and a and isinstance(b,str) and b else "unconfirmed"))
+          python3 - <<'PY'
+          import os,json,re,urllib.request,urllib.error
+          key=os.environ.get("MIZIZI_PREVIEW_ANTHROPIC_API_KEY","")
+          if not key or key.strip()!=key:
+              raise SystemExit("MIZIZI_PREVIEW_CREDENTIAL=MISSING_OR_INVALID")
+          print("MIZIZI_PREVIEW_CREDENTIAL=PRESENT",flush=True)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):
+                  raise ValueError("Redirect denied")
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          req=urllib.request.Request("https://api.anthropic.com/v1/models?limit=100",headers={"x-api-key":key,"anthropic-version":"2026-10-21","Accept":"application/json"},method="GET")
+          try:
+              with opener.open(req,timeout=20) as response:
+                  if response.status!=200: raise ValueError("Invalid status")
+                  data=response.read(1000001)
+              if len(data)>1000000: raise ValueError("Response bound")
+              obj=json.loads(data)
+          except urllib.error.HTTPError as e:
+              raise SystemExit("MIZIZI_MODEL_INVENTORY_HTTP="+str(e.code))
+          except Exception:
+              raise SystemExit("MIZIZI_MODEL_INVENTORY=UNCONFIRMED")
+          rows=obj.get("data")
+          if not isinstance(rows,list) or not rows or len(rows)>100 or obj.get("has_more") is not False:
+              raise SystemExit("MIZIZI_MODEL_INVENTORY_SHAPE=STOP")
+          for row in rows:
+              mid=row.get("id","")
+              if not isinstance(mid,str) or not re.fullmatch(r"claude-[A-Za-z0-9._-]{1,100}",mid): continue
+              line=row.get("line")
+              life=row.get("lifecycle")
+              caps=row.get("capabilities") or {}
+              batch=caps.get("batch") or {}
+              out={"id":mid,"line":line if line in ("haiku","sonnet","opus","fable","mythos") else None,"lifecycle":life if life in ("active","deprecated","retired") else None,"batch":batch.get("supported") is True,"max_input_tokens":row.get("max_input_tokens") if type(row.get("max_input_tokens")) is int else None,"max_tokens":row.get("max_tokens") if type(row.get("max_tokens")) is int else None}
+              print("MIZIZI_MODEL_METADATA="+json.dumps(out,separators=(",",":")))
+          print("MIZIZI_MODEL_INVENTORY=PASS")
+          print("MIZIZI_NO_INFERENCE_REQUEST=PASS")
           PY
-          # CLI-native forward plan. Only the approved Preview database may
-          # change; no secret mutation, provider calls, or runtime fixtures.
-          if ! supabase link --project-ref "$PREVIEW_REF" >"$scratch/link" 2>&1; then
-            echo "MIZIZI_PREVIEW_LINK=UNCONFIRMED"; exit 1
-          fi
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          echo "MIZIZI_PREVIEW_LINK=PASS"
-          if ! supabase db push --dry-run --linked >"$scratch/dry" 2>&1; then
-            echo "MIZIZI_PREVIEW_DRY_RUN=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/dry" <<'PY'
-          import pathlib,re,sys
-          actual=sorted(set(re.findall(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",pathlib.Path(sys.argv[1]).read_text())))
-          expected=sorted(p.name for p in pathlib.Path("supabase/migrations").glob("*.sql") if p.name > "20261126073912_charts2_artist_intake_grant_origin.sql")
-          if len(expected)!=18 or actual!=expected:
-              print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=STOP")
-              print("expected_count="+str(len(expected))+" actual_count="+str(len(actual)))
-              raise SystemExit(1)
-          print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=PASS")
-          print("MIZIZI_PREVIEW_DRY_RUN_COUNT=18")
-          PY
-          echo "MIZIZI_PREVIEW_EXACT_DELTA=PASS"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          test "$PREVIEW_REF" = "ehkmjrjjhzyjkxdfsqdc"
-          test "$PREVIEW_REF" != "$PROD_REF"
-          export SUPABASE_PROJECT_REF="$PREVIEW_REF"
-          # Explicitly discover the noninteractive CLI contract before write.
-          supabase db push --help >"$scratch/push-help" 2>&1
-          grep -q -- '--yes' "$scratch/push-help"
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=START"
-          if ! supabase db push --linked --yes >"$scratch/apply" 2>&1; then
-            python3 - "$scratch/apply" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text(errors="replace")
-          print("MIZIZI_PREVIEW_FORWARD_APPLY=STOP")
-          for m in re.findall(r"Applying migration ([0-9]{14}_[A-Za-z0-9_-]+\.sql)",data): print("MIZIZI_ATTEMPTED_MIGRATION="+m)
-          for state in set(re.findall(r"SQLSTATE ([A-Z0-9]{5})",data)): print("MIZIZI_SQLSTATE="+state)
-          PY
-            exit 1
-          fi
-          echo "MIZIZI_PREVIEW_FORWARD_APPLY=COMMAND_SUCCEEDED"
-          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
-          if ! supabase db push --dry-run --linked >"$scratch/post" 2>&1; then
-            echo "MIZIZI_PREVIEW_POSTFLIGHT=UNCONFIRMED"; exit 1
-          fi
-          python3 - "$scratch/post" <<'PY'
-          import re,sys,pathlib
-          data=pathlib.Path(sys.argv[1]).read_text()
-          if re.search(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",data):
-              raise SystemExit("MIZIZI_PREVIEW_POSTFLIGHT_PENDING=STOP")
-          print("MIZIZI_PREVIEW_POSTFLIGHT_ZERO_PENDING=PASS")
-          PY
-          echo "MIZIZI_PREVIEW_SCHEMA_QUALIFICATION=PASS"
-
