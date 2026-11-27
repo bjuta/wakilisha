@@ -59,8 +59,13 @@ jobs:
           curl --fail --silent --show-error --proto '=https' --max-time 30 'https://raw.githubusercontent.com/supabase/cli/v2.107.0/apps/cli-go/internal/gen/types/templates/prod-ca-2021.crt' -o "$scratch/prod-ca-2021.crt"
           test "$(git hash-object "$scratch/prod-ca-2021.crt")" = 3d693669b23c340c57a3457bdc8b6fefe1806cc5
           openssl x509 -in "$scratch/prod-ca-2021.crt" -noout -checkend 3600
-          pooler_host="$(node -e 'const u=new URL(require("fs").readFileSync("supabase/.temp/pooler-url","utf8").trim());if(!/^[a-z0-9-]+\\.pooler\\.supabase\\.com$/.test(u.hostname)||!u.username.endsWith(".ehkmjrjjhzyjkxdfsqdc"))process.exit(1);process.stdout.write(u.hostname)')"
-          timeout 30 openssl s_client -starttls postgres -connect "$pooler_host:5432" -servername "$pooler_host" -verify_hostname "$pooler_host" -CAfile "$scratch/prod-ca-2021.crt" -verify_return_error </dev/null >"$scratch/tls-check" 2>&1
+          pooler_host="$(node -e 'const u=new URL(require("fs").readFileSync("supabase/.temp/pooler-url","utf8").trim());if(!/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(u.hostname)||!u.username.endsWith(".ehkmjrjjhzyjkxdfsqdc"))process.exit(1);process.stdout.write(u.hostname)')" || { echo MIZIZI_POOLER_HOST_VALIDATION=STOP; exit 1; }
+          echo MIZIZI_POOLER_HOST_VALIDATION=PASS
+          if ! timeout 30 openssl s_client -starttls postgres -connect "$pooler_host:5432" -servername "$pooler_host" -verify_hostname "$pooler_host" -CAfile "$scratch/prod-ca-2021.crt" -verify_return_error </dev/null >"$scratch/tls-check" 2>&1; then
+            echo MIZIZI_PINNED_POOLER_TLS=STOP
+            grep -E "verify error:num=|Verify return code:|Verification error:" "$scratch/tls-check" || true
+            exit 1
+          fi
           grep -Fq 'Verify return code: 0 (ok)' "$scratch/tls-check"
           echo MIZIZI_PINNED_POOLER_TLS=PASS
           export NODE_EXTRA_CA_CERTS="$scratch/prod-ca-2021.crt"
