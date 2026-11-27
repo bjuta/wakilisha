@@ -2052,6 +2052,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const rpc:WorkerRpc=async(fn,args)=>{
    calls.push({fn,args});
    const ok=(data:unknown)=>({data,error:null});
+   if(fn==="mizizi_authorize_desk_model_operation_v1")return ok({operation:args.p_operation,bindingSha256:args.p_binding_sha256,policyRef:"fixture:durable-model:1",validUntil:expiry,allowed:true});
    if(fn==="mizizi_authorize_desk_access_v1"){
     const binding=JSON.parse(String(args.p_binding_text)),operation=String(args.p_operation);
     if(disabled.has(operation))return ok(null);
@@ -2061,7 +2062,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    if(fn==="mizizi_read_desk_custody_policy_v1"){
     const host=String(args.p_host);
     return ok(disabled.has(host)?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
-     authorityRef:"contract:reviewed-rights",originKey:"archive:original-origin",lineageKey:"archive:common-lineage",
+     authorityRef:"contract:reviewed-rights",originKey:host==="www.loc.gov"?"library:original-origin":"archive:original-origin",lineageKey:host==="www.loc.gov"?"library:independent-lineage":"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
      excerptRetentionAllowed:host!=="api.search.brave.com",externalModelProcessingAllowed:true,
      browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry});
@@ -2134,7 +2135,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    searchTransport:provider as unknown as typeof fetch,nativeTestSeams:{resolve4:async()=>["93.184.216.34"],readPinned:native},
    now:()=>NOW,...browserOptions});
   const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
-  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,native,access,examination};
+  return {dispatch,execute,calls,receipts,leadRows,disabled,provider,native,access,examination,rpc};
  }
  it("connects actual search, budget, native reader and parser to private opaque custody and source readback",async()=>{
   const h=fixture(),search=call("search_web",{query:"Nairobi recording archive"});
@@ -2176,6 +2177,56 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   await expect(guarded.read(identity)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   await expect(guarded.append(identity,1,null,pass)).rejects.toThrow("HISTORY_CUSTODY_DENIED");
   expect(base.append).toHaveBeenCalledTimes(1);
+ },20000);
+ it("composes one investigation across open-web discovery, two independent native sources, model authority, finance and guarded journal",async()=>{
+  const h=fixture(),question="Which recording credits are supported by the original archival sources?";
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
+  h.provider.mockResolvedValueOnce(new Response(JSON.stringify({web:{results:[
+   {url,title:"Original programme"},{url:"https://www.loc.gov/item/fixture",title:"Independent catalogue"}]}}),{headers:{"content-type":"application/json"}}));
+  h.native.mockResolvedValueOnce({status:200,contentType:"text/plain",body:textBytes});
+  h.native.mockResolvedValueOnce({status:200,contentType:"text/plain",body:new TextEncoder().encode("The independent catalogue reports a different performer; the exact recording version must be checked.")});
+  const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,now:()=>NOW,
+   authorizeEnvelope:async b=>({requestSha256:b.requestSha256,policyRef:"fixture:host-envelope",validUntil:expiry,modelDisclosureAllowed:true}),
+   authorizeTool:async()=>true});
+  const model="fixture-haiku",events:string[]=[],passes:InvestigationPassV1[]=[];
+  let round=0;
+  const transport=vi.fn(async(_url:string,init:RequestInit)=>{
+   const body=JSON.parse(String(init.body));round++;
+   const result=(value:unknown)=>new Response(JSON.stringify({model,usage:{input_tokens:500,output_tokens:100},...value as object}),{headers:{"content-type":"application/json"}});
+   const tool=(name:string,input:unknown)=>result({stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_"+round,name,input}]});
+   if(round===1)return tool("search_web",{query:"Nairobi recording archive"});
+   const latest=JSON.parse(body.messages.at(-1).content[0].content[0].text);
+   if(round===2)return tool("read_page",{lead_id:latest.leads[0].id});
+   if(round===3){
+    const search=JSON.parse(body.messages[2].content[0].content[0].text);
+    return tool("read_page",{lead_id:search.leads[1].id});
+   }
+   const first=JSON.parse(body.messages[4].content[0].content[0].text).sources[0];
+   return result({stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify({hypotheses:[{
+    statement:"The sources conflict on performer identity.",sourceIds:[first.sourceId,latest.sources[0].sourceId],
+    interpretation:"supported",uncertainty:.6,reasoningSummary:"The two original sources disagree."}],
+    leads:[],passFinding:"The two origins conflict; recording identity is unresolved.",requestedDisposition:"conclude"})}]});
+  });
+  const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({scope,anthropic:{apiKey:"fixture-only-key",transport:transport as unknown as typeof fetch},
+   enabledTools:["search_web","read_page"],readModelInventory:async()=>[{model,family:"haiku",active:true,toolUse:true,
+    structuredOutput:true,vision:false,ordinaryToolTranscript:true,qualityGateRef:"fixture:quality",pricingRef:"fixture:price",
+    maxInputTokens:5000,maxOutputTokens:2500,worstCaseInputMicrousdPerMillion:100000,worstCaseOutputMicrousdPerMillion:500000,validUntil:expiry}],
+   assessRequirement:async()=>({tier:"routine",needsVision:false,inputTokenCeiling:5000,maximumCostMicrousd:8000,assessmentRef:"fixture:assessment"}),
+   ...authority,quote:async b=>({requestSha256:b.requestSha256,pricingRef:"fixture:price",maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,validUntil:expiry}),
+   reserve:async(b,q)=>({reservationId:[JOB,CASE,RECEIPT,WORKSPACE][b.round-1],requestSha256:b.requestSha256,pricingRef:q.pricingRef,maximumCostMicrousd:q.maximumCostMicrousd,validUntil:expiry}),
+   consume:async()=>true,recordModelEvent:async e=>{events.push(e.state);},
+   executeTool:h.dispatch.executeTool,verifyToolReceipt:h.dispatch.verifyToolReceipt,authorizeSource:h.dispatch.authorizeSource,now:()=>NOW});
+  const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_ordinal,_prior,pass)=>{passes.push(pass);}},h.dispatch.verifyJournalPass);
+  const verify=vi.fn(async()=>({verified:false,verificationRef:null}));
+  const result=await runAdaptiveInvestigationV1({identity,store,prepareDeskPass,
+   readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
+   authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:verify,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:20,now:()=>NOW});
+  expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(transport).toHaveBeenCalledTimes(4);expect(h.provider).toHaveBeenCalledTimes(1);expect(h.native).toHaveBeenCalledTimes(2);
+  expect(h.receipts.size).toBe(3);expect(events).toEqual(Array.from({length:4},()=>["send_pending","response_metered"]).flat());
+  expect(passes[0].deskToolReceipts).toHaveLength(3);expect(passes[0].sourceReceipts).toHaveLength(2);
+  expect(new Set(passes[0].sourceReceipts.map(s=>s.lineageKey)).size).toBe(2);
+  expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false}]);expect(verify).toHaveBeenCalledTimes(1);
  },20000);
  it("uses indexed retained discovery before any provider search and then reuses the exact source receipt",async()=>{
   const h=fixture(textBytes,"text/plain",{sharedNativeSearch:true,sharedNativeReuse:true});
@@ -2615,6 +2666,12 @@ describe("MIZIZI keyless provider discovery through existing durable search budg
   const gdelt=fixture({provider:"gdelt",host:"api.gdeltproject.org",allocationRef:"fixture:gdelt-allocation"},{articles});
   const g=await createDurableDeskPublicDiscoveryGatewayV1(gdelt.options)({...request,operation:"search_news"});
   expect(g.leads).toHaveLength(1);expect(g.provider).toBe("gdelt");
+  const tavily=fixture({provider:"tavily_keyless",host:"api.tavily.com",allocationRef:"fixture:tavily-keyless"},{results:articles});
+  const broad=await createDurableDeskPublicDiscoveryGatewayV1(tavily.options)(request);
+  expect(broad.leads).toEqual(g.leads);expect(broad.provider).toBe("tavily_keyless");
+  expect((tavily.readPinned.mock.calls[0] as unknown as [{url:string}])[0].url).toBe("https://api.tavily.com/search");
+  expect(tavily.calls.filter(x=>x.fn==="mizizi_consume_desk_search_v1")).toHaveLength(1);
+  expect(()=>createDurableDeskPublicDiscoveryGatewayV1({...tavily.options,configuration:{...tavily.options.configuration,host:"archive.org"}})).toThrow("DISCOVERY_PROVIDER_DENIED");
   const searx=fixture({provider:"searxng",host:"search.wakilisha.africa",allocationRef:"fixture:searxng-allocation"},{results:articles});
   const s=await createDurableDeskPublicDiscoveryGatewayV1(searx.options)(request);
   expect(s.leads).toEqual(g.leads);

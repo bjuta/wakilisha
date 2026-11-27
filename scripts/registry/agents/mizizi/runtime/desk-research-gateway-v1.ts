@@ -4,7 +4,7 @@
  * native model search, automatic retry, refund, or paid fallback exists.
  */
 import {createHash} from "node:crypto";
-import {createDeskBrowserResourceReaderV1} from "./desk-native-reader-v1.ts";
+import {createDeskBrowserResourceReaderV1,createDeskTavilyDiscoveryReaderV1} from "./desk-native-reader-v1.ts";
 const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const SHA=/^[0-9a-f]{64}$/;
 const MAX_BODY=256000;
@@ -216,7 +216,7 @@ export function createDurableDeskSearchGatewayV1(options:Readonly<{
  * supplies universal web coverage. SearXNG needs a qualified deployment
  * and permitted upstream access. No automatic fallback or subscription. */
 export type DeskPublicDiscoveryProviderV1=Readonly<{
- provider:"wikimedia"|"gdelt"|"searxng";host:string;allocationRef:string;
+ provider:"wikimedia"|"gdelt"|"searxng"|"tavily_keyless";host:string;allocationRef:string;
 }>;
 export type DeskDiscoveryConfigurationV1=Readonly<Partial<Record<
  DeskSearchRequestV1["operation"],DeskPublicDiscoveryProviderV1>>>;
@@ -237,7 +237,8 @@ export function qualifyDeskPublicDiscoveryProviderV1(config:DeskPublicDiscoveryP
   !["search_web","search_news"].includes(operation)||
   !(config.provider==="wikimedia"&&/^[a-z][a-z0-9-]{1,19}\.wikipedia\.org$/.test(config.host)&&operation==="search_web"||
     config.provider==="gdelt"&&config.host==="api.gdeltproject.org"&&operation==="search_news"||
-    config.provider==="searxng"&&!config.host.endsWith(".wikipedia.org")&&config.host!=="api.gdeltproject.org"))
+    config.provider==="tavily_keyless"&&config.host==="api.tavily.com"||
+    config.provider==="searxng"&&!config.host.endsWith(".wikipedia.org")&&!["api.gdeltproject.org","api.tavily.com"].includes(config.host)))
   fail("DISCOVERY_PROVIDER_DENIED");
  return Object.freeze({...config});
 }
@@ -257,6 +258,8 @@ function publicDiscoveryEndpoint(request:PublicDiscoveryRequestV1):URL{
   url.pathname="/api/v2/doc/doc";url.searchParams.set("query",request.query);
   url.searchParams.set("mode","artlist");url.searchParams.set("format","json");
   url.searchParams.set("maxrecords",String(request.count));
+ }else if(request.provider==="tavily_keyless"){
+  url.pathname="/search";
  }else{
   url.pathname="/search";url.searchParams.set("q",request.query);url.searchParams.set("format","json");
   url.searchParams.set("categories",request.operation==="search_news"?"news":"general");
@@ -334,7 +337,7 @@ export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
   const bindingSha256=createHash("sha256").update(JSON.stringify(binding)).digest("hex");
   const sameBinding=(candidate:Parameters<ReturnType<typeof createDeskBrowserResourceReaderV1>>[0],sha:string)=>
    sha===bindingSha256&&JSON.stringify(candidate)===JSON.stringify(binding);
-  const read=createDeskBrowserResourceReaderV1({
+  const readerOptions:Parameters<typeof createDeskBrowserResourceReaderV1>[0]={
    ...options.resourceTestSeams,now,
    authorize:async(candidate,sha)=>{
     if(!sameBinding(candidate,sha)||!expiry(reservation.validUntil,now(),lease))return null;
@@ -347,7 +350,9 @@ export function createDurableDeskPublicDiscoveryGatewayV1(options:Readonly<{
     target.url===url&&target.hostname===config.host&&expiry(reservation.validUntil,now(),lease)&&
     await rpc("mizizi_consume_desk_search_v1",{p_reservation_id:reservation.reservationId,
      p_request_sha256:requestSha256})===true
-  });
+  };
+  const read=config.provider==="tavily_keyless"?createDeskTavilyDiscoveryReaderV1(readerOptions,request.query,request.count,request.operation):
+   createDeskBrowserResourceReaderV1(readerOptions);
   const response=await read(binding,bindingSha256,AbortSignal.timeout(Math.min(20000,Math.max(1,lease-now()))));
   if(response.requestSha256!==bindingSha256||response.status!==200||
    !("body" in response)||!/^application\/json\b/i.test(response.contentType??"")||

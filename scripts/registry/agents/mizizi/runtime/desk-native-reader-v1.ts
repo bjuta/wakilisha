@@ -104,9 +104,10 @@ function browserContentType(value:unknown,resourceType:string):string{
   fail("CONTENT_TYPE_DENIED");
  return value;
 }
-async function readNative(target:Target,signal:AbortSignal,browserType?:string):Promise<HopResponse>{
+async function readNative(target:Target,signal:AbortSignal,browserType?:string,tavilyBody?:string):Promise<HopResponse>{
  const url=publicUrl(target.url);
  if(url.hostname!==target.hostname||!isPublicDeskIpv4V1(target.address))fail("PIN_DENIED");
+ if(tavilyBody!==undefined&&(url.href!=="https://api.tavily.com/search"||browserType!=="fetch"||Buffer.byteLength(tavilyBody)>4096))fail("DISCOVERY_POST_DENIED");
  return new Promise((resolve,reject)=>{
   let settled=false;
   const finish=(err:Error|null,value?:HopResponse)=>{
@@ -115,13 +116,14 @@ async function readNative(target:Target,signal:AbortSignal,browserType?:string):
    if(err)reject(err);else resolve(value!);
   };
   const req=httpsRequest({
-   hostname:target.address,port:443,path:url.pathname+url.search,method:"GET",
+   hostname:target.address,port:443,path:url.pathname+url.search,method:tavilyBody===undefined?"GET":"POST",
    servername:target.hostname,agent:false,rejectUnauthorized:true,minVersion:"TLSv1.2",
    checkServerIdentity:(_name,cert)=>checkServerIdentity(target.hostname,cert),
    maxHeaderSize:16384,signal,
    headers:{Host:target.hostname,"User-Agent":"WAKILISHA-MIZIZI/1.0 (https://wakilisha.africa)",
     Accept:browserType?BROWSER_MIMES[browserType].join(","):"text/html,application/xhtml+xml,text/plain,application/pdf",
-    "Accept-Encoding":"identity",Connection:"close"},
+    "Accept-Encoding":"identity",Connection:"close",...(tavilyBody===undefined?{}:{
+    "Content-Type":"application/json","Content-Length":String(Buffer.byteLength(tavilyBody)),"X-Tavily-Access-Mode":"keyless"})},
   },res=>{
    const stop=(code:string)=>{finish(Error("MIZIZI_DESK_NATIVE_"+code));res.destroy();req.destroy();};
    if(res.socket.remoteAddress!==target.address){stop("PEER_PIN_MISMATCH");return;}
@@ -166,7 +168,7 @@ async function readNative(target:Target,signal:AbortSignal,browserType?:string):
    });
   });
   req.once("error",()=>finish(Error("MIZIZI_DESK_NATIVE_TRANSPORT_UNCONFIRMED")));
-  req.end();
+  req.end(tavilyBody);
  });
 }
 export function createDeskNativeReaderV1(options:NativeReadOptions){
@@ -254,6 +256,16 @@ type BrowserResourceReadOptionsV1=Readonly<{
  resolve4?:NativeReadOptions["resolve4"];
  readPinned?:(target:Target,signal:AbortSignal,resourceType:string)=>Promise<HopResponse>;
 }>;
+/** Fixed zero-charge Tavily discovery transport, not a general POST proxy.
+ * Query is derived from the already authorized public chart request. No key,
+ * arbitrary headers, user-specified endpoint, redirects or automatic retry. */
+export function createDeskTavilyDiscoveryReaderV1(options:BrowserResourceReadOptionsV1,query:string,count:number,operation:"search_web"|"search_news"){
+ if(typeof query!=="string"||query.length<3||query.length>300||query.trim()!==query||/[\\p{Cc}\\p{Cf}]/u.test(query)||
+  !Number.isSafeInteger(count)||count<1||count>10||!["search_web","search_news"].includes(operation))fail("DISCOVERY_POST_DENIED");
+ const body=JSON.stringify({query,topic:operation==="search_news"?"news":"general",search_depth:"basic",max_results:count,
+  include_answer:false,include_raw_content:false,include_images:false,auto_parameters:false});
+ return createDeskBrowserResourceReaderV1({...options,readPinned:options.readPinned??((target,signal,kind)=>readNative(target,signal,kind,body))});
+}
 /** One authorized browser resource hop, not a generic proxy. Shared native
  * TLS/DNS/byte boundary; no Chromium headers, credentials or direct network.
  * Never follow redirects here. Caller must separately authorize next hop.
