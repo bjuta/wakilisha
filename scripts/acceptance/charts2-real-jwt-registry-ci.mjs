@@ -517,6 +517,49 @@ export async function verifyCharts2RealJwtRegistryV1({
  fail(sql("select count(*) from mizizi_private.case_events where case_id='"+pairedId+
    "' and case_revision=2 and actor_key='user:"+winner.id+"';")==="1",
    "STOP_CHART_DISPATCH_HUMAN_JOURNAL");
+
+ // Original factual notes use a genuine author JWT and a distinct steward.
+ // This synthetic public locator is not fetched or licensed source material.
+ {
+  const noteId=randomUUID(),submit="admin_mizizi_submit_factual_note_v1",
+   review="admin_mizizi_review_factual_note_v1",read="admin_mizizi_read_factual_note_v1";
+  const beforeNotes=proof();
+  const payload={p_note_id:noteId,p_case_id:pairedId,p_expected_revision:2,p_field_key:"performer",
+   p_note_kind:"attributed_claim",p_consultation_method:"manual_public_consultation",
+   p_source_locator:"https://example.org/fixture/release-credits",
+   p_note_text:"The fixture listing attributes the performance to a named artist; version remains unresolved.",
+   p_observed_at:new Date(Date.now()-60000).toISOString(),
+   p_acknowledgement:"I personally consulted this source by a permitted method and wrote an original factual note, not copied source content."};
+  denied(await subscriber.rpc(submit,payload),"42501","STOP_NOTE_SUBSCRIBER");
+  denied(await reviewer.rpc(submit,payload),"42501","STOP_NOTE_REVIEWER");
+  denied(await first.user.rpc(submit,{...payload,p_expected_revision:1}),"PT409","STOP_NOTE_STALE");
+  denied(await first.user.rpc(submit,{...payload,p_source_locator:"https://example.org/fixture?token=secret"}),"22023","STOP_NOTE_SECRET_LOCATOR");
+  denied(await first.user.rpc(submit,{...payload,p_acknowledgement:"yes"}),"22023","STOP_NOTE_ATTESTATION");
+  const n=await accept(first.user,submit,payload,"STOP_NOTE_SUBMIT");
+  fail(n.noteId===noteId&&n.authorId===first.id&&n.caseId===pairedId&&n.verified===false&&n.jobsDispatched===0&&/^[a-f0-9]{64}$/.test(n.noteSha256),"STOP_NOTE_BINDING");
+  fail(JSON.stringify(await accept(first.user,submit,payload,"STOP_NOTE_REPLAY"))===JSON.stringify(n),"STOP_NOTE_REPLAY_DRIFT");
+  denied(await first.user.rpc(submit,{...payload,p_note_text:payload.p_note_text+" Changed."}),"23505","STOP_NOTE_TAMPER");
+  denied(await subscriber.rpc(read,{p_note_id:noteId}),"42501","STOP_NOTE_PRIVATE_READ");
+  const privateNote=await accept(second.user,read,{p_note_id:noteId},"STOP_NOTE_STEWARD_READ");
+  fail(privateNote.note.note_text===payload.p_note_text&&privateNote.note.source_locator===payload.p_source_locator&&privateNote.latestReview===null&&privateNote.verified===false,"STOP_NOTE_READBACK");
+  const rev={p_note_id:noteId,p_note_sha256:n.noteSha256,p_expected_review_revision:0,p_decision:"admitted",
+   p_model_processing_allowed:false,p_review_ref:"fixture:independent-original-note-review",
+   p_valid_until:new Date(Date.now()+3600000).toISOString(),
+   p_acknowledgement:"I independently reviewed this exact original note, consultation method, provenance and permitted use; this is not factual verification."};
+  denied(await first.user.rpc(review,rev),"42501","STOP_NOTE_SELF_REVIEW");
+  denied(await second.user.rpc(review,{...rev,p_note_sha256:"f".repeat(64)}),"42501","STOP_NOTE_FORGED_DIGEST");
+  const d=await accept(second.user,review,rev,"STOP_NOTE_INDEPENDENT_REVIEW");
+  fail(d.reviewRevision===1&&d.decision==="admitted"&&d.reviewerId===second.id&&d.modelProcessingAllowed===false&&!d.verified,"STOP_NOTE_REVIEW_BINDING");
+  denied(await second.user.rpc(review,rev),"PT409","STOP_NOTE_REVIEW_CAS");
+  const withdrawn=await accept(first.user,review,{...rev,p_expected_review_revision:1,p_decision:"revoked",
+   p_acknowledgement:"I revoke this exact factual note admission."},"STOP_NOTE_REVOKE");
+  fail(withdrawn.reviewRevision===2&&withdrawn.decision==="revoked"&&!withdrawn.modelProcessingAllowed,"STOP_NOTE_REVOCATION");
+  const finalNote=await accept(second.user,read,{p_note_id:noteId},"STOP_NOTE_REVOKED_READ");
+  fail(finalNote.latestReview.decision==="revoked"&&finalNote.note.note_sha256===n.noteSha256,"STOP_NOTE_HISTORY");
+  fail(proof()===beforeNotes,"STOP_NOTE_CANONICAL_OR_JOB_SIDE_EFFECT");
+  fail(sql("select (select count(*) from mizizi_private.desk_factual_notes_v1 where note_id='"+noteId+"')::text||'|'||(select count(*) from mizizi_private.desk_factual_note_reviews_v1 where note_id='"+noteId+"')::text;")==="1|2","STOP_NOTE_IMMUTABLE_COUNTS");
+  console.log("WK_AUTH_MIZIZI_ORIGINAL_FACTUAL_NOTE_INDEPENDENT_REVIEW_REVOCATION=PASS");
+ }
  denyJit(jobArgs(pairedId,2,"PUBLIC_CC0_RESEARCH: Arbitrary caller supplied research question"),"42501");
  denyJit(jobArgs(pairedId,2,chartReason,"wrong-idempotency-key"),"42501");
  denyJit(jobArgs(pairedId,2),"42501",
