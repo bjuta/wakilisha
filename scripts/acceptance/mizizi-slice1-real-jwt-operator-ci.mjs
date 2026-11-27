@@ -39,6 +39,62 @@ async function call(user,fn,args,label){
 const client=(url,key)=>createClient(url,key,{
  auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}
 });
+// Separate fresh disposable scenario preserves the original bootstrap proof.
+async function verifyOwnerRecovery({api,anonKey,admin,first,second,db}){
+ const fn="admin_mizizi_recover_initial_owner_v1";
+ const args={p_expected_expired_membership_id:randomUUID(),p_expected_revision:1,
+  p_reason:"Disposable local administrator recovery of an expired steward."};
+ const anon=client(api,anonKey);
+ requireDenied(await anon.rpc(fn,args),"42501","STOP_RECOVERY_ANON");
+ requireDenied(await admin.rpc(fn,args),"42501","STOP_RECOVERY_SERVICE");
+ requireDenied(await first.user.rpc(fn,args),"42501","STOP_RECOVERY_SUBSCRIBER");
+ localSql("INSERT INTO public.user_role_assignments(user_id,role_key,status,notes) VALUES ('"+
+  first.id+"'::uuid,'administrator','active','Disposable owner recovery existing administrator fixture.');",db);
+ requireDenied(await first.user.rpc(fn,args),"55000","STOP_RECOVERY_EMPTY_HISTORY");
+ const oldId=localSql("INSERT INTO mizizi_private.workspace_memberships("+
+  "workspace_id,user_id,member_role,grant_source,granted_by,last_changed_by,change_reason,valid_until) "+
+  "SELECT id,'"+second.id+"'::uuid,'steward','operator_review','"+second.id+"'::uuid,'"+
+  second.id+"'::uuid,'Disposable local historical technical steward fixture.',clock_timestamp()+interval '2 minutes' "+
+  "FROM mizizi_private.workspaces WHERE workspace_key='wakilisha-internal' RETURNING id;",db);
+ assert(UUID.test(oldId),"STOP_RECOVERY_HISTORY_ID");
+ args.p_expected_expired_membership_id=oldId;
+ requireDenied(await first.user.rpc(fn,args),"55000","STOP_RECOVERY_ACTIVE_STEWARD");
+ localSql("UPDATE mizizi_private.workspace_memberships SET valid_until=valid_from+interval '1 microsecond',"+
+  "revision=revision+1,change_reason='Disposable local expiration scenario.' WHERE id='"+oldId+"'::uuid;",db);
+ args.p_expected_revision=2;
+ const historical=localSql("SELECT to_jsonb(m)::text FROM mizizi_private.workspace_memberships m WHERE id='"+oldId+"'::uuid;",db);
+ const roles=localSql("SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.user_id,a.role_key),'[]'::jsonb)::text FROM public.user_role_assignments a;",db);
+ requireDenied(await second.user.rpc(fn,args),"42501","STOP_RECOVERY_EXPIRED_STEWARD");
+ requireDenied(await first.user.rpc(fn,{...args,p_expected_revision:1}),"55000","STOP_RECOVERY_STALE_REVISION");
+ requireDenied(await first.user.rpc(fn,{...args,p_reason:"short"}),"22023","STOP_RECOVERY_REASON");
+ requireDenied(await first.user.rpc("admin_mizizi_bootstrap_internal_owner_v1",{p_reason:"Historical membership cannot use original bootstrap."}),"55000","STOP_RECOVERY_BOOTSTRAP_BYPASS");
+ const racing=await Promise.all([first.user.rpc(fn,args),first.user.rpc(fn,args)]);
+ const successes=racing.filter(r=>!r.error);
+ assert(successes.length===1&&UUID.test(successes[0].data||"")&&racing.filter(r=>r.error?.code==="55000").length===1,"STOP_RECOVERY_RACE");
+ const owner=successes[0].data;
+ const proof=localSql("SELECT (SELECT count(*) FROM mizizi_private.workspace_memberships)||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.workspace_memberships WHERE id='"+owner+"'::uuid AND user_id='"+first.id+
+  "'::uuid AND member_role='owner' AND valid_until IS NULL AND revoked_at IS NULL AND revision=1)||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.workspace_events WHERE membership_id='"+owner+
+  "'::uuid AND event_type='membership_granted' AND actor_key='user:"+first.id+"' AND membership_revision=1)||'|'||"+
+  "(SELECT count(*) FROM mizizi_private.cases)||'|'||(SELECT count(*) FROM mizizi_private.desk_resource_reservations_v1);",db);
+ assert(proof==="2|1|1|0|0","STOP_RECOVERY_OWNER_JOURNAL_OR_SIDE_EFFECT");
+ assert(localSql("SELECT to_jsonb(m)::text FROM mizizi_private.workspace_memberships m WHERE id='"+oldId+"'::uuid;",db)===historical,"STOP_RECOVERY_HISTORY_REWRITTEN");
+ assert(localSql("SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.user_id,a.role_key),'[]'::jsonb)::text FROM public.user_role_assignments a;",db)===roles,"STOP_RECOVERY_PLATFORM_ROLE_CHANGED");
+ const cases=await call(first.user,"admin_mizizi_cases_v1",{p_limit:100},"STOP_RECOVERY_OWNER_READ");
+ assert(Array.isArray(cases)&&cases.length===0,"STOP_RECOVERY_OWNER_CASES");
+ requireDenied(await first.user.rpc(fn,args),"55000","STOP_RECOVERY_REPLAY");
+ // A still-signed JWT cannot claim a new recovery after its session is gone.
+ const session=await first.user.auth.getSession();
+ const token=session.data.session?.access_token;
+ assert(token,"STOP_RECOVERY_SESSION_RECEIPT");
+ const logout=await first.user.auth.signOut({scope:"global"});
+ assert(!logout.error,"STOP_RECOVERY_SESSION_LOGOUT");
+ const stale=createClient(api,anonKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:"Bearer "+token}}});
+ requireDenied(await stale.rpc(fn,args),"42501","STOP_RECOVERY_SIGNED_OUT_SESSION");
+ console.log("WK_AUTH_INITIAL_OWNER_RECOVERY_EXACT_HISTORY_CONCURRENT_GENUINE_JWT=PASS");
+ console.log("WK_AUTH_INITIAL_OWNER_RECOVERY_PLATFORM_ROLES_AND_RESEARCH_UNCHANGED=PASS");
+}
 async function main(){
  assert(process.env.GITHUB_ACTIONS==="true"&&process.env.GITHUB_EVENT_NAME==="pull_request"&&
   !process.env.SUPABASE_ACCESS_TOKEN&&!process.env.SUPABASE_PROJECT_REF&&
@@ -88,6 +144,11 @@ async function main(){
  }
  const first=people[0],second=people[1];
  console.log("WK_AUTH_TWO_GENUINE_SIGNED_IN_LOCAL_USERS=PASS");
+ if(process.argv[2]==="--recovery-only"){
+  await verifyOwnerRecovery({api,anonKey:values.ANON_KEY,admin,first,second,db});
+  return;
+ }
+ if(process.argv.length!==2)throw Error("STOP_UNKNOWN_DISPOSABLE_AUTH_SCENARIO");
  requireDenied(await client(api,values.ANON_KEY).rpc("admin_mizizi_cases_v1",
   {p_limit:100}),"42501","STOP_ANON_ACCESS");
  // O21: actual anonymous PostgREST bootstrap call must never acquire an owner.
