@@ -1,34 +1,31 @@
-name: MIZIZI Research Notebook Focused Regression
+name: MIZIZI Mint Factual Note Custody Migration
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
-concurrency:
-  group: mizizi-preview-schema-qualification
-  cancel-in-progress: false
 jobs:
-  worker:
+  mint:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 14a8f1fe6cc8ed42295f2906ea90d86f8af692b8
-          fetch-depth: 2
+          ref: c82e04b052aa932f6bebac7d7f94a303107efda5
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: supabase/setup-cli@v1
         with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --prefer-offline --no-audit --no-fund
-      - name: Exact offline runtime and worker checks
+          version: 2.107.0
+          github-token: ${{ github.token }}
+      - name: Mint forward migration without linking or hosted access
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 14a8f1fe6cc8ed42295f2906ea90d86f8af692b8
-          for name in MIZIZI_PREVIEW_OPERATOR_JWT MIZIZI_PREVIEW_SERVICE_ROLE_KEY MIZIZI_PREVIEW_JIT_DATABASE_URL MIZIZI_PREVIEW_ANTHROPIC_API_KEY SUPABASE_ACCESS_TOKEN; do
-            test -z "${!name:-}"
-          done
-          git diff --check 28ff4de1e880cda9336e4727aae4dba76ada994f HEAD
-          npx --no-install vitest run test/registry/mizizi-chart-calibration-flow.test.ts test/registry/mizizi-research-worker-cycle.test.ts
+          test "$(git rev-parse HEAD)" = c82e04b052aa932f6bebac7d7f94a303107efda5
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l)" -eq 305
+          test -z "$(find supabase/migrations -name '*_mizizi_desk_factual_note_custody.sql')"
+          supabase migration new mizizi_desk_factual_note_custody
+          file="$(find supabase/migrations -name '*_mizizi_desk_factual_note_custody.sql')"
+          test -f "$file"
+          test "$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l)" -eq 306
+          printf 'MIZIZI_MINTED_MIGRATION=%s\n' "$file"
