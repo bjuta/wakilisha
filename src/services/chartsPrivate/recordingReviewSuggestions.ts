@@ -113,6 +113,10 @@ export function suggestRecordingReviewGroups(
   }] as const));
   const parent = rows.map((_, i) => i);
   const rank = rows.map(() => 0);
+  // Track component members at union time. Every valid component contains
+  // at most one observation per source; no full-workload scan per pair.
+  const members = rows.map((_, i) => [i]);
+  const sourceSets = rows.map(row => new Set([row.source_key]));
   const find = (n: number): number => {
     while (parent[n] !== n) {
       parent[n] = parent[parent[n]];
@@ -123,21 +127,24 @@ export function suggestRecordingReviewGroups(
   const unite = (a: number, b: number) => {
     const x = find(a), y = find(b);
     if (x === y) return;
-    if (rank[x] < rank[y]) parent[x] = y;
-    else if (rank[x] > rank[y]) parent[y] = x;
-    else { parent[y] = x; rank[x]++; }
+    const root = rank[x] < rank[y] ? y : x;
+    const child = root === x ? y : x;
+    parent[child] = root;
+    if (rank[x] === rank[y]) rank[root]++;
+    members[root].push(...members[child]);
+    for (const source of sourceSets[child]) sourceSets[root].add(source);
+    members[child] = [];
+    sourceSets[child].clear();
   };
   const reasons = new Map<string, Set<string>>();
   // Connected components alone are unsafe: a title-and-prefix chain can
   // accidentally combine two recording versions or two positions from one
   // source. Require every candidate to be compatible with the whole group.
-  const membersOf = (root: number): number[] => rows.flatMap((_, i) =>
-    find(i) === root ? [i] : []
-  );
   const compatibleMerge = (a: number, b: number): boolean => {
-    const left = membersOf(find(a)), right = membersOf(find(b));
-    const sources = new Set([...left,...right].map(i=>rows[i].source_key));
-    if(sources.size !== left.length + right.length)return false;
+    const x = find(a), y = find(b);
+    if (x === y) return false;
+    for (const source of sourceSets[x]) if (sourceSets[y].has(source)) return false;
+    const left = members[x], right = members[y];
     return left.every(i=>right.every(j=>{
       const reason=pairReason(rows[i],rows[j],identities,normalized);
       return Boolean(reason) && reason !== "Check Missing Artist Credit";
@@ -149,6 +156,10 @@ export function suggestRecordingReviewGroups(
     if (!normalized.get(rows[i])!.artist) continue;
     for (let j = i + 1; j < rows.length; j++) {
       if (!normalized.get(rows[j])!.artist) continue;
+      const x = find(i), y = find(j);
+      // Reject source collisions before doing the expensive title comparison.
+      if (x === y || sourceSets[x].has(rows[j].source_key) ||
+          sourceSets[y].has(rows[i].source_key)) continue;
       const reason = pairReason(rows[i], rows[j], identities,normalized);
       if (!reason || !compatibleMerge(i,j)) continue;
       unite(i,j);
