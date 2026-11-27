@@ -1,4 +1,4 @@
-import {discoverMusicBrainzCoreCohortV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-core-cohort-v1.mjs";
+import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1} from "../../scripts/registry/agents/mizizi/runtime/musicbrainz-core-cohort-v1.mjs";
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
@@ -2200,6 +2200,55 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
    await run(directory,manifest);
   }finally{await rm(directory,{recursive:true,force:true});}
  }
+ it("cryptographically verifies a signed core archive, rejects another publisher and tampered compressed bytes, and retains only selected members",async()=>{
+  const {execFileSync}=await import("node:child_process");
+  const program=`
+import hashlib, importlib.util, io, pathlib, subprocess, sys, tarfile, tempfile
+sys.dont_write_bytecode=True
+spec=importlib.util.spec_from_file_location("qualifier",sys.argv[1])
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as root:
+ p=pathlib.Path(root); home=p/"gnupg";home.mkdir(mode=0o700)
+ def gpg(*args):
+  return subprocess.check_output(["gpg","--homedir",str(home),"--batch","--pinentry-mode","loopback","--passphrase","",*args],stderr=subprocess.DEVNULL)
+ gpg("--quick-gen-key","Fixture signing key <fixture@example.invalid>","ed25519","sign","1d")
+ fp=next(line.split(":")[9] for line in gpg("--with-colons","--list-keys").decode().splitlines() if line.startswith("fpr:"))
+ keyring=p/"fixture.gpg";keyring.write_bytes(gpg("--export",fp))
+ archive=p/"mbdump.tar.bz2"
+ entries={"TIMESTAMP":b"2026-11-26 00:00:00+00:00","SCHEMA_SEQUENCE":b"31",
+  "mbdump/recording":b"recording-row\\n","mbdump/isrc":b"isrc-row\\n","mbdump/artist_credit":b"credit-row\\n",
+  "../not-extracted":b"never write me","mbdump/editor":b"do not retain"}
+ with tarfile.open(archive,"w:bz2") as f:
+  for name,data in entries.items():
+   item=tarfile.TarInfo(name);item.size=len(data);f.addfile(item,io.BytesIO(data))
+ checksum=hashlib.sha256(archive.read_bytes()).hexdigest()
+ (p/"SHA256SUMS").write_text(checksum+"  mbdump.tar.bz2\\n")
+ gpg("--armor","--detach-sign","--output",str(p/"SHA256SUMS.asc"),str(p/"SHA256SUMS"))
+ try:
+  m.qualify(p,keyring,p/"wrong-publisher",1024)
+  raise AssertionError("unreviewed publisher accepted")
+ except ValueError as e:
+  assert "PUBLISHER_SIGNATURE_DENIED" in str(e), str(e)
+ result=m.qualify(p,keyring,p/"verified",1024,expected_fingerprint=fp)
+ assert result["manifest"]["archiveSha256"]==checksum
+ assert result["manifest"]["snapshot"]=="20261126-000000"
+ assert result["archiveSignatureVerified"] and not result["custodyAuthorized"]
+ assert set(x.name for x in (p/"verified").iterdir())=={"recording","isrc","artist_credit","qualification.json"}
+ assert result["manifest"]["tables"]["recording"]==hashlib.sha256(entries["mbdump/recording"]).hexdigest()
+ with archive.open("ab") as f:f.write(b"tampered")
+ try:
+  m.qualify(p,keyring,p/"tampered",1024,expected_fingerprint=fp)
+  raise AssertionError("tampered archive accepted")
+ except ValueError as e:
+  assert "SIGNED_ARCHIVE_DIGEST_MISMATCH" in str(e), str(e)
+ assert not (p/"tampered").exists()
+ assert not any(x.name.startswith(".mizizi-core-") for x in p.iterdir())
+ print("MIZIZI_SIGNED_FIXTURE_ARCHIVE=PASS")
+`;
+  const output=execFileSync("python3",["-c",program,"scripts/registry/agents/mizizi/runtime/qualify-musicbrainz-core-archive-v1.py"],
+   {encoding:"utf8",timeout:25000,maxBuffer:65536});
+  expect(output.trim()).toBe("MIZIZI_SIGNED_FIXTURE_ARCHIVE=PASS");
+ },30000);
  it("reads each core table once for 1,000 cases, preserves each subject and shares source projections, without claiming identity",async()=>{
   await fixture(async(directory,manifest)=>{
    const recordings=Array.from({length:1000},(_,i)=>({recordingId:cohortId(i+1),title:"Home Bound",artist:"Artist A",isrc:code}));
@@ -2293,6 +2342,14 @@ describe("MusicBrainz core CC0 offline cohort discovery",()=>{
    await expect(runDurableDeskResearchWorkerCohortV1({...args,corePlanning:{directory,manifest,
     observations:[observations[0],observations[1],observations[1]]}} as never)).rejects.toThrow("COHORT_PLAN_SCOPE_DENIED");
    expect(claimed).toEqual([]);
+   await expect(runDurableDeskResearchWorkerCohortV1({...args,operationalNativeOnly:true} as never))
+    .rejects.toThrow("COHORT_SIGNED_ARCHIVE_REQUIRED");
+   expect(claimed).toEqual([]);
+   await expect(discoverQualifiedMusicBrainzCoreCohortV1({archiveDirectory:directory,keyring:directory,
+    scratchDirectory:directory,maxExtractBytes:1024,recordings:[{recordingId:ids[1],title:"Home Bound",artist:"Artist A"}]}))
+    .rejects.toThrow("ARCHIVE_QUALIFICATION_UNCONFIRMED");
+   const {readdir}=await import("node:fs/promises");
+   expect((await readdir(directory)).sort()).toEqual(["artist_credit","isrc","recording"]);
   });
  });
  it("distinguishes identifier metadata conflict, missing candidates, and duplicate subject or tampered snapshot",async()=>{

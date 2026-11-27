@@ -3,7 +3,7 @@
  * investigation or cultural question is definitively resolved.
  */
 import {createHash} from "node:crypto";
-import {discoverMusicBrainzCoreCohortV1} from "./musicbrainz-core-cohort-v1.mjs";
+import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1} from "./musicbrainz-core-cohort-v1.mjs";
 import {createCharts2RegistryCatalogueCohortV1} from "../../../../../supabase/functions/_shared/charts2-private-native-review-v1.mjs";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import {runAdaptiveInvestigationV1, type InvestigationIdentityV1,
@@ -422,9 +422,9 @@ export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
    * Archive publisher/signature qualification remains the caller's duty.
    * No ISRC from chart labels; never turn an offline hit into identity. */
   corePlanning?:Readonly<{
-   directory:string;manifest:Parameters<typeof discoverMusicBrainzCoreCohortV1>[0]["manifest"];
    observations:readonly Readonly<{caseId:string;membershipSha256:string;observationSha256:string;title:string;artist:string|null}>[];
-  }>;
+  }&({directory:string;manifest:Parameters<typeof discoverMusicBrainzCoreCohortV1>[0]["manifest"]}|
+   {archiveDirectory:string;keyring:string;scratchDirectory:string;maxExtractBytes:number})>;
  }
 >){
  const {chartScopes,corePlanning,...worker}=input;
@@ -450,9 +450,15 @@ export async function runDurableDeskResearchWorkerCohortV1(input:Readonly<
     throw Error("MIZIZI_DESK_COHORT_PLAN_SCOPE_DENIED");
    observationByCase.set(o.caseId,Object.freeze({...o}));
   }
-  const result=await discoverMusicBrainzCoreCohortV1({directory:corePlanning.directory,manifest:corePlanning.manifest,
-   recordings:[...observationByCase.values()].sort((a,b)=>a.caseId.localeCompare(b.caseId)).map(o=>({
-    recordingId:o.caseId,title:o.title,artist:o.artist,isrc:null}))});
+  const recordings=[...observationByCase.values()].sort((a,b)=>a.caseId.localeCompare(b.caseId)).map(o=>({
+    recordingId:o.caseId,title:o.title,artist:o.artist,isrc:null}));
+  // Raw tables remain useful offline candidate fixtures. Operational
+  // composition may not substitute a self-issued extraction manifest.
+  if(worker.operationalNativeOnly===true&&!("archiveDirectory" in corePlanning))
+   throw Error("MIZIZI_DESK_COHORT_SIGNED_ARCHIVE_REQUIRED");
+  const result="archiveDirectory" in corePlanning?
+   await discoverQualifiedMusicBrainzCoreCohortV1({...corePlanning,recordings}):
+   await discoverMusicBrainzCoreCohortV1({directory:corePlanning.directory,manifest:corePlanning.manifest,recordings});
   const plan=result.acquisitionPlan,scopeById=new Map(chartScopes.map(s=>[s.caseId,s]));
   if(plan.orderedSubjectIds.length!==chartScopes.length||new Set(plan.orderedSubjectIds).size!==chartScopes.length||
    plan.orderedSubjectIds.some(id=>!scopeById.has(id)))

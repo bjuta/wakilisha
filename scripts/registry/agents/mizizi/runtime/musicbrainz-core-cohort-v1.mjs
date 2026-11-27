@@ -7,9 +7,11 @@
  */
 import {createHash} from "node:crypto";
 import {createReadStream} from "node:fs";
-import {readFile,stat} from "node:fs/promises";
+import {readFile,stat,mkdtemp,rm} from "node:fs/promises";
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
 import {join,resolve} from "node:path";
-import {pathToFileURL} from "node:url";
+import {pathToFileURL,fileURLToPath} from "node:url";
 
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -291,6 +293,36 @@ export async function discoverMusicBrainzCoreCohortV1({directory,manifest,record
  return {contract:"mizizi.musicbrainz_core_cohort.v1",candidateOnly:true,identityVerified:false,canPublish:false,
   source:{...m,license:"CC0-1.0",lineage:"musicbrainz:community-core",archiveSignatureVerifiedByReader:false,
    tableDigestsVerified:true},inputSha256:digest(JSON.stringify(inputs)),scans,summary,sources,recordings:projected,sharedEvidence,acquisitionPlan};
+}
+/** Operational bulk intake: verify publisher signature and actual compressed
+ * archive before scanning. Never accept a caller's boolean or self-issued
+ * table manifest as archive qualification. All extracted files are transient.
+ */
+export async function discoverQualifiedMusicBrainzCoreCohortV1({archiveDirectory,keyring,scratchDirectory,maxExtractBytes,recordings}={}){
+ if(![archiveDirectory,keyring,scratchDirectory].every(x=>typeof x==="string"&&x.length>0)||
+  !Number.isSafeInteger(maxExtractBytes)||maxExtractBytes<1||maxExtractBytes>24*1024**3)fail("ARCHIVE_CONFIGURATION_DENIED");
+ const root=await mkdtemp(join(resolve(scratchDirectory),"mizizi-qualified-core-")),directory=join(root,"core");
+ try{
+  let stdout;
+  try{
+   ({stdout}=await promisify(execFile)("python3",[fileURLToPath(new URL("./qualify-musicbrainz-core-archive-v1.py",import.meta.url)),
+    "--archive-directory",resolve(archiveDirectory),"--keyring",resolve(keyring),"--output",directory,
+    "--max-extract-bytes",String(maxExtractBytes)],{timeout:7200000,maxBuffer:65536}));
+  }catch{fail("ARCHIVE_QUALIFICATION_UNCONFIRMED");}
+  let receipt;try{receipt=JSON.parse(stdout);}catch{fail("ARCHIVE_QUALIFICATION_UNCONFIRMED");}
+  if(receipt?.contract!=="mizizi.musicbrainz_core_archive_qualification.v1"||
+   receipt.publisherFingerprint!=="D5E63B4BDCCE195642948684B8FC2375C777580F"||
+   receipt.archiveSignatureVerified!==true||receipt.candidateOnly!==true||receipt.custodyAuthorized!==false||
+   receipt.modelDisclosureAuthorized!==false||receipt.canonicalWriteAuthorized!==false||
+   !SHA.test(receipt.signedChecksumsSha256)||!SHA.test(receipt.signatureSha256)||
+   !Number.isSafeInteger(receipt.selectedBytes)||receipt.selectedBytes<1||receipt.selectedBytes>maxExtractBytes)
+   fail("ARCHIVE_QUALIFICATION_UNCONFIRMED");
+  const result=await discoverMusicBrainzCoreCohortV1({directory,manifest:receipt.manifest,recordings});
+  return {...result,source:{...result.source,archiveSignatureVerifiedByReader:true,
+   publisherFingerprint:receipt.publisherFingerprint,signedChecksumsSha256:receipt.signedChecksumsSha256,
+   signatureSha256:receipt.signatureSha256,schemaSequence:receipt.schemaSequence,
+   compressedBytes:receipt.compressedBytes,selectedBytes:receipt.selectedBytes},archiveQualification:receipt};
+ }finally{await rm(root,{recursive:true,force:true});}
 }
 async function smallJson(path,max){
  const info=await stat(path);
