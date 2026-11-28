@@ -230,6 +230,9 @@ begin
  -- Explicit access decisions take precedence; no legacy grant is rewritten.
  transient_access:=coalesce(mizizi_private.desk_operational_policy_live_v1(o,c)
   and o.public_web_transient_allowed and p.revision is null
+  -- Preserve an existing positive scoped grant and its receipt meaning.
+  and not coalesce(mizizi_private.desk_custody_policy_live_v1(custody)
+   and mizizi_private.desk_operational_url_allowed_v1(o,h,u,p_operation,custody.revision),false)
   and split_part(u,'?',1) ~ '^https://[a-z0-9.-]+(/[A-Za-z0-9_./~%:-]*)?$'
   and split_part(u,'?',1) !~* '%(2e|2f|5c|25)'
   and split_part(u,'?',1) !~ '/[.]{1,2}(/|$)'
