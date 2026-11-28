@@ -1,29 +1,138 @@
-name: MIZIZI Preview Bounded Session Requalification
+name: MIZIZI Preview Migration 309 Integrated Recovery Qualification
 on:
   push:
     branches:
       - ops/mizizi-preview-qualification-preflight-20261127
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: mizizi-preview-schema-qualification
+  cancel-in-progress: false
 jobs:
-  mint:
+  preflight:
     if: github.repository == 'bjuta/wakilisha' && github.ref == 'refs/heads/ops/mizizi-preview-qualification-preflight-20261127'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
+    env:
+      PREVIEW_REF: ehkmjrjjhzyjkxdfsqdc
+      PROD_REF: pgzizndxdyhqmtyywjmt
+      EXPECTED_HEAD: 045cf9c9b832178780497e4a8b4352e75bbfac17
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact approved integration candidate
+        uses: actions/checkout@v4
         with:
+          ref: 045cf9c9b832178780497e4a8b4352e75bbfac17
           persist-credentials: false
-      - uses: supabase/setup-cli@v1
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: 2.107.0
           github-token: ${{ github.token }}
-      - name: Mint exact integration recovery migration filename without hosted mutation
+      - name: Reverify exact protected acceptance and open integration PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          supabase --version
-          supabase migration new mizizi_terminal_integrated_research_retry
-          minted="$(find supabase/migrations -maxdepth 1 -type f -name '*_mizizi_terminal_integrated_research_retry.sql' | sort | tail -n 1)"
-          test -n "$minted"
-          echo "MIZIZI_CLI_MINTED_MIGRATION=$minted"
-          test "$(git diff --name-only)" = ""
+          python3 - <<'PY'
+          import json,os,urllib.request,time
+          def get(path):
+              request=urllib.request.Request("https://api.github.com/repos/bjuta/wakilisha/"+path,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"})
+              with urllib.request.urlopen(request,timeout=15) as f: return json.load(f)
+          h=os.environ["EXPECTED_HEAD"]
+          pr=get("pulls/1442")
+          if pr.get("state")!="open" or pr.get("merged") or pr["head"]["sha"]!=h: raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
+          deadline=time.monotonic()+600
+          gates={46134575102:"Critical Control Plane",46134575104:"MIZIZI Slice 1 Disposable PostgreSQL Proof"}
+          while True:
+              pr=get("pulls/1442")
+              if pr.get("state")!="open" or pr.get("merged") or pr.get("draft") or pr["head"]["sha"]!=h:
+                  raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
+              pending=False
+              for number,name in gates.items():
+                  run=get("actions/runs/"+str(number))
+                  if run.get("head_sha")!=h or run.get("event")!="pull_request" or run.get("name")!=name:
+                      raise SystemExit("MIZIZI_PROTECTED_GATE_IDENTITY=STOP")
+                  if run.get("status")!="completed":
+                      pending=True
+                  elif run.get("conclusion")!="success":
+                      raise SystemExit("MIZIZI_PROTECTED_GATE=STOP:"+name)
+              if not pending: break
+              if time.monotonic()>=deadline: raise SystemExit("MIZIZI_PROTECTED_GATE_TIMEOUT=STOP")
+              time.sleep(15)
+          print("MIZIZI_EXACT_PROTECTED_ACCEPTANCE=PASS")
+          PY
+      - name: Non-secret availability and migration preflight, exact Preview forward apply
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$PREVIEW_REF" != "$PROD_REF"
+          test "$(find supabase/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')" = 309
+          test "$(sha256sum supabase/migrations/20261128100418_mizizi_terminal_integrated_research_retry.sql | cut -d ' ' -f1)" = 40fb592006028821d6c592c332c0bab7ca4e4eac5e3de35229b9231dcfdf9d9e
+          echo "MIZIZI_PREFLIGHT_EXACT_CANDIDATE=PASS"
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "MIZIZI_MANAGEMENT_CREDENTIAL=MISSING"
+            exit 1
+          fi
+          echo "MIZIZI_MANAGEMENT_CREDENTIAL=PRESENT"
+          scratch="$(mktemp -d)"
+          trap 'rm -rf "$scratch"' EXIT
+          # CLI-native forward plan. Only the approved Preview database may
+          # change; no secret mutation, provider calls, or runtime fixtures.
+          if ! supabase link --project-ref "$PREVIEW_REF" >"$scratch/link" 2>&1; then
+            echo "MIZIZI_PREVIEW_LINK=UNCONFIRMED"; exit 1
+          fi
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
+          echo "MIZIZI_PREVIEW_LINK=PASS"
+          if ! supabase db push --dry-run --linked >"$scratch/dry" 2>&1; then
+            echo "MIZIZI_PREVIEW_DRY_RUN=UNCONFIRMED"; exit 1
+          fi
+          python3 - "$scratch/dry" <<'PY'
+          import pathlib,re,sys
+          actual=sorted(set(re.findall(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",pathlib.Path(sys.argv[1]).read_text())))
+          expected=["20261128100418_mizizi_terminal_integrated_research_retry.sql"]
+          if actual!=expected:
+              print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=STOP")
+              print("expected_count="+str(len(expected))+" actual_count="+str(len(actual)))
+              raise SystemExit(1)
+          print("MIZIZI_PREVIEW_DRY_RUN_PENDING_SET=PASS")
+          print("MIZIZI_PREVIEW_DRY_RUN_COUNT=1")
+          PY
+          echo "MIZIZI_PREVIEW_EXACT_DELTA=PASS"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
+          test "$PREVIEW_REF" = "ehkmjrjjhzyjkxdfsqdc"
+          test "$PREVIEW_REF" != "$PROD_REF"
+          export SUPABASE_PROJECT_REF="$PREVIEW_REF"
+          # Explicitly discover the noninteractive CLI contract before write.
+          supabase db push --help >"$scratch/push-help" 2>&1
+          grep -q -- '--yes' "$scratch/push-help"
+          echo "MIZIZI_PREVIEW_FORWARD_APPLY=START"
+          if ! supabase db push --linked --yes >"$scratch/apply" 2>&1; then
+            python3 - "$scratch/apply" <<'PY'
+          import re,sys,pathlib
+          data=pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          print("MIZIZI_PREVIEW_FORWARD_APPLY=STOP")
+          for m in re.findall(r"Applying migration ([0-9]{14}_[A-Za-z0-9_-]+\.sql)",data): print("MIZIZI_ATTEMPTED_MIGRATION="+m)
+          for state in set(re.findall(r"SQLSTATE ([A-Z0-9]{5})",data)): print("MIZIZI_SQLSTATE="+state)
+          PY
+            exit 1
+          fi
+          echo "MIZIZI_PREVIEW_FORWARD_APPLY=COMMAND_SUCCEEDED"
+          test "$(cat supabase/.temp/project-ref)" = "$PREVIEW_REF"
+          if ! supabase db push --dry-run --linked >"$scratch/post" 2>&1; then
+            echo "MIZIZI_PREVIEW_POSTFLIGHT=UNCONFIRMED"; exit 1
+          fi
+          python3 - "$scratch/post" <<'PY'
+          import re,sys,pathlib
+          data=pathlib.Path(sys.argv[1]).read_text()
+          if re.search(r"[0-9]{14}_[A-Za-z0-9_-]+\.sql",data):
+              raise SystemExit("MIZIZI_PREVIEW_POSTFLIGHT_PENDING=STOP")
+          print("MIZIZI_PREVIEW_POSTFLIGHT_ZERO_PENDING=PASS")
+          PY
+          echo "MIZIZI_PREVIEW_SCHEMA_QUALIFICATION=PASS"
+
