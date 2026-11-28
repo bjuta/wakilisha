@@ -251,7 +251,8 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     sharedNativeSearch:operational?.sharedNativeAutoAllowed===true,
     allowSameCaseRecall:operational?.toolNames.includes("recall_evidence")===true,now:input.now});
    modelAuthority=createDurableDeskModelAuthorityV1({rpc:input.rpc,scope,factualNoteSubject,
-    discoveryHosts:dispatcher.discoveryHosts,authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,now:input.now});
+    discoveryHosts:dispatcher.discoveryHosts,authorizeEnvelope:config.authorizeEnvelope,authorizeTool:config.authorizeTool,
+    allowNotebook:operational?.publicWebTransientAllowed===true,now:input.now});
    const anthropic={apiKey:config.anthropic.apiKey,workspaceId:config.anthropic.workspaceId};
    const finance=createDeskResourceBudgetV1({rpc:input.rpc,now:input.now}).modelFinance(anthropic);
    const batch=operational?createDeskAsyncOpeningBatchV1({rpc:input.rpc,credential:anthropic,now:input.now}):undefined;
@@ -274,11 +275,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     }
     return true;
    };
-   const createDeskPass=(factualNoteReadback?:DeskFactualNoteReadbackV1)=>createCostRoutedDeskAnthropicPassV1({
+   const createDeskPass=(factualNoteReadback?:DeskFactualNoteReadbackV1,writeNotebook=false)=>createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:eligibleTools,
     // Always consult existing async intent in operational mode, including
     // after a policy change. The SQL opt-in is default false.
-    asyncOpeningBatch:factualNoteReadback?undefined:batch,factualNoteReadback,readModelInventory,
+    asyncOpeningBatch:factualNoteReadback||writeNotebook?undefined:batch,factualNoteReadback,writeNotebook,readModelInventory,
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
     verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,discoveryHosts:dispatcher.discoveryHosts,now:input.now});
    const labels=job.chartContext.positions,first=labels[0];
@@ -306,7 +307,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
       const plan=await batch.plan(scope,question);
       if(plan.state==="disabled"||plan.state==="available"){
        const packet=await readDeskFactualNotesV1(input.rpc,scope,factualNoteSubject,input.now??Date.now);
-       if(packet.notes.length)return await createDeskPass(packet)(id,question,history);
+       if(packet.notes.length)return await createDeskPass(packet,operational?.publicWebTransientAllowed===true)(id,question,history);
+       // Keep existing paid/uncertain batch intent and qualified batch routes.
+       // Only the synchronous, batch-disabled path uses the new notebook schema.
+       if(plan.state==="disabled"&&operational?.publicWebTransientAllowed===true)
+        return await createDeskPass(undefined,true)(id,question,history);
       }
      }
      return (compact?await compact(id,question,history):null)??await createDeskPass()(id,question,history);

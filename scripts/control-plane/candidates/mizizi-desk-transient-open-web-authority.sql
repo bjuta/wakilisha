@@ -1335,3 +1335,422 @@ begin
  from jsonb_array_elements(result->'leads') l join jsonb_array_elements(p_lead_bindings) b on l->>'id'=b->>'id';
  return jsonb_build_object('receiptId',rid,'resultSha256',p_result_sha256,'outcome','created');
 end $function$;
+
+-- The same original-note store accepts MIZIZI-authored entries atomically
+-- with the already-authorized immutable pass. No invented human actor.
+do $wk_note_append_preimage$ begin
+ if pg_get_functiondef('public.mizizi_append_research_pass_v1(uuid,text,text,text,text)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION public.mizizi_append_research_pass_v1(p_job_id uuid, p_worker_id text, p_body_text text, p_fingerprint text, p_predecessor text)
+ RETURNS TABLE(case_id uuid, ordinal integer, fingerprint text, outcome text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare
+ v_case_id uuid;
+ v_workspace_id uuid;
+ v_body jsonb;
+ v_ordinal integer;
+ v_last_ordinal integer;
+ v_last_fingerprint text;
+ v_existing text;
+begin
+ if coalesce(auth.role(),'')<>'service_role' then
+  raise exception 'Service-role research authority required' using errcode='42501';
+ end if;
+ if p_job_id is null or p_worker_id is null or
+    p_worker_id !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$' or
+    p_body_text is null or octet_length(p_body_text)>32768 or
+    (p_fingerprint is null or p_fingerprint !~ '^[a-f0-9]{64}$')
+ then raise exception 'Invalid bounded research-pass request' using errcode='22023';
+ end if;
+ if encode(sha256(convert_to(p_body_text,'UTF8')),'hex')<>p_fingerprint
+ then raise exception 'Research-pass content fingerprint mismatch' using errcode='22023';
+ end if;
+ begin
+  v_body:=p_body_text::jsonb;
+ exception when others then
+  raise exception 'Invalid research-pass JSON' using errcode='22023';
+ end;
+ if jsonb_typeof(v_body)<>'object'
+    or v_body->>'contract' is distinct from 'mizizi.adaptive_investigation.v1'
+    or v_body ? 'fingerprint'
+    or jsonb_typeof(v_body->'sourceReceipts')<>'array'
+    or jsonb_array_length(v_body->'sourceReceipts')>30
+    or jsonb_typeof(v_body->'findings')<>'array'
+    or jsonb_typeof(v_body->'proposedLeads')<>'array'
+    or jsonb_typeof(v_body->'decision')<>'object'
+ then
+  raise exception 'Invalid research-pass contract' using errcode='22023';
+ end if;
+ begin
+  v_ordinal:=(v_body->>'ordinal')::integer;
+ exception when others then
+  raise exception 'Research-pass ordinal is invalid' using errcode='22023';
+ end;
+ if (v_ordinal is null or v_ordinal not between 1 and 10000)
+    or nullif(v_body->>'question','') is null
+    or (v_body->>'predecessorFingerprint') is distinct from p_predecessor
+ then raise exception 'Invalid research-pass identity' using errcode='22023';
+ end if;
+ if p_worker_id like 'mizizi-chart:%' then
+  perform pg_advisory_xact_lock(214781521,61431);
+ end if;
+ -- Serialize appenders on the actual case row, and verify the worker's
+ -- current lease and exact case revision inside this very transaction.
+ select c.id,c.workspace_id into v_case_id,v_workspace_id
+ from platform_private.jobs j
+ join platform_private.command_receipts cr
+  on cr.id=j.command_receipt_id
+   and cr.resource_id=j.resource_id and cr.command_type=j.command_type
+ join mizizi_private.case_resource_bindings b
+  on b.resource_id=j.resource_id and b.case_id=j.resource_id
+ join mizizi_private.cases c
+  on c.id=b.case_id and c.workspace_id=b.workspace_id
+ where j.id=p_job_id
+  and j.command_type='mizizi.case_research_v1'
+  and j.job_type='mizizi.case_research_v1'
+  and j.status='running' and j.locked_by=p_worker_id
+  and j.lease_expires_at>now() and cr.status='accepted'
+  and (j.input_payload->>'case_id')::uuid=c.id
+  and (j.input_payload->>'workspace_id')::uuid=c.workspace_id
+  and j.input_payload->>'operation'='read_only_research'
+  and c.case_state in ('open','in_progress')
+  and c.current_stage='research'
+  and c.revision=(j.input_payload->>'expected_case_revision')::integer
+ for update of j,c;
+ if v_case_id is null then
+  raise exception 'Research pass is not authorized by a current job lease' using errcode='55000';
+ end if;
+ if exists (select 1 from mizizi_private.cases c where c.id=v_case_id and
+   (c.claim_family_key='charts2_recording_investigation_v1' or exists (
+    select 1 from mizizi_private.chart_candidate_subjects_v1 s where s.case_id=c.id)))
+ then
+   perform mizizi_private.assert_desk_journal_current_v1(p_job_id,p_worker_id,v_case_id,v_body);
+ end if;
+ if v_body->>'caseId' is distinct from v_case_id::text
+    or v_body->>'workspaceId' is distinct from v_workspace_id::text
+ then raise exception 'Research-pass workspace or case mismatch' using errcode='42501';
+ end if;
+ select p.fingerprint into v_existing
+  from mizizi_private.research_passes p
+ where p.case_id=v_case_id and p.ordinal=v_ordinal;
+ if v_existing is not null then
+  if v_existing<>p_fingerprint then
+   raise exception 'Conflicting immutable pass ordinal' using errcode='55000';
+  end if;
+  return query select v_case_id,v_ordinal,p_fingerprint,'replayed'::text;
+  return;
+ end if;
+ select p.ordinal,p.fingerprint into v_last_ordinal,v_last_fingerprint
+ from mizizi_private.research_passes p
+ where p.case_id=v_case_id order by p.ordinal desc limit 1;
+ if v_ordinal<>coalesce(v_last_ordinal,0)+1
+    or p_predecessor is distinct from v_last_fingerprint
+ then raise exception 'Research-pass chain stale or out of order' using errcode='55000';
+ end if;
+ insert into mizizi_private.research_passes(
+  case_id,workspace_id,job_id,ordinal,predecessor_fingerprint,fingerprint,body_text
+ ) values(
+  v_case_id,v_workspace_id,p_job_id,v_ordinal,p_predecessor,p_fingerprint,p_body_text
+ );
+ return query select v_case_id,v_ordinal,p_fingerprint,'created'::text;
+end;
+$function$
+$wk_exact$
+ then raise exception 'MIZIZI_AGENT_NOTE_APPEND_PREIMAGE_CHANGED';end if;
+ if pg_get_functiondef('public.admin_mizizi_review_factual_note_v1(uuid,text,integer,text,boolean,text,timestamptz,text)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION public.admin_mizizi_review_factual_note_v1(p_note_id uuid, p_note_sha256 text, p_expected_review_revision integer, p_decision text, p_model_processing_allowed boolean, p_review_ref text, p_valid_until timestamp with time zone, p_acknowledgement text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare actor uuid;n mizizi_private.desk_factual_notes_v1;c mizizi_private.cases%rowtype;
+ prev mizizi_private.desk_factual_note_reviews_v1;d mizizi_private.desk_factual_note_reviews_v1;
+begin
+ actor:=mizizi_private.assert_headquarters_operator_v1('steward');
+ if p_note_id is null or coalesce(p_note_sha256,'') !~ '^[a-f0-9]{64}$'
+ or p_expected_review_revision is null or p_expected_review_revision<0
+ or coalesce(p_decision,'') not in ('admitted','revoked') or p_model_processing_allowed is null
+ or (p_decision='revoked' and p_model_processing_allowed)
+ or p_review_ref is null or length(p_review_ref) not between 8 and 500 or btrim(p_review_ref)<>p_review_ref or p_review_ref ~ '[[:cntrl:]]'
+ or p_valid_until is null or not isfinite(p_valid_until) or p_valid_until<=clock_timestamp() or p_valid_until>clock_timestamp()+interval '24 hours'
+ or p_acknowledgement is distinct from (case when p_decision='admitted'
+ then 'I independently reviewed this exact original note, consultation method, provenance and permitted use; this is not factual verification.'
+ else 'I revoke this exact factual note admission.' end )
+ then raise exception 'Invalid factual note review' using errcode='22023';end if;
+ perform pg_advisory_xact_lock(214781521,61431);
+ select * into n from mizizi_private.desk_factual_notes_v1 where note_id=p_note_id;
+ if not found or n.note_sha256<>p_note_sha256 then raise exception 'Note unavailable' using errcode='42501';end if;
+ perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,actor);
+ select * into prev from mizizi_private.desk_factual_note_reviews_v1 where note_id=n.note_id order by revision desc limit 1;
+ if coalesce(prev.revision,0)<>p_expected_review_revision then raise exception 'Factual note review revision conflict' using errcode='PT409';end if;
+ if p_decision='admitted' then
+  if actor=n.author_id then raise exception 'Independent note reviewer required' using errcode='42501';end if;
+  perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,n.author_id);
+  select * into c from mizizi_private.cases where id=n.case_id and workspace_id=n.workspace_id for update;
+  if not found or c.revision<>n.expected_revision or c.case_state<>'in_progress' or c.current_stage<>'research'
+  then raise exception 'Stale note case' using errcode='PT409';end if;
+  perform mizizi_private.assert_chart_candidate_current_v1(n.case_id,n.workspace_id,null);
+ elsif prev.revision is null or prev.decision<>'admitted' then
+  raise exception 'No admitted note to revoke' using errcode='55000';
+ end if;
+ d.note_id:=n.note_id;d.revision:=p_expected_review_revision+1;d.reviewer_id:=actor;d.note_sha256:=n.note_sha256;
+ d.decision:=p_decision;d.model_processing_allowed:=p_model_processing_allowed;d.review_ref:=p_review_ref;
+ d.valid_until:=p_valid_until;d.recorded_at:=clock_timestamp();
+ insert into mizizi_private.desk_factual_note_reviews_v1 select (d).*;
+ return jsonb_build_object('contract','mizizi.factual_note_review.v1','noteId',n.note_id,'noteSha256',n.note_sha256,
+  'reviewRevision',d.revision,'decision',d.decision,'reviewerId',actor,'modelProcessingAllowed',d.model_processing_allowed,
+  'verified',false,'jobsDispatched',0);
+end $function$
+$wk_exact$
+ then raise exception 'MIZIZI_AGENT_NOTE_REVIEW_PREIMAGE_CHANGED';end if;
+end $wk_note_append_preimage$;
+alter table mizizi_private.desk_factual_notes_v1
+ alter column author_id drop not null,
+ add column author_job_id uuid,
+ add column author_worker_id text,
+ add column origin_pass_fingerprint text,
+ add column origin_claim_index integer,
+ add column source_receipt_ids uuid[],
+ drop constraint desk_factual_notes_v1_consultation_method_check,
+ add constraint desk_factual_notes_v1_authorship_v1 check (
+  (author_id is not null and consultation_method in ('manual_public_consultation','manual_first_party_consultation')
+   and author_job_id is null and author_worker_id is null and origin_pass_fingerprint is null and origin_claim_index is null and source_receipt_ids is null)
+  or (author_id is null and consultation_method='autonomous_authorized_consultation'
+   and author_job_id is not null and author_worker_id is not null
+   and author_worker_id ~ '^mizizi-chart:[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+   and origin_pass_fingerprint is not null and origin_pass_fingerprint ~ '^[a-f0-9]{64}$'
+   and origin_claim_index is not null and origin_claim_index between 0 and 19
+   and source_receipt_ids is not null and cardinality(source_receipt_ids) between 1 and 12));
+create unique index desk_factual_agent_note_pass_claim_v1 on mizizi_private.desk_factual_notes_v1(case_id,origin_pass_fingerprint,origin_claim_index)
+ where author_job_id is not null;
+create function mizizi_private.persist_desk_agent_notes_v1(p_job_id uuid,p_worker_id text,p_case_id uuid,p_fingerprint text,b jsonb)
+returns void language plpgsql security definer set search_path=pg_catalog as $f$
+declare c jsonb;o mizizi_private.desk_operational_policy_versions_v1;
+ n mizizi_private.desk_factual_notes_v1;f jsonb;src jsonb;ref jsonb;sid uuid;
+ r mizizi_private.desk_tool_receipts_v1;claim_index integer:=-1;ids uuid[];
+begin
+ if coalesce(auth.role(),'')<>'service_role' then raise exception 'Agent notebook service authority required' using errcode='42501';end if;
+ c:=mizizi_private.read_leased_chart_research_context_v1(p_job_id,p_worker_id);
+ if c is null or c->>'caseId' is distinct from p_case_id::text then raise exception 'Agent notebook lease denied' using errcode='42501';end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if o.revision is null or not mizizi_private.desk_operational_policy_live_v1(o,c)
+  or b ? 'deskBatchReceipt' or b ? 'interruptionCode' or jsonb_array_length(b->'findings')>20
+  or not exists(select 1 from mizizi_private.research_passes p where p.case_id=p_case_id and p.job_id=p_job_id
+    and p.fingerprint=p_fingerprint and p.body_text::jsonb=b)
+ then raise exception 'Agent notebook pass denied' using errcode='42501';end if;
+ for f in select value from jsonb_array_elements(b->'findings') loop
+  claim_index:=claim_index+1;
+  if not(f ? 'fieldKey' or f ? 'noteKind') then continue;end if;
+  if jsonb_typeof(f) is distinct from 'object' or (select count(*) from jsonb_object_keys(f))<>9
+   or coalesce(f->>'fieldKey','') not in ('subject_version','release_date','performer','composition_credits','recording_production','label_distribution')
+   or coalesce(f->>'noteKind','') not in ('direct_observation','attributed_claim','inference')
+   or jsonb_typeof(f->'statement') is distinct from 'string' or length(f->>'statement') not between 8 and 1200
+   or btrim(f->>'statement') is distinct from f->>'statement' or f->>'statement' ~ '[[:cntrl:]]'
+   or jsonb_typeof(f->'sourceIds') is distinct from 'array' or jsonb_array_length(f->'sourceIds') not between 1 and 12
+   or (select count(distinct v) from jsonb_array_elements_text(f->'sourceIds') v)<>jsonb_array_length(f->'sourceIds')
+  then raise exception 'Agent notebook original note shape denied' using errcode='42501';end if;
+  ids:=array[]::uuid[];n.source_locator:=null;n.observed_at:=null;
+  for ref in select value from jsonb_array_elements(f->'sourceIds') loop
+   if jsonb_typeof(ref) is distinct from 'string' or coalesce(ref#>>'{}','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+    then raise exception 'Agent notebook source identity denied' using errcode='42501';end if;
+   sid:=(ref#>>'{}')::uuid;
+   select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+   if not found or r.job_id<>p_job_id or r.worker_id<>p_worker_id or r.lease_expires_at is distinct from (c->>'leaseExpiresAt')::timestamptz
+    or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false)
+    or not exists(select 1 from jsonb_array_elements(b->'deskToolReceipts') d where d->>'receiptId'=sid::text
+     and d->>'callSha256'=r.call_sha256 and d->>'resultSha256'=r.result_sha256)
+    then raise exception 'Agent notebook source custody denied' using errcode='42501';end if;
+   select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
+   if not found or src->'modelDisclosed' is distinct from 'true'::jsonb
+    or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
+    or (length(lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>=80
+     and strpos(lower(regexp_replace(btrim(src->>'excerpt'),'[[:space:]]+',' ','g')),lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>0)
+    then raise exception 'Agent notebook source or verbatim note denied' using errcode='42501';end if;
+   if n.source_locator is null then n.source_locator:=src->>'citation';end if;
+   n.observed_at:=greatest(n.observed_at,(src->>'observedAt')::timestamptz);
+   ids:=array_append(ids,sid);
+  end loop;
+  n.note_id:=gen_random_uuid();n.case_id:=p_case_id;n.workspace_id:=(c->>'workspaceId')::uuid;
+  n.expected_revision:=(c->>'expectedRevision')::integer;n.membership_sha256:=c->>'membershipSha256';
+  n.observation_sha256:=c->>'observationSha256';n.author_id:=null;n.author_job_id:=p_job_id;n.author_worker_id:=p_worker_id;
+  n.origin_pass_fingerprint:=p_fingerprint;n.origin_claim_index:=claim_index;n.source_receipt_ids:=ids;
+  n.field_key:=f->>'fieldKey';n.note_kind:=f->>'noteKind';n.consultation_method:='autonomous_authorized_consultation';
+  n.note_text:=f->>'statement';n.recorded_at:=clock_timestamp();
+  n.note_sha256:=encode(sha256(convert_to(jsonb_build_array(n.case_id,n.workspace_id,n.expected_revision,n.membership_sha256,
+   n.observation_sha256,n.author_job_id,n.author_worker_id,n.origin_pass_fingerprint,n.origin_claim_index,n.source_receipt_ids,
+   n.field_key,n.note_kind,n.consultation_method,n.source_locator,n.note_text)::text,'UTF8')),'hex');
+  insert into mizizi_private.desk_factual_notes_v1 select (n).*;
+ end loop;
+end $f$;
+revoke all on function mizizi_private.persist_desk_agent_notes_v1(uuid,text,uuid,text,jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+CREATE OR REPLACE FUNCTION public.mizizi_append_research_pass_v1(p_job_id uuid, p_worker_id text, p_body_text text, p_fingerprint text, p_predecessor text)
+ RETURNS TABLE(case_id uuid, ordinal integer, fingerprint text, outcome text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare
+ v_case_id uuid;
+ v_workspace_id uuid;
+ v_body jsonb;
+ v_ordinal integer;
+ v_last_ordinal integer;
+ v_last_fingerprint text;
+ v_existing text;
+begin
+ if coalesce(auth.role(),'')<>'service_role' then
+  raise exception 'Service-role research authority required' using errcode='42501';
+ end if;
+ if p_job_id is null or p_worker_id is null or
+    p_worker_id !~ '^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$' or
+    p_body_text is null or octet_length(p_body_text)>32768 or
+    (p_fingerprint is null or p_fingerprint !~ '^[a-f0-9]{64}$')
+ then raise exception 'Invalid bounded research-pass request' using errcode='22023';
+ end if;
+ if encode(sha256(convert_to(p_body_text,'UTF8')),'hex')<>p_fingerprint
+ then raise exception 'Research-pass content fingerprint mismatch' using errcode='22023';
+ end if;
+ begin
+  v_body:=p_body_text::jsonb;
+ exception when others then
+  raise exception 'Invalid research-pass JSON' using errcode='22023';
+ end;
+ if jsonb_typeof(v_body)<>'object'
+    or v_body->>'contract' is distinct from 'mizizi.adaptive_investigation.v1'
+    or v_body ? 'fingerprint'
+    or jsonb_typeof(v_body->'sourceReceipts')<>'array'
+    or jsonb_array_length(v_body->'sourceReceipts')>30
+    or jsonb_typeof(v_body->'findings')<>'array'
+    or jsonb_typeof(v_body->'proposedLeads')<>'array'
+    or jsonb_typeof(v_body->'decision')<>'object'
+ then
+  raise exception 'Invalid research-pass contract' using errcode='22023';
+ end if;
+ begin
+  v_ordinal:=(v_body->>'ordinal')::integer;
+ exception when others then
+  raise exception 'Research-pass ordinal is invalid' using errcode='22023';
+ end;
+ if (v_ordinal is null or v_ordinal not between 1 and 10000)
+    or nullif(v_body->>'question','') is null
+    or (v_body->>'predecessorFingerprint') is distinct from p_predecessor
+ then raise exception 'Invalid research-pass identity' using errcode='22023';
+ end if;
+ if p_worker_id like 'mizizi-chart:%' then
+  perform pg_advisory_xact_lock(214781521,61431);
+ end if;
+ -- Serialize appenders on the actual case row, and verify the worker's
+ -- current lease and exact case revision inside this very transaction.
+ select c.id,c.workspace_id into v_case_id,v_workspace_id
+ from platform_private.jobs j
+ join platform_private.command_receipts cr
+  on cr.id=j.command_receipt_id
+   and cr.resource_id=j.resource_id and cr.command_type=j.command_type
+ join mizizi_private.case_resource_bindings b
+  on b.resource_id=j.resource_id and b.case_id=j.resource_id
+ join mizizi_private.cases c
+  on c.id=b.case_id and c.workspace_id=b.workspace_id
+ where j.id=p_job_id
+  and j.command_type='mizizi.case_research_v1'
+  and j.job_type='mizizi.case_research_v1'
+  and j.status='running' and j.locked_by=p_worker_id
+  and j.lease_expires_at>now() and cr.status='accepted'
+  and (j.input_payload->>'case_id')::uuid=c.id
+  and (j.input_payload->>'workspace_id')::uuid=c.workspace_id
+  and j.input_payload->>'operation'='read_only_research'
+  and c.case_state in ('open','in_progress')
+  and c.current_stage='research'
+  and c.revision=(j.input_payload->>'expected_case_revision')::integer
+ for update of j,c;
+ if v_case_id is null then
+  raise exception 'Research pass is not authorized by a current job lease' using errcode='55000';
+ end if;
+ if exists (select 1 from mizizi_private.cases c where c.id=v_case_id and
+   (c.claim_family_key='charts2_recording_investigation_v1' or exists (
+    select 1 from mizizi_private.chart_candidate_subjects_v1 s where s.case_id=c.id)))
+ then
+   perform mizizi_private.assert_desk_journal_current_v1(p_job_id,p_worker_id,v_case_id,v_body);
+ end if;
+ if v_body->>'caseId' is distinct from v_case_id::text
+    or v_body->>'workspaceId' is distinct from v_workspace_id::text
+ then raise exception 'Research-pass workspace or case mismatch' using errcode='42501';
+ end if;
+ select p.fingerprint into v_existing
+  from mizizi_private.research_passes p
+ where p.case_id=v_case_id and p.ordinal=v_ordinal;
+ if v_existing is not null then
+  if v_existing<>p_fingerprint then
+   raise exception 'Conflicting immutable pass ordinal' using errcode='55000';
+  end if;
+  return query select v_case_id,v_ordinal,p_fingerprint,'replayed'::text;
+  return;
+ end if;
+ select p.ordinal,p.fingerprint into v_last_ordinal,v_last_fingerprint
+ from mizizi_private.research_passes p
+ where p.case_id=v_case_id order by p.ordinal desc limit 1;
+ if v_ordinal<>coalesce(v_last_ordinal,0)+1
+    or p_predecessor is distinct from v_last_fingerprint
+ then raise exception 'Research-pass chain stale or out of order' using errcode='55000';
+ end if;
+ insert into mizizi_private.research_passes(
+  case_id,workspace_id,job_id,ordinal,predecessor_fingerprint,fingerprint,body_text
+ ) values(
+  v_case_id,v_workspace_id,p_job_id,v_ordinal,p_predecessor,p_fingerprint,p_body_text
+ );
+ if exists(select 1 from jsonb_array_elements(v_body->'findings') f where f ? 'fieldKey' or f ? 'noteKind') then
+  perform mizizi_private.persist_desk_agent_notes_v1(p_job_id,p_worker_id,v_case_id,p_fingerprint,v_body);
+ end if;
+ return query select v_case_id,v_ordinal,p_fingerprint,'created'::text;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION public.admin_mizizi_review_factual_note_v1(p_note_id uuid, p_note_sha256 text, p_expected_review_revision integer, p_decision text, p_model_processing_allowed boolean, p_review_ref text, p_valid_until timestamp with time zone, p_acknowledgement text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare actor uuid;n mizizi_private.desk_factual_notes_v1;c mizizi_private.cases%rowtype;
+ prev mizizi_private.desk_factual_note_reviews_v1;d mizizi_private.desk_factual_note_reviews_v1;
+begin
+ actor:=mizizi_private.assert_headquarters_operator_v1('steward');
+ if p_note_id is null or coalesce(p_note_sha256,'') !~ '^[a-f0-9]{64}$'
+ or p_expected_review_revision is null or p_expected_review_revision<0
+ or coalesce(p_decision,'') not in ('admitted','revoked') or p_model_processing_allowed is null
+ or (p_decision='revoked' and p_model_processing_allowed)
+ or p_review_ref is null or length(p_review_ref) not between 8 and 500 or btrim(p_review_ref)<>p_review_ref or p_review_ref ~ '[[:cntrl:]]'
+ or p_valid_until is null or not isfinite(p_valid_until) or p_valid_until<=clock_timestamp() or p_valid_until>clock_timestamp()+interval '24 hours'
+ or p_acknowledgement is distinct from (case when p_decision='admitted'
+ then 'I independently reviewed this exact original note, consultation method, provenance and permitted use; this is not factual verification.'
+ else 'I revoke this exact factual note admission.' end )
+ then raise exception 'Invalid factual note review' using errcode='22023';end if;
+ perform pg_advisory_xact_lock(214781521,61431);
+ select * into n from mizizi_private.desk_factual_notes_v1 where note_id=p_note_id;
+ if not found or n.note_sha256<>p_note_sha256 then raise exception 'Note unavailable' using errcode='42501';end if;
+ perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,actor);
+ select * into prev from mizizi_private.desk_factual_note_reviews_v1 where note_id=n.note_id order by revision desc limit 1;
+ if coalesce(prev.revision,0)<>p_expected_review_revision then raise exception 'Factual note review revision conflict' using errcode='PT409';end if;
+ if p_decision='admitted' then
+  if actor=n.author_id then raise exception 'Independent note reviewer required' using errcode='42501';end if;
+  if n.author_id is not null then
+   perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,n.author_id);
+  elsif n.author_job_id is null or n.origin_pass_fingerprint is null then
+   raise exception 'Agent note provenance required' using errcode='42501';
+  end if;
+  select * into c from mizizi_private.cases where id=n.case_id and workspace_id=n.workspace_id for update;
+  if not found or c.revision<>n.expected_revision or c.case_state<>'in_progress' or c.current_stage<>'research'
+  then raise exception 'Stale note case' using errcode='PT409';end if;
+  perform mizizi_private.assert_chart_candidate_current_v1(n.case_id,n.workspace_id,null);
+ elsif prev.revision is null or prev.decision<>'admitted' then
+  raise exception 'No admitted note to revoke' using errcode='55000';
+ end if;
+ d.note_id:=n.note_id;d.revision:=p_expected_review_revision+1;d.reviewer_id:=actor;d.note_sha256:=n.note_sha256;
+ d.decision:=p_decision;d.model_processing_allowed:=p_model_processing_allowed;d.review_ref:=p_review_ref;
+ d.valid_until:=p_valid_until;d.recorded_at:=clock_timestamp();
+ insert into mizizi_private.desk_factual_note_reviews_v1 select (d).*;
+ return jsonb_build_object('contract','mizizi.factual_note_review.v1','noteId',n.note_id,'noteSha256',n.note_sha256,
+  'reviewRevision',d.revision,'decision',d.decision,'reviewerId',actor,'modelProcessingAllowed',d.model_processing_allowed,
+  'verified',false,'jobsDispatched',0);
+end $function$
+

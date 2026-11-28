@@ -1926,6 +1926,34 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
    }
   }
  });
+ it("writes source-bound original notebook classifications through the existing journal without asserting truth",async()=>{
+  const tagged={...conclusion,hypotheses:[{...conclusion.hypotheses[0],fieldKey:"performer",noteKind:"attributed_claim"}]};
+  for(const variant of ["valid","invalid-field","invalid-kind","verbatim","missing"]){
+   const h=fixture(),rows:InvestigationPassV1[]=[];
+   const claim={...tagged.hypotheses[0]};
+   if(variant==="invalid-field")claim.fieldKey="invented";
+   if(variant==="invalid-kind")claim.noteKind="verified_fact";
+   if(variant==="verbatim")claim.statement=evidence.excerpt.repeat(2);
+   if(variant==="missing")delete (claim as any).fieldKey;
+   if(variant==="verbatim"){
+    const raw=evidence.excerpt+" The original archive gives no named individual performers.";
+    claim.statement=raw;
+    h.executeTool.mockImplementation(async(_s,c)=>c.name==="search_web"?
+     {receiptId:RECEIPT,leads:[{id:leadId,kind:"reference" as const,label:"Original archive"}],sources:[]}:
+     {receiptId:WORKSPACE,leads:[],sources:[{...evidence,excerpt:raw}]});
+   }
+   h.replies[2]=final({...tagged,hypotheses:[claim]});
+   const run=runAdaptiveInvestigationV1({identity,prepareDeskPass:createCostRoutedDeskAnthropicPassV1({...h.config,writeNotebook:true}),
+    store:{read:async()=>rows.slice(),append:async(_id,_n,_p,pass)=>{rows.push(pass);}},
+    readSources:async()=>[],analyze:async()=>{throw Error("legacy denied");},authorizeModelProcessing:async()=>true,
+    verifyFinding:async()=>({verified:false,verificationRef:null}),maxNewPasses:1,maxTotalPasses:20,costBudgetUnits:20,now:()=>NOW});
+   if(variant!=="valid"){await expect(run).rejects.toThrow(/FINAL_(NOTEBOOK_)?CLAIM_INVALID/);expect(rows).toEqual([]);continue;}
+   await run;
+   expect(rows[0].findings[0]).toMatchObject({fieldKey:"performer",noteKind:"attributed_claim",sourceIds:[EVENT],independentlyVerified:false});
+   expect(JSON.parse(String(h.send.mock.calls[0][1].body)).output_config.format.schema.properties.hypotheses.items.required).toContain("fieldKey");
+   expect(JSON.parse(String(h.send.mock.calls[0][1].body)).system).toContain("original notebook entry");
+  }
+ });
  it("requires both durable and host grants and rechecks exact envelope before transport",async()=>{
   const h=fixture();
   let allowModel=false,allowTool=false,modelChecks=0;

@@ -16,11 +16,28 @@ export type SourceAuthorityV1=Readonly<{
  externalModelProcessingAllowed:boolean;privateEvidenceRetentionAllowed:boolean;
 }>;
 export type SourceExcerptV1=Readonly<{source:SourceAuthorityV1;excerpt:string;citation:string}>;
+export const NOTEBOOK_FIELDS_V1=["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"] as const;
+export const NOTEBOOK_KINDS_V1=["direct_observation","attributed_claim","inference"] as const;
 export type ResearchClaimV1=Readonly<{
  statement:string;sourceIds:readonly string[];
  interpretation:"hypothesis"|"supported"|"contradicted"|"unknown";
  uncertainty:number;reasoningSummary:string;
+ /** Optional original agent notebook classification. Not evidence or independent verification. */
+ fieldKey?:typeof NOTEBOOK_FIELDS_V1[number];noteKind?:typeof NOTEBOOK_KINDS_V1[number];
 }>;
+export function notebookClaimCurrentV1(claim:ResearchClaimV1,sources:readonly {sourceId:string;excerpt:string}[]):boolean{
+ if(claim.fieldKey===undefined&&claim.noteKind===undefined)return true;
+ if(!NOTEBOOK_FIELDS_V1.includes(claim.fieldKey!)||!NOTEBOOK_KINDS_V1.includes(claim.noteKind!)||
+  typeof claim.statement!=="string"||claim.statement.length<8||claim.statement.length>1200||
+  !claim.sourceIds.length||new Set(claim.sourceIds).size!==claim.sourceIds.length)return false;
+ const normalized=(v:string)=>v.trim().replace(/\\s+/g," ").toLowerCase();
+ const statement=normalized(claim.statement);
+ return claim.sourceIds.every(id=>{
+  const s=sources.find(x=>x.sourceId===id);
+  return !!s&&s.excerpt!=="Visual derivative for examination; no textual claim is verified."&&
+   !(statement.length>=80&&normalized(s.excerpt).includes(statement));
+ });
+}
 export type ResearchLeadV1=Readonly<{
  question:string;rationale:string;expectedInformationGain:number;
  importance:number;estimatedCostUnits:number;
@@ -141,6 +158,8 @@ export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:
    throw new Error("MIZIZI_RESEARCH_HISTORY_CORRUPT_OR_CONFLICTED");
   if(pass.factualNoteReferences!==undefined&&!validFactualNoteReferencesV1(pass.factualNoteReferences))
    throw Error("MIZIZI_RESEARCH_NOTE_HISTORY_INVALID");
+  if(pass.findings.some(f=>!notebookClaimCurrentV1(f,pass.sourceReceipts)))
+   throw Error("MIZIZI_RESEARCH_NOTEBOOK_HISTORY_INVALID");
   const event=pass.reopenEvent;
   if(event!==undefined){
    if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,sourceEventRef"||
@@ -396,6 +415,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    if(claim.sourceIds.length>20||
       claim.sourceIds.some(ref=>!modelVisibleIds.has(ref.toLowerCase())))
     throw new TypeError("MIZIZI_RESEARCH_UNOBSERVED_EVIDENCE_CITATION");
+   if(!notebookClaimCurrentV1(claim,sources.map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt}))))
+    throw Error("MIZIZI_RESEARCH_NOTEBOOK_CLAIM_INVALID");
    const refs=authorities.filter(a=>modelVisibleIds.has(a.sourceId.toLowerCase())&&
     claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
    const independent=await verifyFinding(claim,Object.freeze(refs));

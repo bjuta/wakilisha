@@ -11,6 +11,7 @@ import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptions
  from "./anthropic-investigation-analyst-v1.ts";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
+import {NOTEBOOK_FIELDS_V1,NOTEBOOK_KINDS_V1,notebookClaimCurrentV1,type ResearchClaimV1} from "./adaptive-investigation-v1.ts";
 import {readDeskFactualNotesV1,factualNoteContextV1,factualNoteReferencesV1,type DeskFactualNoteReadbackV1,type DeskFactualNoteSubjectV1} from "./desk-factual-note-readback-v1.ts";
 import type {DeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -36,6 +37,16 @@ const PROMPT=[
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
 ].join(" ");
 const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified human research context, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
+const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use only actually examined source IDs, never quote publisher text as your note. A note is not independent factual verification.";
+const NOTEBOOK_CLAIM_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items,
+ properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.properties,
+  fieldKey:{type:"string",enum:NOTEBOOK_FIELDS_V1},noteKind:{type:"string",enum:NOTEBOOK_KINDS_V1}},
+ required:[...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.required,"fieldKey","noteKind"]};
+const NOTEBOOK_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,
+ properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties,
+  hypotheses:{type:"array",items:NOTEBOOK_CLAIM_SCHEMA}}};
+const deskSystem=(withNotes:boolean,notebook:boolean)=>(withNotes?NOTE_PROMPT:PROMPT)+(notebook?NOTEBOOK_INSTRUCTION:"");
+const deskOutput=(notebook:boolean)=>({format:{type:"json_schema",schema:notebook?NOTEBOOK_SCHEMA:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}});
 const hash=(value:string|Uint8Array)=>createHash("sha256").update(value).digest("hex");
 const fail=(code:string):never=>{throw Error("MIZIZI_DESK_TOOL_"+code);};
 const record=(v:unknown):Record<string,unknown>=>{
@@ -244,6 +255,8 @@ export type DeskAnthropicOptionsV1=Readonly<{
  asyncOpeningBatch?:DeskAsyncOpeningBatchV1;
  /** Independently read current, reviewed note context; never a source receipt. */
  factualNoteReadback?:DeskFactualNoteReadbackV1;
+ /** Source-bound agent notebook writing in ordinary synchronous sessions. */
+ writeNotebook?:boolean;
  admitRecoveredBatchCost?:(microusd:number)=>boolean;
  /** Trusted, independent policy must inspect actual serialized payload,
   * question, exact sources, tool receipt bindings and current lease. */
@@ -269,14 +282,17 @@ export type DeskAnthropicOptionsV1=Readonly<{
 /** Independently reconstruct the allowed serialized transcript from durable
  * custody readback. The model cannot introduce arbitrary free text, image
  * bytes, schemas, source claims or prior private analysis into the envelope. */
-async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string,subject:DeskFactualNoteSubjectV1|undefined,now:()=>number,hosts:DiscoveryHostsV1|undefined):Promise<boolean>{
+async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,body:string,subject:DeskFactualNoteSubjectV1|undefined,now:()=>number,hosts:DiscoveryHostsV1|undefined,allowNotebook:boolean):Promise<boolean>{
  try{
   const parsed=record(JSON.parse(body));
+  const withNoteContext=b.factualNoteReadbackSha256!==undefined;
+  const notebook=parsed.system===deskSystem(withNoteContext,true);
+  if(notebook&&!allowNotebook)return false;
   const thinking=ordinaryThinking(b.model);
   if(JSON.stringify(parsed)!==body||Object.keys(parsed).length!==7+Object.keys(thinking).length||parsed.model!==b.model||
    JSON.stringify(parsed.thinking)!==JSON.stringify("thinking" in thinking?thinking.thinking:undefined)||
-   parsed.max_tokens!==MAX_OUTPUT||parsed.system!==(b.factualNoteReadbackSha256===undefined?PROMPT:NOTE_PROMPT)||
-   JSON.stringify(parsed.output_config)!==JSON.stringify({format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}})||
+   parsed.max_tokens!==MAX_OUTPUT||parsed.system!==deskSystem(withNoteContext,notebook)||
+   JSON.stringify(parsed.output_config)!==JSON.stringify(deskOutput(notebook))||
    !Array.isArray(parsed.tools)||!Array.isArray(parsed.messages))return false;
   const names=parsed.tools.map(t=>record(t).name),enabled=new Set(names as string[]);
   const specs=TOOL_SPECS.filter(t=>enabled.has(t[0])).map(([name,description,properties])=>({name,description,strict:true,input_schema:schema(properties)}));
@@ -358,7 +374,7 @@ export function createDurableDeskModelAuthorityV1(options:Readonly<{
  rpc:WorkerRpc;scope:DeskSearchScopeV1;
  authorizeEnvelope:DeskAnthropicOptionsV1["authorizeEnvelope"];
  authorizeTool:DeskAnthropicOptionsV1["authorizeTool"];factualNoteSubject?:DeskFactualNoteSubjectV1;
- discoveryHosts?:DiscoveryHostsV1;now?:()=>number;
+ discoveryHosts?:DiscoveryHostsV1;allowNotebook?:boolean;now?:()=>number;
 }>):Pick<DeskAnthropicOptionsV1,"authorizeEnvelope"|"authorizeTool">{
  const now=options.now??Date.now,scope=options.scope;
  const sameScope=(s:DeskSearchScopeV1)=>JSON.stringify(s)===JSON.stringify(scope);
@@ -381,7 +397,7 @@ export function createDurableDeskModelAuthorityV1(options:Readonly<{
   authorizeEnvelope:async(binding,body)=>{
    if(!sameScope(binding.scope)||hash(body)!==binding.bodySha256||Buffer.byteLength(body,"utf8")!==binding.requestBytes||
     hash(JSON.stringify({scope:binding.scope,round:binding.round,credentialSha256:binding.credentialSha256,bodySha256:binding.bodySha256}))!==binding.requestSha256)return null;
-   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body,options.factualNoteSubject,now,options.discoveryHosts))return null;
+   if(!await verifySerializedDeskEnvelopeV1(options.rpc,binding,body,options.factualNoteSubject,now,options.discoveryHosts,options.allowNotebook===true))return null;
    const external=await options.authorizeEnvelope(binding,body);
    if(!external||external.requestSha256!==binding.requestSha256||external.modelDisclosureAllowed!==true||
     !text(external.policyRef,200,8)||!Number.isFinite(Date.parse(external.validUntil))||Date.parse(external.validUntil)<=now()||
@@ -476,8 +492,11 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
  const credentialSha256=hash(JSON.stringify(["mizizi:anthropic:credential:v1",workspace??null,apiKey]));
  const enabled=new Set(options.enabledTools),tools=TOOL_SPECS.filter(t=>enabled.has(t[0]))
   .map(([name,description,properties])=>({name,description,strict:true,input_schema:schema(properties)}));
- const system=options.factualNoteReadback?NOTE_PROMPT:PROMPT;
- const promptFingerprint=hash(JSON.stringify({system,tools,schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}));
+ const notebook=options.writeNotebook===true;
+ if(notebook&&options.asyncOpeningBatch)fail("NOTEBOOK_BATCH_DENIED");
+ const system=deskSystem(!!options.factualNoteReadback,notebook);
+ const output=deskOutput(notebook);
+ const promptFingerprint=hash(JSON.stringify({system,tools,schema:output.format.schema}));
  return async(identity,question,history)=>{
   if(identity.caseId!==boundScope.caseId||identity.workspaceId!==boundScope.workspaceId||!text(question,1000,8))
    fail("CASE_OR_QUESTION_DENIED");
@@ -527,7 +546,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    const choice=deskToolChoice(model,enabled,round,leads,sources.size,recovery);
    const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system,...ordinaryThinking(model),
     tools,tool_choice:choice,
-    output_config:{format:{type:"json_schema",schema:ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1}},messages});
+    output_config:output,messages});
    const requestBytes=Buffer.byteLength(body,"utf8");
    if(requestBytes>MAX_ENVELOPE)fail("ENVELOPE_BOUND");
    const bodySha256=hash(body);
@@ -608,12 +627,15 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // not authority. The engine independently adjudicates the cited sources.
     for(const raw of parsed.hypotheses){
      const c=record(raw);
-     if(Object.keys(c).length!==5||!text(c.statement,1800,8)||!text(c.reasoningSummary,2000,8)||
+     if(Object.keys(c).length!==(notebook?7:5)||!text(c.statement,notebook?1200:1800,8)||!text(c.reasoningSummary,2000,8)||
       !Array.isArray(c.sourceIds)||c.sourceIds.length<1||c.sourceIds.length>20||
       c.sourceIds.some(id=>typeof id!=="string"||!sources.has(id))||
       !["hypothesis","supported","contradicted","unknown"].includes(String(c.interpretation))||
       typeof c.uncertainty!=="number"||!Number.isFinite(c.uncertainty)||c.uncertainty<0||c.uncertainty>1)
        fail("FINAL_CLAIM_INVALID");
+     if(notebook&&(!Object.hasOwn(c,"fieldKey")||!Object.hasOwn(c,"noteKind")||
+      !notebookClaimCurrentV1(c as unknown as ResearchClaimV1,[...sources.values()].map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt})))))
+      fail("FINAL_NOTEBOOK_CLAIM_INVALID");
     }
     for(const raw of parsed.leads){
      const l=record(raw);
