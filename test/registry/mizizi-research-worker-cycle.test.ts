@@ -2629,7 +2629,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(new Set(passes[0].sourceReceipts.map(s=>s.lineageKey)).size).toBe(2);
   expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false}]);expect(verify).toHaveBeenCalledTimes(1);
  },20000);
- it("examines permitted non-retainable text in memory, journals only metadata and an unverified original note",async()=>{
+ it.each(["original","statement","reasoning","pass","lead_question","lead_rationale"] as const)("examines non-retainable text without persisting publisher expression (%s)",async mode=>{
   const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true},true);
   h.disabled.add("fixture_transient_disclosure");
   const question="What does the archival programme report about the recording?";
@@ -2650,11 +2650,15 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    expect(latest.consultation.text).toBe(new TextDecoder().decode(textBytes));
    const stored=h.receipts.get(latest.consultation.receiptId)!;
    expect(JSON.parse(String(stored.resultText)).consultation).not.toHaveProperty("text");
+   const copied=new TextDecoder().decode(textBytes).slice(4,74);
+   const wrapped="A provisional account: "+copied+"; still unverified.";
    return result({stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify({hypotheses:[{
-    statement:"The programme provides an attributed performer claim, not independently established identity.",
+    statement:mode==="statement"?wrapped:"The programme provides an attributed performer claim, not independently established identity.",
     sourceIds:[],consultationIds:[latest.consultation.receiptId],fieldKey:"performer",noteKind:"attributed_claim",
-    interpretation:"supported",uncertainty:.7,reasoningSummary:"The text is a single source report."}],
-    leads:[],passFinding:"Performer identity remains unverified.",requestedDisposition:"conclude"})}]});
+    interpretation:"supported",uncertainty:.7,reasoningSummary:mode==="reasoning"?wrapped:"The text is a single source report."}],
+    leads:mode==="lead_question"||mode==="lead_rationale"?[{question:mode==="lead_question"?wrapped:"Which original release establishes identity?",
+     rationale:mode==="lead_rationale"?wrapped:"Find independent recording credits.",expectedInformationGain:.9,importance:.9,estimatedCostUnits:1}]:[],
+    passFinding:mode==="pass"?wrapped:"Performer identity remains unverified.",requestedDisposition:"conclude"})}]});
   });
   const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({scope,writeNotebook:true,
    anthropic:{apiKey:"fixture-only-key",transport:transport as unknown as typeof fetch},
@@ -2668,9 +2672,18 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    executeTool:h.dispatch.executeTool,verifyToolReceipt:h.dispatch.verifyToolReceipt,authorizeSource:h.dispatch.authorizeSource,now:()=>NOW});
   const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_ordinal,_prior,pass)=>{passes.push(pass);}},h.dispatch.verifyJournalPass);
   const verify=vi.fn(async()=>({verified:true,verificationRef:"fixture:should-not-run"}));
-  const result=await runAdaptiveInvestigationV1({identity,store,prepareDeskPass,
+  const run=runAdaptiveInvestigationV1({identity,store,prepareDeskPass,
    readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
    authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:verify,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:20,now:()=>NOW});
+  if(mode!=="original"){
+   await expect(run).rejects.toThrow("TRANSIENT_VERBATIM_OUTPUT_DENIED");
+   expect(passes).toHaveLength(0);
+   expect(transport).toHaveBeenCalledTimes(3);
+   expect(verify).not.toHaveBeenCalled();
+   expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
+   return;
+  }
+  const result=await run;
   expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
   expect(transport).toHaveBeenCalledTimes(3);expect(verify).not.toHaveBeenCalled();
   expect(passes[0].sourceReceipts).toEqual([]);

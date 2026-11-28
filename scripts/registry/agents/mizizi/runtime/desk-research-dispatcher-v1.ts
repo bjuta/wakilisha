@@ -422,8 +422,8 @@ export function createDeskResearchDispatcherV1(options:Options){
     const url=urlOf(b.capture.finalUrl).href,p=await policy(urlOf(url).hostname);
     const visual=b.action==="visual";
     if((p&&p.browserRenderAllowed!==true)||(visual&&!p))fail("SOURCE_CUSTODY_DENIED");
-    if(!p){
-     // Access-only actions must carry no publisher labels, text or visual content.
+    if(!p?.excerptRetentionAllowed){
+     // Non-retainable observations must carry no publisher action labels or visual content.
      const labels:Readonly<Record<string,string>>={expand:"Expand public section",search:"Search public page",follow:"Follow public reference",scroll_down:"Scroll down"};
      if(b.leads.some(l=>l.kind!=="browser_action"||!b.actionBindings.some(a=>a.id===l.id&&labels[a.action]===l.label)))
       fail("TRANSIENT_BROWSER_LABEL_DENIED");
@@ -628,7 +628,8 @@ export function createDeskResearchDispatcherV1(options:Options){
     if(interpreted.source.sha256!==captured.sha256||interpreted.source.representation!=="rendered_dom_not_original_response"||
      interpreted.source.finalUrl!==url||interpreted.projectionSha256!==hash(JSON.stringify(interpreted.projection)))
      fail("SOURCE_PROJECTION_UNCONFIRMED");
-    const refs=leadsFrom(interpreted.projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})));
+    const refs=leadsFrom(p.excerptRetentionAllowed?interpreted.projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})):
+      interpreted.projection.links.filter((l:{url:string})=>!l.url.includes("?")).map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));
     const leads=[...refs.leads],bindings=[...refs.bindings];
     const descriptor=captured.visual?imageDescriptor(captured.visual):null;
     if(descriptor){

@@ -669,6 +669,22 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
        fail("FINAL_LEAD_INVALID");
     }
     if(!text(parsed.passFinding,3000,8))fail("FINAL_RESULT_INVALID");
+    // Transient text may enter only this in-memory model transcript. Inspect
+    // ALL durable free-text fields, even if the response omits the consultation
+    // citation or surrounds copied text with original words. This conservative
+    // exact-overlap check is not a copyright or independent truth detector.
+    if(consultations.size){
+     const norm=(v:string)=>v.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().toLowerCase();
+     const durable=[parsed.passFinding,...parsed.hypotheses.flatMap(raw=>{const c=record(raw);return [c.statement,c.reasoningSummary];}),
+      ...parsed.leads.flatMap(raw=>{const l=record(raw);return [l.question,l.rationale];})].map(v=>norm(String(v)));
+     const overlap=64;
+     for(const c of consultations.values()){
+      const source=norm(c.text!);
+      for(let i=0;i+overlap<=source.length;i++){
+       if(durable.some(v=>v.includes(source.slice(i,i+overlap))))fail("TRANSIENT_VERBATIM_OUTPUT_DENIED");
+      }
+     }
+    }
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();

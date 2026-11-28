@@ -956,6 +956,18 @@ begin
        when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
    then return null;end if;
  elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from p_policy_revision then return null;end if;
+ -- Non-retainable page navigation never persists publisher anchor/action labels.
+ -- Discovery labels are a distinct existing provider contract.
+ if not transient_receipt and not p.excerpt_retention_allowed and op in ('read_page','render_page','browse_page') and (
+  exists(select 1 from jsonb_array_elements(result->'leads') v where v->>'kind'='reference'
+    and v->>'label' is distinct from 'Public reference (unverified)')
+  or exists(select 1 from jsonb_array_elements(result->'leads') v where v->>'kind'='browser_action'
+    and not exists(select 1 from jsonb_array_elements(p_provenance->'detail'->'actionBindings') a
+      where a->>'id'=v->>'id' and v->>'label'=case a->>'action'
+       when 'expand' then 'Expand public section' when 'search' then 'Search public page'
+       when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))
+  or exists(select 1 from jsonb_array_elements(result->'leads') v where v->>'kind'='visual')
+ ) then return null;end if;
  if result ? 'consultation' then
   -- No publisher expression in the durable result. The current external
   -- processing permission is independent of the denied excerpt retention.
