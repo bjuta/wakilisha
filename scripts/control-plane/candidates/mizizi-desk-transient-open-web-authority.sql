@@ -2283,4 +2283,3 @@ begin
  if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
   raise exception 'Desk journal lease expired' using errcode='55000';end if;
 end $function$
-
