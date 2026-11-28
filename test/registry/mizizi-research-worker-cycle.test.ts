@@ -106,6 +106,22 @@ describe("MIZIZI original factual-note readback",()=>{
   }
   await expect(readDeskFactualNotesV1(rpc,scope,subject,()=>NOW,[EVENT])).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
  });
+ it("accepts foreign agent context only with exact receiving subject and an unverified provider recording match",async()=>{
+  const shared={...note,caseId:EVENT,authorId:null,reviewerId:null,reviewRef:null,reviewRevision:0,
+   membershipSha256:"e".repeat(64),observationSha256:"f".repeat(64),
+   consultationMethod:"autonomous_authorized_consultation",authorJobId:JOB,authorWorkerId:"mizizi-chart:"+EVENT,
+   originPassFingerprint:"d".repeat(64),originClaimIndex:0,sourceReceiptIds:[EVENT],sourceLocators:[sourceLocator],modelUseRef:"desk-standing:1",
+   sharedAttribution:{sourceKey:"youtube_ke",providerTrackId:"fixture-id",targetCaseId:CASE,targetExpectedRevision:2,
+    targetMembershipSha256:subject.membershipSha256,targetObservationSha256:subject.observationSha256,candidateOnly:true}};
+  const read=(n:unknown)=>readDeskFactualNotesV1(async()=>({data:packet({...body,notes:[n]}),error:null}),scope,subject,()=>NOW);
+  expect((await read(shared)).notes).toEqual([shared]);
+  for(const bad of [{targetCaseId:EVENT},{targetExpectedRevision:1},{targetObservationSha256:"a".repeat(64)},
+   {providerTrackId:""},{sourceKey:"shazam_ke"},{candidateOnly:false}]){
+   await expect(read({...shared,sharedAttribution:{...shared.sharedAttribution,...bad}})).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+  }
+  const {sharedAttribution:_,...foreign}=shared;
+  await expect(read(foreign)).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+ });
  it("rejects tampering, stale/foreign bindings, self-review, false verification and private or expired notes",async()=>{
   const variants=[{...body,scope:{...scope,caseId:EVENT}},{...body,observationSha256:"d".repeat(64)},
    ...[{noteText:"Tampered note"},{sourceLocator:"https://example.org/fixture?token=secret"},{authorId:EVENT},

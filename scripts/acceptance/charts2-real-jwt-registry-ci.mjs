@@ -354,9 +354,9 @@ export async function verifyCharts2RealJwtRegistryV1({
  select s.source_key,s.endpoint,1,'service_original',now(),
    s.source_key||'/'||left(s.sha,2)||'/'||s.sha||s.ext,1024,s.sha,now(),
    s.mime,s.depth,s.depth,
-   (select jsonb_agg(jsonb_build_object('rank',n,'title','CI Admission Song '||n,
+   (select jsonb_agg(jsonb_build_object('rank',n,'title','CI Admission Song '||case when s.source_key='youtube_ke' and n=2 then 1 else n end,
      'artist',case when s.source_key='apple_ke' then null else 'CI Admission Artist' end,
-     'provider_track_id',case when s.source_key='shazam_ke' then null else 'admission-'||s.source_key||'-'||n end)
+     'provider_track_id',case when s.source_key='shazam_ke' then null else 'admission-'||s.source_key||'-'||case when s.source_key='youtube_ke' and n=2 then 1 else n end end)
      order by n) from generate_series(1,s.depth) n),
    'ci-admission-local-v1',
    case when s.source_key='youtube_ke' then 'provider_declared_end_date' else 'unknown' end,
@@ -983,7 +983,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   fingerprint:sourceHash,authorityRef:p.authorityRef,useBasis:p.useBasis,observedAt,expiresAt:p.validUntil,revokedAt:null,
   privateResearchAllowed:true,externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true};
  const sharedName="mizizi_read_desk_shared_attribution_v1";
- const sharedTarget=sql("select s.case_id from mizizi_private.chart_candidate_subjects_v1 s join mizizi_private.cases c on c.id=s.case_id and c.workspace_id=s.workspace_id join mizizi_private.chart_candidate_positions_v1 p on p.case_id=s.case_id and p.workspace_id=s.workspace_id join jsonb_array_elements(platform_private.charts2_compute_private_freeze_v1(true)->'investigation_positions') v on v->>'receipt_id'=p.receipt_id::text and (v->>'rank')::int=p.rank and v->>'source_key'=p.source_key where s.initial_disposition='research' and s.member_count=1 and c.case_state='open' and c.current_stage='triage' and length(v->>'title') between 2 and 140 and length(v->>'artist') between 2 and 140 order by s.case_id limit 1;");
+ const sharedTarget=sql("select s.case_id from mizizi_private.chart_candidate_subjects_v1 s join mizizi_private.cases c on c.id=s.case_id and c.workspace_id=s.workspace_id join mizizi_private.chart_candidate_positions_v1 p on p.case_id=s.case_id and p.workspace_id=s.workspace_id join jsonb_array_elements(platform_private.charts2_compute_private_freeze_v1(true)->'investigation_positions') v on v->>'receipt_id'=p.receipt_id::text and (v->>'rank')::int=p.rank and v->>'source_key'=p.source_key where s.initial_disposition='research' and s.member_count=1 and c.case_state='open' and c.current_stage='triage' and p.source_key='youtube_ke' and p.rank=2 and length(v->>'title') between 2 and 140 and length(v->>'artist') between 2 and 140 order by s.case_id limit 1;");
  const sharedLabel=JSON.parse(sql("select jsonb_build_object('title',v->>'title','artist',v->>'artist')::text from mizizi_private.chart_candidate_positions_v1 p join jsonb_array_elements(platform_private.charts2_compute_private_freeze_v1(true)->'investigation_positions') v on v->>'receipt_id'=p.receipt_id::text and (v->>'rank')::int=p.rank and v->>'source_key'=p.source_key where p.case_id="+q(sharedTarget)+"::uuid;"));
  const sharedPair=sharedLabel.title+" by "+sharedLabel.artist;
  const standingExcerpt={source:standingSource,excerpt:"Synthetic standing source, no live acquisition. "+sharedPair+".",citation:url+"#plain_text"};
@@ -1219,6 +1219,13 @@ export async function verifyCharts2RealJwtRegistryV1({
    then raise exception 'STOP_AGENT_NOTE_READBACK';end if;
   packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
   if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>1 then raise exception 'STOP_AGENT_NOTE_TARGETED_READ';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${sharedScopeSql},array[(agent->>'noteId')::uuid]);
+  if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>1
+   or (packet->>'bodyText')::jsonb->'notes'->0->>'caseId' is distinct from ${q(pairedId)}
+   or (packet->>'bodyText')::jsonb->'notes'->0->'sharedAttribution'->>'targetCaseId' is distinct from ${q(sharedTarget)}
+   or (packet->>'bodyText')::jsonb->'notes'->0->'sharedAttribution'->>'providerTrackId' is distinct from 'admission-youtube_ke-1'
+   or (packet->>'bodyText')::jsonb->'notes'->0->'verified' is distinct from 'false'::jsonb
+   then raise exception 'STOP_AGENT_NOTE_SHARED_PROVIDER_MATCH';end if;
   -- A steward can revoke an agent's initially reusable, unreviewed context
   -- directly. No human review/admission is invented just to revoke it.
   set local role authenticated;
@@ -1234,6 +1241,8 @@ export async function verifyCharts2RealJwtRegistryV1({
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
   if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>0 then raise exception 'STOP_AGENT_NOTE_REVOKED_READ';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${sharedScopeSql},array[(agent->>'noteId')::uuid]);
+  if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>0 then raise exception 'STOP_AGENT_NOTE_SHARED_REVOCATION';end if;
   raise exception 'Fixture rollback' using errcode='ZX001';
  exception when sqlstate 'ZX001' then null;end;
  raise notice 'WK_AUTH_MIZIZI_AGENT_NOTE_ATOMIC_APPEND_REPLAY_RECALL=PASS';

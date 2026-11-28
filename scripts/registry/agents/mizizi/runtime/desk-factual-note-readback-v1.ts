@@ -16,6 +16,8 @@ export type DeskFactualNoteV1=Readonly<{
  expectedRevision:number;membershipSha256:string;observationSha256:string;authorId:string|null;reviewerId:string|null;
  authorJobId?:string;authorWorkerId?:string;originPassFingerprint?:string;originClaimIndex?:number;
  sourceReceiptIds?:readonly string[];sourceLocators?:readonly string[];modelUseRef?:string;
+ sharedAttribution?:Readonly<{sourceKey:string;providerTrackId:string;targetCaseId:string;targetExpectedRevision:number;
+  targetMembershipSha256:string;targetObservationSha256:string;candidateOnly:true}>;
  fieldKey:string;noteKind:string;consultationMethod:string;sourceLocator:string;noteText:string;
  noteTextSha256:string;locatorSha256:string;observedAt:string;reviewRef:string|null;validUntil:string;
  representation:"original_factual_note";verified:false;modelUseEligible:true;
@@ -45,10 +47,12 @@ export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScope
  const seen=new Set<string>(),notes:DeskFactualNoteV1[]=[];
  for(const n of b.notes){
   const agent=n?.consultationMethod==="autonomous_authorized_consultation";
+  const shared=agent&&n?.sharedAttribution!==undefined;
   if(!shape(n,["noteId","noteSha256","reviewRevision","caseId","workspaceId","expectedRevision","membershipSha256",
    "observationSha256","authorId","reviewerId","fieldKey","noteKind","consultationMethod","sourceLocator","noteText",
    "noteTextSha256","locatorSha256","observedAt","reviewRef","validUntil","representation","verified","modelUseEligible",
-   ...(agent?["authorJobId","authorWorkerId","originPassFingerprint","originClaimIndex","sourceReceiptIds","sourceLocators","modelUseRef"]:[])]))
+   ...(agent?["authorJobId","authorWorkerId","originPassFingerprint","originClaimIndex","sourceReceiptIds","sourceLocators","modelUseRef"]:[]),
+   ...(shared?["sharedAttribution"]:[])]))
    return failNote();
   const x=n as unknown as DeskFactualNoteV1;
   const validLocator=(v:unknown)=>{
@@ -69,11 +73,16 @@ export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScope
      typeof x.reviewerId==="string"&&UUID.test(x.reviewerId)&&text(x.reviewRef,500,8)):
    typeof x.authorId==="string"&&UUID.test(x.authorId)&&typeof x.reviewerId==="string"&&UUID.test(x.reviewerId)&&
     x.authorId!==x.reviewerId&&x.reviewRevision>=1&&text(x.reviewRef,500,8);
-  if(!authorValid||typeof x.noteId!=="string"||!UUID.test(x.noteId)||seen.has(x.noteId)||
+  const a=x.sharedAttribution;
+  const scopeValid=shared?!!a&&shape(a,["sourceKey","providerTrackId","targetCaseId","targetExpectedRevision","targetMembershipSha256","targetObservationSha256","candidateOnly"])&&
+   ["youtube_ke","mdundo_ke","apple_ke","audiomack_ke"].includes(a.sourceKey)&&text(a.providerTrackId,256)&&
+   UUID.test(x.caseId)&&x.caseId!==scope.caseId&&Number.isSafeInteger(x.expectedRevision)&&x.expectedRevision>=1&&
+   SHA.test(x.membershipSha256)&&SHA.test(x.observationSha256)&&a.targetCaseId===scope.caseId&&a.targetExpectedRevision===scope.expectedRevision&&
+   a.targetMembershipSha256===subject.membershipSha256&&a.targetObservationSha256===subject.observationSha256&&a.candidateOnly===true:
+   x.caseId===scope.caseId&&x.expectedRevision===scope.expectedRevision&&x.membershipSha256===subject.membershipSha256&&x.observationSha256===subject.observationSha256;
+  if(!authorValid||!scopeValid||typeof x.noteId!=="string"||!UUID.test(x.noteId)||seen.has(x.noteId)||
    (noteIds!==undefined&&!noteIds.includes(x.noteId))||typeof x.noteSha256!=="string"||!SHA.test(x.noteSha256)||
-   !Number.isSafeInteger(x.reviewRevision)||x.reviewRevision<0||x.caseId!==scope.caseId||x.workspaceId!==scope.workspaceId||
-   x.expectedRevision!==scope.expectedRevision||x.membershipSha256!==subject.membershipSha256||
-   x.observationSha256!==subject.observationSha256||
+   !Number.isSafeInteger(x.reviewRevision)||x.reviewRevision<0||x.workspaceId!==scope.workspaceId||
    !["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"].includes(x.fieldKey)||
    !["direct_observation","attributed_claim","inference"].includes(x.noteKind)||
    (!agent&&!["manual_public_consultation","manual_first_party_consultation"].includes(x.consultationMethod))||
@@ -99,7 +108,8 @@ export function factualNoteReferencesV1(packet:DeskFactualNoteReadbackV1):readon
 export function factualNoteContextV1(packet:DeskFactualNoteReadbackV1){
  return packet.notes.map(n=>({noteId:n.noteId,fieldKey:n.fieldKey,noteKind:n.noteKind,sourceLocator:n.sourceLocator,
   noteText:n.noteText,observedAt:n.observedAt,representation:n.representation,verified:false,
-  ...(n.authorJobId?{authorship:"mizizi",sourceLocators:n.sourceLocators}: {})}));
+  ...(n.authorJobId?{authorship:"mizizi",sourceLocators:n.sourceLocators}: {}),
+  ...(n.sharedAttribution?{relatedCaseCandidate:true,originCaseId:n.caseId,matchBasis:"same provider recording ID and observed labels; identity not verified"}:{})}));
 }
 export function validFactualNoteReferencesV1(refs:unknown):refs is readonly DeskFactualNoteReferenceV1[]{
  if(!Array.isArray(refs)||refs.length<1||refs.length>12)return false;

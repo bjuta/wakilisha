@@ -1936,6 +1936,62 @@ begin
  return jsonb_build_object('sourceLocators',locators,'validUntil',expiry);
 end $f$;
 revoke all on function mizizi_private.desk_agent_note_current_v1(mizizi_private.desk_factual_notes_v1,jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+-- Cross-case notes are hypotheses, not evidence or recording identity grants.
+-- Reconstruct the origin subject independently from its original receipt bindings.
+create function mizizi_private.desk_notebook_origin_context_v1(n mizizi_private.desk_factual_notes_v1)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
+declare s mizizi_private.chart_candidate_subjects_v1;positions jsonb;coords jsonb;
+begin
+ select * into s from mizizi_private.chart_candidate_subjects_v1 where case_id=n.case_id and workspace_id=n.workspace_id;
+ if not found or s.initial_disposition<>'research' or s.membership_sha256<>n.membership_sha256
+  or s.observation_sha256<>n.observation_sha256 then return null;end if;
+ select jsonb_agg(jsonb_build_object('source_key',p.source_key,'receipt_id',p.receipt_id,'original_sha256',p.original_sha256,
+  'rank',p.rank,'title',v->>'title','artist',v->>'artist','provider_track_id',nullif(v->>'provider_track_id',''),'disposition','research')
+  order by p.source_key,p.receipt_id,p.rank),
+  jsonb_agg(jsonb_build_object('source_key',p.source_key,'receipt_id',p.receipt_id,'original_sha256',p.original_sha256,'rank',p.rank)
+  order by p.source_key,p.receipt_id,p.rank)
+ into positions,coords
+ from mizizi_private.chart_candidate_positions_v1 p
+ join platform_private.charts2_capture_receipts_v1 r on r.id=p.receipt_id and r.source_key=p.source_key
+  and r.original_sha256=p.original_sha256 and r.original_verified_at is not null
+ cross join lateral jsonb_array_elements(r.observations) v
+ where p.case_id=n.case_id and p.workspace_id=n.workspace_id and v->>'rank'=p.rank::text;
+ if jsonb_array_length(positions) is distinct from s.member_count
+  or encode(sha256(convert_to(positions::text,'UTF8')),'hex') is distinct from s.observation_sha256
+  or encode(sha256(convert_to(coords::text,'UTF8')),'hex') is distinct from s.membership_sha256 then return null;end if;
+ return jsonb_build_object('caseId',n.case_id,'workspaceId',n.workspace_id,'expectedRevision',n.expected_revision,
+  'membershipSha256',n.membership_sha256,'observationSha256',n.observation_sha256,'positions',positions);
+end $f$;
+revoke all on function mizizi_private.desk_notebook_origin_context_v1(mizizi_private.desk_factual_notes_v1)
+ from public,anon,authenticated,service_role,mizizi_executor;
+
+create function mizizi_private.desk_notebook_provider_match_v1(origin jsonb,target jsonb)
+returns jsonb language plpgsql immutable set search_path=pg_catalog as $f$
+declare matched jsonb;
+begin
+ if origin is null or target is null or origin->>'workspaceId' is distinct from target->>'workspaceId'
+  or origin->>'caseId' is not distinct from target->>'caseId'
+  or jsonb_typeof(origin->'positions') is distinct from 'array' or jsonb_typeof(target->'positions') is distinct from 'array'
+  or jsonb_array_length(origin->'positions') not between 1 and 5 or jsonb_array_length(target->'positions') not between 1 and 5
+  then return null;end if;
+ if exists(select 1 from jsonb_array_elements(origin->'positions') a
+  join jsonb_array_elements(target->'positions') b on a->>'source_key'=b->>'source_key'
+  where a->>'provider_track_id' is distinct from b->>'provider_track_id'
+   or a->>'title' is distinct from b->>'title' or a->>'artist' is distinct from b->>'artist') then return null;end if;
+ select jsonb_build_object('sourceKey',a->>'source_key','providerTrackId',a->>'provider_track_id')
+ into matched from jsonb_array_elements(origin->'positions') a
+ join jsonb_array_elements(target->'positions') b on a->>'source_key'=b->>'source_key'
+ where a->>'source_key' in ('youtube_ke','mdundo_ke','apple_ke','audiomack_ke')
+  and a->>'provider_track_id'=b->>'provider_track_id' and length(btrim(a->>'provider_track_id')) between 1 and 256
+  and a->>'provider_track_id'=btrim(a->>'provider_track_id') and a->>'provider_track_id' !~ '[[:cntrl:]]'
+  and a->>'title'=b->>'title' and length(btrim(a->>'title')) between 2 and 500
+  and a->>'artist'=b->>'artist' and length(btrim(a->>'artist')) between 2 and 500
+ order by a->>'source_key' limit 1;
+ return matched;
+end $f$;
+revoke all on function mizizi_private.desk_notebook_provider_match_v1(jsonb,jsonb)
+ from public,anon,authenticated,service_role,mizizi_executor;
+
 CREATE FUNCTION mizizi_private.desk_factual_note_packet_v1(p_scope jsonb,p_note_ids uuid[])
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1944,7 +2000,8 @@ CREATE FUNCTION mizizi_private.desk_factual_note_packet_v1(p_scope jsonb,p_note_
 AS $function$
 declare c jsonb;n mizizi_private.desk_factual_notes_v1;d mizizi_private.desk_factual_note_reviews_v1;
  items jsonb:='[]'::jsonb;body text;expiry timestamptz;agent jsonb;agent_fields jsonb;
- o mizizi_private.desk_operational_policy_versions_v1;has_review boolean;
+ o mizizi_private.desk_operational_policy_versions_v1;origin_policy mizizi_private.desk_operational_policy_versions_v1;
+ has_review boolean;foreign_note boolean;origin_context jsonb;shared_match jsonb;receipt mizizi_private.desk_tool_receipts_v1;sid uuid;
 begin
  if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  perform pg_advisory_xact_lock(214781521,61431);
@@ -1954,13 +2011,46 @@ begin
   cardinality(p_note_ids)<>(select count(distinct v) from unnest(p_note_ids) v)) then return null;end if;
  o:=mizizi_private.current_desk_operational_policy_v1(c);
  for n in select x.* from mizizi_private.desk_factual_notes_v1 x
-  where x.case_id=(c->>'caseId')::uuid and x.workspace_id=(c->>'workspaceId')::uuid
-   and x.expected_revision=(c->>'expectedRevision')::integer
-   and x.membership_sha256=c->>'membershipSha256' and x.observation_sha256=c->>'observationSha256'
+  where x.workspace_id=(c->>'workspaceId')::uuid
    and (p_note_ids is null or x.note_id=any(p_note_ids))
-  order by (x.author_id is null),case when x.author_id is not null then x.note_id end,x.recorded_at desc,x.note_id
+   and ((x.case_id=(c->>'caseId')::uuid and x.expected_revision=(c->>'expectedRevision')::integer
+    and x.membership_sha256=c->>'membershipSha256' and x.observation_sha256=c->>'observationSha256')
+    or (x.case_id<>(c->>'caseId')::uuid and x.author_job_id is not null and o.shared_native_auto_allowed
+     and exists(select 1 from mizizi_private.chart_candidate_positions_v1 p
+      join platform_private.charts2_capture_receipts_v1 r on r.id=p.receipt_id and r.original_sha256=p.original_sha256
+      cross join lateral jsonb_array_elements(r.observations) v
+      join jsonb_array_elements(c->'positions') t on t->>'source_key'=p.source_key
+       and t->>'provider_track_id'=v->>'provider_track_id' and t->>'title'=v->>'title' and t->>'artist'=v->>'artist'
+      where p.workspace_id=x.workspace_id and p.case_id=x.case_id and v->>'rank'=p.rank::text
+       and length(btrim(v->>'provider_track_id')) between 1 and 256)))
+  order by (x.case_id<>(c->>'caseId')::uuid),(x.author_id is null),
+   case when x.author_id is not null then x.note_id end,x.recorded_at desc,x.note_id
  loop
-  agent_fields:='{}'::jsonb;
+  agent_fields:='{}'::jsonb;foreign_note:=n.case_id::text<>c->>'caseId';
+  origin_context:=c;shared_match:=null;
+  if foreign_note then
+   origin_context:=mizizi_private.desk_notebook_origin_context_v1(n);
+   shared_match:=mizizi_private.desk_notebook_provider_match_v1(origin_context,c);
+   if shared_match is null then continue;end if;
+   origin_policy:=mizizi_private.current_desk_operational_policy_v1(origin_context);
+   if not coalesce(mizizi_private.desk_operational_policy_live_v1(origin_policy,origin_context),false)
+    or not origin_policy.shared_native_auto_allowed then continue;end if;
+   -- No shared-to-shared propagation or borrowed browser/session authority.
+   foreach sid in array n.source_receipt_ids loop
+    select * into receipt from mizizi_private.desk_tool_receipts_v1 where id=sid;
+    if not found or receipt.operation<>'read_page' or receipt.provenance ? 'sharedNative'
+     or receipt.provenance ? 'sameCaseRecall'
+     or not coalesce(mizizi_private.desk_operational_url_allowed_v1(o,receipt.host,receipt.provenance->>'finalUrl','native_text',receipt.policy_revision),false)
+     or exists(with recursive parents as (
+      select receipt.id as id,receipt.parent_receipt_id as parent_receipt_id,receipt.provenance as provenance,1 as depth
+      union all select r.id,r.parent_receipt_id,r.provenance,p.depth+1 from parents p
+       join mizizi_private.desk_tool_receipts_v1 r on r.id=p.parent_receipt_id where p.depth<200
+     ) select 1 from parents where provenance ? 'sharedNative' or provenance ? 'sharedNativeSearch'
+      or provenance ? 'sameCaseRecall' or provenance->'detail' ? 'localBrowser' or depth=200)
+    then shared_match:=null;exit;end if;
+   end loop;
+   if shared_match is null then continue;end if;
+  end if;
   select * into d from mizizi_private.desk_factual_note_reviews_v1 r where r.note_id=n.note_id order by r.revision desc limit 1;
   has_review:=found;
   if n.author_id is not null then
@@ -1980,14 +2070,19 @@ begin
     begin perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,d.reviewer_id);
     exception when insufficient_privilege then continue;end;
    end if;
-   agent:=mizizi_private.desk_agent_note_current_v1(n,c);
+   agent:=mizizi_private.desk_agent_note_current_v1(n,origin_context);
    if agent is null then continue;end if;
    expiry:=least(o.valid_until,(c->>'leaseExpiresAt')::timestamptz,(agent->>'validUntil')::timestamptz,
-    case when has_review then d.valid_until end);
+    case when has_review then d.valid_until end,case when foreign_note then origin_policy.valid_until end);
    agent_fields:=jsonb_build_object('authorJobId',n.author_job_id,'authorWorkerId',n.author_worker_id,
     'originPassFingerprint',n.origin_pass_fingerprint,'originClaimIndex',n.origin_claim_index,
     'sourceReceiptIds',to_jsonb(n.source_receipt_ids),'sourceLocators',agent->'sourceLocators',
     'modelUseRef','desk-standing:'||o.revision::text);
+   if foreign_note then
+    agent_fields:=agent_fields||jsonb_build_object('sharedAttribution',shared_match||jsonb_build_object(
+     'targetCaseId',c->>'caseId','targetExpectedRevision',(c->>'expectedRevision')::integer,
+     'targetMembershipSha256',c->>'membershipSha256','targetObservationSha256',c->>'observationSha256','candidateOnly',true));
+   end if;
   end if;
   -- Bound only the selected context, never the durable corpus.
   if jsonb_array_length(items)>=12 then exit;end if;
