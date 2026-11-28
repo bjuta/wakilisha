@@ -34,6 +34,33 @@ jobs:
           PY
           node --check /tmp/mizizi-runner-syntax.mjs
           echo MIZIZI_EXECUTOR_CLEANUP_OFFLINE=PASS
+  focused-open-web-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dde96dfde3dbfb9ee2bd57c3dec901434c34c3ec
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Exact source and credential-free focused tests
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = dde96dfde3dbfb9ee2bd57c3dec901434c34c3ec
+          git diff --check HEAD^ HEAD
+          for key in MIZIZI_PREVIEW_ANON_KEY MIZIZI_PREVIEW_SERVICE_ROLE_KEY MIZIZI_PREVIEW_OPERATOR_JWT MIZIZI_PREVIEW_JIT_DATABASE_URL MIZIZI_PREVIEW_ANTHROPIC_API_KEY ANTHROPIC_API_KEY SUPABASE_ACCESS_TOKEN; do
+            test -z "${!key:-}"
+          done
+          node --check scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/vitest run test/registry/mizizi-research-worker-cycle.test.ts test/registry/mizizi-chart-calibration-flow.test.ts
+          ./node_modules/.bin/playwright install --with-deps chromium
+          npm run test:ui-browser -- test/ui-browser/mizizi-desk-research-browser.spec.ts
+          echo MIZIZI_FOCUSED_OPEN_WEB=PASS
   integrated:
     # Preserve the corrected runner for the independently reviewed live execution.
     # This offline increment must never issue another hosted credential.
