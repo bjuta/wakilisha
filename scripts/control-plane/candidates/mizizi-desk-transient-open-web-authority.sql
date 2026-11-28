@@ -811,7 +811,7 @@ $wk_exact$ then raise exception 'MIZIZI_TRANSIENT_PREIMAGE_CHANGED: desk_custody
 end $wk_transient_receipt_preimage$;
 
 alter table mizizi_private.desk_tool_receipts_v1 alter column policy_revision drop not null;
-alter table mizizi_private.desk_tool_receipts_v1 add constraint desk_tool_receipts_transient_only_v1 check (policy_revision is not null or (operation='read_page' and source_id is null and operational_revision is not null and parent_receipt_id is not null and (result_text::jsonb->'sources' is not distinct from '[]'::jsonb) and (result_text::jsonb->'visual' is not distinct from 'null'::jsonb)));
+alter table mizizi_private.desk_tool_receipts_v1 add constraint desk_tool_receipts_transient_only_v1 check (policy_revision is not null or (operation in ('read_page','browse_page') and source_id is null and operational_revision is not null and parent_receipt_id is not null and (result_text::jsonb->'sources' is not distinct from '[]'::jsonb) and (result_text::jsonb->'visual' is not distinct from 'null'::jsonb)));
 
 CREATE OR REPLACE FUNCTION mizizi_private.desk_custody_receipt_current_v1(r mizizi_private.desk_tool_receipts_v1, c jsonb)
  RETURNS boolean
@@ -837,13 +837,22 @@ begin
   if ancestor.policy_revision is null then
    -- Consultation receipts cannot become evidence or survive a newly
    -- issued host-specific custody decision without fresh authorization.
-   if p.revision is not null or ancestor.operation<>'read_page' or ancestor.source_id is not null
+   if p.revision is not null or ancestor.operation not in ('read_page','browse_page') or ancestor.source_id is not null
     or ancestor.operational_revision is null or ancestor.parent_receipt_id is null
     or ancestor.result_text::jsonb->'sources' is distinct from '[]'::jsonb
     or ancestor.result_text::jsonb->'visual' is distinct from 'null'::jsonb
     or ancestor.provenance->>'locator' is distinct from 'no_text'
-    or exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
-      where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)')
+    or (ancestor.operation='read_page' and exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
+      where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)'))
+    or (ancestor.operation='browse_page' and (
+      ancestor.provenance->'detail'->'visual' is distinct from 'null'::jsonb
+      or not coalesce(mizizi_private.desk_local_browser_receipt_available_v1(ancestor,c),false)
+      or exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
+       where v->>'kind' is distinct from 'browser_action' or not exists(
+        select 1 from jsonb_array_elements(ancestor.provenance->'detail'->'actionBindings') a
+        where a->>'id'=v->>'id' and v->>'label'=case a->>'action'
+         when 'expand' then 'Expand public section' when 'search' then 'Search public page'
+         when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
     then return false;end if;
   elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from ancestor.policy_revision
    or (ancestor.source_id is not null and not p.excerpt_retention_allowed)
@@ -921,16 +930,25 @@ begin
  -- Consultation is not source-content custody. This branch requires a
  -- standing session and no existing source-specific custody decision.
  transient_receipt:=coalesce(p_policy_revision is null and p.revision is null
-  and op='read_page' and mizizi_private.desk_operational_policy_live_v1(o,c)
+  and op in ('read_page','browse_page') and mizizi_private.desk_operational_policy_live_v1(o,c)
   and o.public_web_transient_allowed and p_host not in ('api.gdeltproject.org','api.tavily.com','api.search.brave.com'),false);
  if transient_receipt then
   if result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
    or p_provenance->>'locator' is distinct from 'no_text'
-   or p_provenance->'documentPages' is distinct from 'null'::jsonb
-   or p_provenance->'renderRequired' is distinct from 'false'::jsonb
-   or exists(select 1 from jsonb_array_elements(result->'leads') v
-    where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)')
-   or exists(select 1 from jsonb_array_elements(p_lead_bindings) v where position('?' in coalesce(v->>'url',''))>0)
+   or (op='read_page' and (
+    p_provenance->'documentPages' is distinct from 'null'::jsonb
+    or p_provenance->'renderRequired' is distinct from 'false'::jsonb
+    or exists(select 1 from jsonb_array_elements(result->'leads') v
+     where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)')
+    or exists(select 1 from jsonb_array_elements(p_lead_bindings) v where position('?' in coalesce(v->>'url',''))>0)))
+   or (op='browse_page' and (
+    p_provenance->'detail'->'visual' is distinct from 'null'::jsonb
+    or exists(select 1 from jsonb_array_elements(result->'leads') v
+     where v->>'kind' is distinct from 'browser_action' or not exists(
+      select 1 from jsonb_array_elements(p_provenance->'detail'->'actionBindings') a
+      where a->>'id'=v->>'id' and v->>'label'=case a->>'action'
+       when 'expand' then 'Expand public section' when 'search' then 'Search public page'
+       when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
    then return null;end if;
  elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from p_policy_revision then return null;end if;
  if o.revision is not null and (not mizizi_private.desk_operational_policy_live_v1(o,c) or not(op=any(o.tool_names))
@@ -1024,7 +1042,7 @@ begin
   -- exact current action/source grants and the same private receipt ledger.
   -- Source bytes and the live DOM are not retained in SQL.
   detail:=p_provenance->'detail';local_meta:=detail->'localBrowser';local_action:=local_meta->>'action';
-  if o.revision is null or not p.browser_render_allowed or p.source_family<>'public_web'
+  if o.revision is null or (not transient_receipt and (not p.browser_render_allowed or p.source_family<>'public_web'))
    or not(p_provenance ?& array['parentReceiptId','finalUrl','sourceSha256','projectionSha256','contentType','retrievedAt','byteLength','locator','detail'])
    or (select count(*) from jsonb_object_keys(p_provenance))<>9
    or jsonb_typeof(detail) is distinct from 'object' or (select count(*) from jsonb_object_keys(detail))<>3
@@ -1038,7 +1056,7 @@ begin
    or coalesce(local_meta->>'generation','') !~ '^[1-9][0-9]{0,2}$'
    or coalesce(local_action,'') not in ('navigate','expand','follow','search','scroll_down','visual')
    or coalesce(call_body->'input'->>'lead_id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
-   or mizizi_private.desk_custody_url_host_v1(p_provenance->>'finalUrl') is distinct from p.host
+   or mizizi_private.desk_custody_url_host_v1(p_provenance->>'finalUrl') is distinct from p_host
    or p_provenance->>'contentType' is distinct from 'text/html'
    or coalesce(p_provenance->>'sourceSha256','') !~ '^[0-9a-f]{64}$'
    or coalesce(p_provenance->>'projectionSha256','') !~ '^[0-9a-f]{64}$'
@@ -1091,6 +1109,7 @@ begin
    and q.lease_expires_at=local_res.lease_expires_at and q.call_sha256=p_call_sha256
    and q.operation=case when op='inspect_visual' then 'browser_visual' else 'browser_text' end
    and q.url_sha256=final_hash and q.source_sha256=p_provenance->>'sourceSha256'
+   and (not transient_receipt or q.custody_revision is null)
    and q.standing_revision=o.revision and q.valid_until>clock_timestamp())
    or exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q
     where q.job_id=local_res.job_id and q.lease_expires_at=local_res.lease_expires_at
@@ -1287,7 +1306,7 @@ begin
    elsif lead->>'kind'='render' then
     if op<>'read_page' or not p.browser_render_allowed or p_provenance->'renderRequired' is distinct from 'true'::jsonb then return null;end if;
    elsif lead->>'kind'='browser_action' or (lead->>'kind'='visual' and op='browse_page') then
-    if op<>'browse_page' or local_meta is null or not p.browser_render_allowed
+    if op<>'browse_page' or local_meta is null or (not transient_receipt and not p.browser_render_allowed)
      or (lead->>'kind'='visual' and (not p.visual_processing_allowed or not p.excerpt_retention_allowed))
      or not exists(select 1 from jsonb_array_elements(detail->'actionBindings') v
       where v->>'id'=lead->>'id' and (select count(*) from jsonb_object_keys(v))=2

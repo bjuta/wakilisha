@@ -2723,6 +2723,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const found=await open.execute(call("search_web",{query:"Nairobi recording archive"}));
   const consulted=await open.execute(call("read_page",{lead_id:found.leads[0].id}));
   expect(consulted.sources).toEqual([]);
+  expect(consulted.leads).toHaveLength(1);
   expect(consulted.leads.every(l=>l.kind==="reference"&&l.label==="Public reference (unverified)")).toBe(true);
   expect(open.native).toHaveBeenCalledTimes(1);
   const appended=open.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1").at(-1)!;

@@ -560,11 +560,12 @@ export async function withDeskInteractiveBrowserV1(options,work){
  * and observation admission contract is installed. No default grants.
  */
 export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveReference,
- authorizeCall,authorizeQuery,admitObservation,visualAllowed=false,authorizeVisualLead,now=Date.now}={}){
+ authorizeCall,authorizeQuery,admitObservation,visualAllowed=false,authorizeVisualLead,authorizeContentLabels,now=Date.now}={}){
  const scope=scopeOf(rawScope,now());
  if(!session||["navigate","follow","expand","scroll","search","observe","capture"].some(k=>typeof session[k]!=="function")||
   [resolveReference,authorizeCall,authorizeQuery,admitObservation,now].some(f=>typeof f!=="function")||
   (authorizeVisualLead!==undefined&&typeof authorizeVisualLead!=="function")||
+  (authorizeContentLabels!==undefined&&typeof authorizeContentLabels!=="function")||
   typeof visualAllowed!=="boolean")fail("ACTION_ROUTER_CONFIGURATION");
  const sameScope=s=>s&&JSON.stringify(scope)===JSON.stringify(s);
  const cleanLabel=s=>typeof s==="string"?s.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,300).trim():"";
@@ -577,7 +578,7 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
  // A bounded set of actionable controls, followed by page links. Reserve
  // room for each capability rather than let a page's navigation menu
  // crowd the research controls out of the model context.
- function actionLeads(observation,allowVisual){
+ function actionLeads(observation,allowVisual,allowContentLabels){
   const entries=[];
   const add=(kind,label,action,element=null)=>{
    if(!label||entries.length>=8)return;
@@ -593,7 +594,8 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
     if(e?.kind!==type||typeof e.ref!=="string"||e.ref.length>40||
      type==="expand"&&e.expanded===true||count>=limit)continue;
     const label=cleanLabel(e.label);if(!label)continue;
-    add("browser_action",type==="expand"?"Expand: "+label:type==="search"?"Search: "+label:"Follow: "+label,
+    add("browser_action",allowContentLabels?(type==="expand"?"Expand: "+label:type==="search"?"Search: "+label:"Follow: "+label):
+     (type==="expand"?"Expand public section":type==="search"?"Search public page":"Follow public reference"),
      type==="link"?"follow":type,e.ref);count++;
    }
   }
@@ -672,7 +674,9 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
     // changes are possible. A trusted admitter must derive actual evidence
     // from captured bytes, not claim the observation is the captured DOM.
     const allowVisual=visualAllowed&&(!authorizeVisualLead||await authorizeVisualLead(scope,observation.url)===true);
-    const entries=action==="visual"?[]:actionLeads(observation,allowVisual);
+    // An access-only observation exposes control types, not publisher-supplied labels.
+    const allowContentLabels=!authorizeContentLabels||await authorizeContentLabels(scope,observation.url)===true;
+    const entries=action==="visual"?[]:actionLeads(observation,allowVisual,allowContentLabels);
     const leads=entries.map(e=>e.lead);
     const receiptId=freshId();
     const result=await admitObservation(Object.freeze({scope,call,callSha256,receiptId,

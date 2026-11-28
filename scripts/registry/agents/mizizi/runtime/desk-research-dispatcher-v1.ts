@@ -380,6 +380,11 @@ export function createDeskResearchDispatcherV1(options:Options){
   routerOptions:(getSession:()=>Promise<LocalSessionProof>)=>({
    resolveReference:resolveLocalLead,authorizeCall:options.authorizeInteractiveCall!,
    authorizeQuery:localConfig.authorizeQuery,visualAllowed:localConfig.captureVisual===true,
+   authorizeContentLabels:async(candidate:DeskSearchScopeV1,url:string)=>{
+    assertScope(candidate);
+    const p=await policy(urlOf(url).hostname);
+    return !!p&&p.browserRenderAllowed===true&&p.excerptRetentionAllowed;
+   },
    authorizeVisualLead:async(candidate:DeskSearchScopeV1,url:string)=>{
     assertScope(candidate);
     const p=await policy(urlOf(url).hostname);
@@ -401,8 +406,14 @@ export function createDeskResearchDispatcherV1(options:Options){
     const session=await getSession(),parent=await resolveLocalLead(scope,b.parentLeadId);
     if(!parent)fail("LOCAL_PARENT_DENIED");
     const url=urlOf(b.capture.finalUrl).href,p=await policy(urlOf(url).hostname);
-    if(!p||p.browserRenderAllowed!==true)fail("SOURCE_CUSTODY_DENIED");
     const visual=b.action==="visual";
+    if((p&&p.browserRenderAllowed!==true)||(visual&&!p))fail("SOURCE_CUSTODY_DENIED");
+    if(!p){
+     // Access-only actions must carry no publisher labels, text or visual content.
+     const labels:Readonly<Record<string,string>>={expand:"Expand public section",search:"Search public page",follow:"Follow public reference",scroll_down:"Scroll down"};
+     if(b.leads.some(l=>l.kind!=="browser_action"||!b.actionBindings.some(a=>a.id===l.id&&labels[a.action]===l.label)))
+      fail("TRANSIENT_BROWSER_LABEL_DENIED");
+    }
     const descriptor=visual&&b.capture.visual?imageDescriptor({body:b.capture.visual.body,sha256:b.capture.visual.sha256,
      width:1280,height:900,byteLength:b.capture.visual.body.length}):null;
     if(visual!==!!descriptor)fail("VISUAL_DIGEST_DENIED");
@@ -413,7 +424,7 @@ export function createDeskResearchDispatcherV1(options:Options){
      await options.authorizeExamination(scope,examinationBinding)!==true)fail("LOCAL_EXAMINATION_DENIED");
     const excerpt=visual?"Visual derivative for examination; no textual claim is verified.":
      b.capture.visibleText.replace(/[\p{Cf}]/gu," ").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g," ").trim().slice(0,4000).trim();
-    const locator=visual?"browser_viewport:1":excerpt?"browser_visible_text":"no_text";
+    const locator=visual?"browser_viewport:1":p&&excerpt&&p.excerptRetentionAllowed?"browser_visible_text":"no_text";
     const capturedAt=new Date(now()).toISOString();
     const source={sha256:b.capture.sha256,retrievedAt:capturedAt,finalUrl:url};
     const metadata={parentReceiptId:parent.receiptId,finalUrl:url,sourceSha256:b.capture.sha256,
@@ -423,10 +434,10 @@ export function createDeskResearchDispatcherV1(options:Options){
       action:b.action,generation:b.observation.generation},visual:descriptor,
       actionBindings:b.actionBindings.map(x=>({id:x.id,action:x.action}))}};
     const result:DeskToolResultV1={receiptId:b.receiptId,leads:b.leads,
-     sources:excerpt&&p.excerptRetentionAllowed?[makeExcerpt(b.receiptId,p,source,locator,excerpt)]:[],
+     sources:excerpt&&p?.excerptRetentionAllowed?[makeExcerpt(b.receiptId,p,source,locator,excerpt)]:[],
      ...(descriptor&&b.capture.visual?{visual:{sourceId:b.receiptId,sha256:descriptor.sha256,
       contentType:"image/png" as const,body:Uint8Array.from(b.capture.visual.body)}}:{})};
-    return append(JSON.stringify({scope:b.scope,call:b.call}),b.callSha256,result,p,metadata,
+    return append(JSON.stringify({scope:b.scope,call:b.call}),b.callSha256,result,p??{host:urlOf(url).hostname,revision:null},metadata,
      b.actionBindings.map(x=>({id:x.id,url:x.url})));
    }
   })

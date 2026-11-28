@@ -233,7 +233,7 @@ test("MIZIZI browser action router refuses invented/stale IDs and unapproved sea
  await withDeskInteractiveBrowserV1({browser,scope:s,...h},async(session:any)=>{
   const router=createDeskBrowserActionRouterV1({scope:s,session,
    resolveReference:async(_:unknown,id:string)=>id===leadId?{id,kind:"reference",receiptId:randomUUID(),url:start}:null,
-   authorizeCall:async()=>true,authorizeQuery:async()=>false,
+   authorizeCall:async()=>true,authorizeQuery:async()=>false,authorizeContentLabels:async()=>false,
    admitObservation:async(b:any)=>({receiptId:b.receiptId,leads:b.leads,sources:[]})});
   const execute=(id:string,query="")=>{
    const call={name:"browse_page",input:{lead_id:id,query}};
@@ -241,8 +241,11 @@ test("MIZIZI browser action router refuses invented/stale IDs and unapproved sea
   };
   await expect(execute(randomUUID())).rejects.toThrow("ACTION_ROUTER_LEAD_DENIED");
   const first=await execute(leadId);
-  const search=first.leads.find((l:any)=>l.label.startsWith("Search:"));
-  const expand=first.leads.find((l:any)=>l.label==="Expand: Reveal credits");
+  const search=first.leads.find((l:any)=>l.label==="Search public page");
+  const expand=first.leads.find((l:any)=>l.label==="Expand public section");
+  expect(search).toBeDefined();expect(expand).toBeDefined();
+  expect(JSON.stringify(first)).not.toContain("Reveal credits");
+  expect(first.sources).toEqual([]);
   await expect(execute(search.id,"private information")).rejects.toThrow("ACTION_ROUTER_QUERY_DENIED");
   await execute(expand.id);
   await expect(execute(search.id)).rejects.toThrow("ACTION_ROUTER_STALE_LEAD");
