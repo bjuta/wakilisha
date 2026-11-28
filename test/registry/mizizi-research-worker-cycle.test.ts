@@ -2348,7 +2348,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
      excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host)&&!(disabled.has("fixture_transient_disclosure")&&host==="archive.org"),externalModelProcessingAllowed:true,
      browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry,
      ...(disabled.has("fixture_transient_disclosure")&&host==="archive.org"&&!disabled.has("no_provider_processing")?{
-      transientProviderCredentialSha256:"e".repeat(64),transientProviderProcessingRef:"fixture:reviewed-provider-handling"}:{})});
+      transientProviderCredentialSha256:hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"])),transientProviderProcessingRef:"fixture:reviewed-provider-handling"}:{})});
    }
    if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
     policyRef:"policy:public-search",validUntil:expiry,publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true});
@@ -2686,7 +2686,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false}]);expect(verify).toHaveBeenCalledTimes(1);
  },20000);
  it.each(["missing","wrong_credential"] as const)("does not disclose non-retainable source text without exact provider handling authority (%s)",async mode=>{
-  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:(mode==="wrong_credential"?"f":"e").repeat(64)},true);
+  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:mode==="wrong_credential"?"f".repeat(64):hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))},true);
   h.disabled.add("fixture_transient_disclosure");if(mode==="missing")h.disabled.add("no_provider_processing");
   const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
   const page=await h.execute(call("read_page",{lead_id:first.leads[0].id}));
@@ -2694,7 +2694,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
  },20000);
  it.each(["original","statement","reasoning","pass","lead_question","lead_rationale"] as const)("examines non-retainable text without persisting publisher expression (%s)",async mode=>{
-  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:"e".repeat(64)},true);
+  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))},true);
   h.disabled.add("fixture_transient_disclosure");
   const question="What does the archival programme report about the recording?";
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};

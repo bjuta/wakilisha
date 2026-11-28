@@ -1109,6 +1109,23 @@ export async function verifyCharts2RealJwtRegistryV1({
  values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
  'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
  array['search_web','read_page','browse_page','inspect_visual','recall_evidence'],5,10000,${j(rules)},now()+interval '2 days',true,array['recording credits'],true,true,false);
+ -- Database-owner-only structural checks, no simulated provider entitlement.
+ do $notebook_authority$ declare a jsonb;b jsonb;begin
+  a:=jsonb_build_object('caseId','origin','workspaceId',${q(ws)},'positions',jsonb_build_array(
+   jsonb_build_object('source_key','youtube_ke','provider_track_id','recording-a','title','Same title','artist','Same artist')));
+  b:=jsonb_set(a,'{caseId}',to_jsonb('target'::text));
+  if mizizi_private.desk_notebook_provider_match_v1(a,b)->>'providerTrackId' is distinct from 'recording-a'
+   or mizizi_private.desk_notebook_provider_match_v1(a,jsonb_set(b,'{positions,0,provider_track_id}',to_jsonb('recording-b'::text))) is not null
+   or mizizi_private.desk_notebook_provider_match_v1(a,jsonb_set(b,'{positions,0,provider_track_id}','null'::jsonb)) is not null
+   or mizizi_private.desk_notebook_provider_match_v1(a,jsonb_set(b,'{workspaceId}',to_jsonb('foreign'::text))) is not null
+   or mizizi_private.desk_notebook_provider_match_v1(a,jsonb_set(b,'{positions,0,artist}',to_jsonb('Other artist'::text))) is not null
+  then raise exception 'STOP_NOTEBOOK_PROVIDER_MATCH_BOUNDARY';end if;
+  if exists(select 1 from mizizi_private.desk_custody_policy_versions_v1 where transient_provider_processing_ref is not null or transient_provider_credential_sha256 is not null)
+   or has_function_privilege('service_role','mizizi_private.desk_notebook_provider_match_v1(jsonb,jsonb)','EXECUTE')
+   or has_function_privilege('authenticated','public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[])','EXECUTE')
+   or has_table_privilege('service_role','mizizi_private.desk_custody_policy_versions_v1','INSERT')
+  then raise exception 'STOP_NOTEBOOK_AUTHORITY_DEFAULT_OR_ACL';end if;
+ end $notebook_authority$;
  insert into mizizi_private.desk_resource_policy_versions_v1(
  resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
  exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,

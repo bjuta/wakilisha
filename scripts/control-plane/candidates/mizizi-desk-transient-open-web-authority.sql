@@ -2100,7 +2100,8 @@ begin
    if shared_match is null then continue;end if;
    origin_policy:=mizizi_private.current_desk_operational_policy_v1(origin_context);
    if not coalesce(mizizi_private.desk_operational_policy_live_v1(origin_policy,origin_context),false)
-    or not origin_policy.shared_native_auto_allowed then continue;end if;
+    or not origin_policy.shared_native_auto_allowed
+    or origin_policy.credential_sha256 is distinct from o.credential_sha256 then continue;end if;
    -- No shared-to-shared propagation or borrowed browser/session authority.
    foreach sid in array n.source_receipt_ids loop
     select * into receipt from mizizi_private.desk_tool_receipts_v1 where id=sid;
