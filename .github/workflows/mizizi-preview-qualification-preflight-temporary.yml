@@ -18,12 +18,12 @@ jobs:
     env:
       PREVIEW_REF: ehkmjrjjhzyjkxdfsqdc
       PROD_REF: pgzizndxdyhqmtyywjmt
-      EXPECTED_HEAD: 045cf9c9b832178780497e4a8b4352e75bbfac17
+      EXPECTED_HEAD: 614711c7a9acad7378ebdcefc0eb1c7a55c00923
     steps:
       - name: Check out exact approved integration candidate
         uses: actions/checkout@v4
         with:
-          ref: 045cf9c9b832178780497e4a8b4352e75bbfac17
+          ref: 614711c7a9acad7378ebdcefc0eb1c7a55c00923
           persist-credentials: false
       - name: Set up pinned Supabase CLI
         uses: supabase/setup-cli@v1
@@ -44,7 +44,7 @@ jobs:
           pr=get("pulls/1442")
           if pr.get("state")!="open" or pr.get("merged") or pr["head"]["sha"]!=h: raise SystemExit("MIZIZI_APPROVED_PR_HEAD=STOP")
           deadline=time.monotonic()+600
-          gates={46134575102:"Critical Control Plane",46134575104:"MIZIZI Slice 1 Disposable PostgreSQL Proof"}
+          gates={46134791733:"Critical Control Plane",46134791745:"MIZIZI Slice 1 Disposable PostgreSQL Proof"}
           while True:
               pr=get("pulls/1442")
               if pr.get("state")!="open" or pr.get("merged") or pr.get("draft") or pr["head"]["sha"]!=h:
