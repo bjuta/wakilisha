@@ -332,6 +332,68 @@ begin
  return true;
 end $function$;
 
+-- Provider retention is independent of WAKILISHA excerpt retention.
+-- An independently issued source policy must explicitly bind approved actual
+-- provider handling (including retention, exceptional handling, and account)
+-- to the exact credential digest. No worker-created permission or default.
+do $wk_provider_processing_preimage$ begin
+ if pg_get_functiondef('public.mizizi_read_desk_custody_policy_v1(jsonb,text)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION public.mizizi_read_desk_custody_policy_v1(p_scope jsonb, p_host text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;p mizizi_private.desk_custody_policy_versions_v1;
+begin
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ p:=mizizi_private.current_desk_custody_policy_v1((p_scope->>'workspaceId')::uuid,p_host);
+ if not mizizi_private.desk_custody_policy_live_v1(p) then return null;end if;
+ return jsonb_build_object('host',p.host,'revision',p.revision,'sourceFamily',p.source_family,
+ 'authorityRef',p.authority_ref,'originKey',p.origin_key,'lineageKey',p.lineage_key,'useBasis',p.use_basis,
+ 'privateResearchAllowed',p.private_research_allowed,'metadataRetentionAllowed',p.metadata_retention_allowed,
+ 'excerptRetentionAllowed',p.excerpt_retention_allowed,'externalModelProcessingAllowed',p.external_model_processing_allowed,
+ 'browserRenderAllowed',p.browser_render_allowed,'visualProcessingAllowed',p.visual_processing_allowed,
+ 'validUntil',p.valid_until);
+end $function$
+$wk_exact$
+ then raise exception 'MIZIZI_PROVIDER_PROCESSING_PREIMAGE_CHANGED';end if;
+end $wk_provider_processing_preimage$;
+alter table mizizi_private.desk_custody_policy_versions_v1
+ add column transient_provider_credential_sha256 text,
+ add column transient_provider_processing_ref text,
+ add constraint desk_transient_provider_processing_binding check(
+  (transient_provider_credential_sha256 is null and transient_provider_processing_ref is null)
+  or (transient_provider_credential_sha256 is not null and transient_provider_processing_ref is not null
+   and transient_provider_credential_sha256 ~ '^[a-f0-9]{64}$'
+   and length(btrim(transient_provider_processing_ref)) between 8 and 500
+   and transient_provider_processing_ref=btrim(transient_provider_processing_ref)
+   and transient_provider_processing_ref !~ '[[:cntrl:]]'
+   and source_family='public_web' and enabled and external_model_processing_allowed and not excerpt_retention_allowed));
+CREATE OR REPLACE FUNCTION public.mizizi_read_desk_custody_policy_v1(p_scope jsonb, p_host text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;p mizizi_private.desk_custody_policy_versions_v1;
+begin
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ p:=mizizi_private.current_desk_custody_policy_v1((p_scope->>'workspaceId')::uuid,p_host);
+ if not mizizi_private.desk_custody_policy_live_v1(p) then return null;end if;
+ return jsonb_build_object('host',p.host,'revision',p.revision,'sourceFamily',p.source_family,
+ 'authorityRef',p.authority_ref,'originKey',p.origin_key,'lineageKey',p.lineage_key,'useBasis',p.use_basis,
+ 'privateResearchAllowed',p.private_research_allowed,'metadataRetentionAllowed',p.metadata_retention_allowed,
+ 'excerptRetentionAllowed',p.excerpt_retention_allowed,'externalModelProcessingAllowed',p.external_model_processing_allowed,
+ 'browserRenderAllowed',p.browser_render_allowed,'visualProcessingAllowed',p.visual_processing_allowed,
+ 'transientProviderCredentialSha256',p.transient_provider_credential_sha256,
+ 'transientProviderProcessingRef',p.transient_provider_processing_ref,
+ 'validUntil',p.valid_until);
+end $function$;
+
 -- Access-only receipts reuse the same immutable receipt and reference tables.
 -- No source content or claim is admitted through this path.
 do $wk_transient_receipt_preimage$
@@ -860,7 +922,10 @@ begin
     then return false;end if;
   elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from ancestor.policy_revision
    or (ancestor.source_id is not null and not p.excerpt_retention_allowed)
-   or (ancestor.result_text::jsonb ? 'consultation' and (p.excerpt_retention_allowed or not p.external_model_processing_allowed or ancestor.source_id is not null))
+   or (ancestor.result_text::jsonb ? 'consultation' and (p.excerpt_retention_allowed or not p.external_model_processing_allowed or ancestor.source_id is not null
+    or p.transient_provider_processing_ref is null or p.transient_provider_credential_sha256 is distinct from
+       (select o.credential_sha256 from mizizi_private.desk_operational_policy_versions_v1 o where o.workspace_id=ancestor.workspace_id
+        and o.case_id=ancestor.case_id and o.revision=ancestor.operational_revision)))
    or (ancestor.operation in ('render_page','browse_page') and not p.browser_render_allowed)
    or (ancestor.provenance->'detail' ? 'localBrowser' and (not p.browser_render_allowed or not mizizi_private.desk_local_browser_receipt_available_v1(ancestor,c)))
    or (ancestor.operation='inspect_visual' and not p.visual_processing_allowed)
@@ -972,6 +1037,7 @@ begin
   -- No publisher expression in the durable result. The current external
   -- processing permission is independent of the denied excerpt retention.
   if o.revision is null or not o.public_web_transient_allowed or p.excerpt_retention_allowed or not p.external_model_processing_allowed
+   or p.transient_provider_processing_ref is null or p.transient_provider_credential_sha256 is distinct from o.credential_sha256
    or op not in ('read_page','read_document','render_page','browse_page') or result ? 'unavailable'
    or result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
    or jsonb_typeof(result->'consultation') is distinct from 'object'

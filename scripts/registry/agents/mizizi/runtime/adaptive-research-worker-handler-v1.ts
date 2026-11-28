@@ -246,6 +246,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,factualNoteSubject,braveApiKey:config.braveApiKey,discovery:config.discovery,
     allowTransientModelConsultation:()=>transientModelConsultation,
+    transientProviderCredentialSha256:operational?.credentialSha256,
     requirePublicMethodEligibility:operational?.publicWebTransientAllowed===true,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,

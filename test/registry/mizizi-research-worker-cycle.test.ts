@@ -2307,7 +2307,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation"|"requirePublicMethodEligibility">={},useTavily=false){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation"|"requirePublicMethodEligibility"|"transientProviderCredentialSha256">={},useTavily=false){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
@@ -2346,7 +2346,9 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
      authorityRef:"contract:reviewed-rights",originKey:host==="www.loc.gov"?"library:original-origin":"archive:original-origin",lineageKey:host==="www.loc.gov"?"library:independent-lineage":"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
      excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host)&&!(disabled.has("fixture_transient_disclosure")&&host==="archive.org"),externalModelProcessingAllowed:true,
-     browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry});
+     browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry,
+     ...(disabled.has("fixture_transient_disclosure")&&host==="archive.org"&&!disabled.has("no_provider_processing")?{
+      transientProviderCredentialSha256:"e".repeat(64),transientProviderProcessingRef:"fixture:reviewed-provider-handling"}:{})});
    }
    if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
     policyRef:"policy:public-search",validUntil:expiry,publicQueryAllowed:true,providerUseAllowed:true,zeroIncrementalSpendAllowed:true});
@@ -2683,8 +2685,16 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(new Set(passes[0].sourceReceipts.map(s=>s.lineageKey)).size).toBe(2);
   expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false}]);expect(verify).toHaveBeenCalledTimes(1);
  },20000);
+ it.each(["missing","wrong_credential"] as const)("does not disclose non-retainable source text without exact provider handling authority (%s)",async mode=>{
+  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:(mode==="wrong_credential"?"f":"e").repeat(64)},true);
+  h.disabled.add("fixture_transient_disclosure");if(mode==="missing")h.disabled.add("no_provider_processing");
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const page=await h.execute(call("read_page",{lead_id:first.leads[0].id}));
+  expect(page.sources).toEqual([]);expect(page.consultation).toBeUndefined();
+  expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
+ },20000);
  it.each(["original","statement","reasoning","pass","lead_question","lead_rationale"] as const)("examines non-retainable text without persisting publisher expression (%s)",async mode=>{
-  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true},true);
+  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:"e".repeat(64)},true);
   h.disabled.add("fixture_transient_disclosure");
   const question="What does the archival programme report about the recording?";
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};

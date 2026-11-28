@@ -31,6 +31,7 @@ type CustodyPolicy=Readonly<{
  originKey:string;lineageKey:string;useBasis:SourceAuthorityV1["useBasis"];
  privateResearchAllowed:true;metadataRetentionAllowed:true;excerptRetentionAllowed:boolean;
  externalModelProcessingAllowed:true;browserRenderAllowed?:boolean;visualProcessingAllowed?:boolean;validUntil:string;
+ transientProviderCredentialSha256?:string|null;transientProviderProcessingRef?:string|null;
 }>;
 type StoredReceipt=Readonly<{receiptId:string;callSha256:string;resultSha256:string;resultText:string;provenance:unknown}>;
 type StoredLead=Readonly<{id:string;url:string;kind:DeskToolLeadV1["kind"];label:string;receiptId:string}>;
@@ -77,6 +78,7 @@ type Options=Readonly<{
  allowSameCaseRecall?:boolean;
  factualNoteSubject?:DeskFactualNoteSubjectV1;
  allowTransientModelConsultation?:()=>boolean;
+ transientProviderCredentialSha256?:string;
  requirePublicMethodEligibility?:boolean;
  now?:()=>number;
 }>;
@@ -141,6 +143,8 @@ export function createDeskResearchDispatcherV1(options:Options){
    ![p.authorityRef,p.originKey,p.lineageKey].every(x=>text(x,500,8))||
    p.privateResearchAllowed!==true||p.metadataRetentionAllowed!==true||
    p.externalModelProcessingAllowed!==true||typeof p.excerptRetentionAllowed!=="boolean"||
+   ((p.transientProviderCredentialSha256!=null||p.transientProviderProcessingRef!=null)&&
+    (!SHA.test(p.transientProviderCredentialSha256??"")||!text(p.transientProviderProcessingRef,500,8)||p.excerptRetentionAllowed))||
    typeof p.validUntil!=="string"||!Number.isFinite(Date.parse(p.validUntil))||Date.parse(p.validUntil)<=now())
    fail("CUSTODY_POLICY_UNCONFIRMED");
   return Object.freeze({...p});
@@ -315,7 +319,9 @@ export function createDeskResearchDispatcherV1(options:Options){
   // Ordinary access alone is not permission to disclose publisher text.
   // This separate path uses independently reviewed model processing, while
   // keeping the normalized text in memory only.
-  if(options.allowTransientModelConsultation?.()!==true||!p||p.excerptRetentionAllowed||!p.externalModelProcessingAllowed)return undefined;
+  if(options.allowTransientModelConsultation?.()!==true||!p||p.excerptRetentionAllowed||!p.externalModelProcessingAllowed||
+   !SHA.test(options.transientProviderCredentialSha256??"")||p.transientProviderCredentialSha256!==options.transientProviderCredentialSha256||
+   !text(p.transientProviderProcessingRef,500,8))return undefined;
   const content=raw.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,4000).trim();
   if(!content||locator==="no_text")return undefined;
   const ref={receiptId:id,textSha256:hash(content),textBytes:Buffer.byteLength(content,"utf8"),
