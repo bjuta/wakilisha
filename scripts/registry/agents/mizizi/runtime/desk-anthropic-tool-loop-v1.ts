@@ -38,6 +38,21 @@ const PROMPT=[
 ].join(" ");
 const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified original research context, authored by MIZIZI or a human researcher, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
 const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use sourceIds for retained evidence and consultationIds for transiently examined text. Either may be empty but at least one examined reference is required. A consultation ID is not a source ID. Never quote publisher text as your note. A note is not independent factual verification.";
+// This is a bounded verbatim-overlap fence, not a copyright detector.
+// Apply it before any free-text tool call reaches a provider or durable
+// authorization ledger, as well as before original note/journal output.
+// Opaque lead IDs and page coordinates carry no publisher expression.
+function transientVerbatimOverlapV1(values:readonly string[],consultations:Iterable<DeskTransientConsultationV1>):boolean{
+ const norm=(v:string)=>v.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().toLowerCase();
+ const output=values.map(norm);
+ const overlap=64;
+ for(const c of consultations){
+  if(typeof c.text!=="string")return true;
+  const source=norm(c.text);
+  for(let i=0;i+overlap<=source.length;i++)if(output.some(v=>v.includes(source.slice(i,i+overlap))))return true;
+ }
+ return false;
+}
 const NOTEBOOK_CLAIM_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items,
  properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.properties,
   fieldKey:{type:"string",enum:NOTEBOOK_FIELDS_V1},noteKind:{type:"string",enum:NOTEBOOK_KINDS_V1},
@@ -328,6 +343,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
   }else if(Object.hasOwn(question,"factualNotes"))return false;
   const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],consultationIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>(),failedHosts=new Set<string>();
   const recovery={failedOperations,failedHosts,hosts};
+  const consultedText:DeskTransientConsultationV1[]=[];
   for(let i=0;i<b.toolReceipts.length;i++){
    const binding=b.toolReceipts[i];
    if(receiptIds.has(binding.receiptId)||!UUID.test(binding.receiptId))return false;
@@ -343,6 +359,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(assistant.role!=="assistant"||!Array.isArray(assistant.content)||assistant.content.length!==1||
     user.role!=="user"||!Array.isArray(user.content)||user.content.length!==1)return false;
    const block=record(assistant.content[0]),call=canonicalTool(block.name,block.input,enabled,leads);
+   if(typeof call.input.query==="string"&&transientVerbatimOverlapV1([call.input.query],consultedText))return false;
    const choice=deskToolChoice(b.model,enabled,i+1,leads,sourceIds.length+consultationIds.length,recovery);
    if(failedOperations.has(call.name)||choice.type==="tool"&&call.name!==choice.name||
     ((call.name==="search_web"||call.name==="search_news")&&failedHosts.has(hosts?.[call.name]??"")))return false;
@@ -370,7 +387,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
      !Array.isArray(resultBlock.content)||resultBlock.content.length!==1)return false;
     const supplied=record(JSON.parse(String(record(resultBlock.content[0]).text))).consultation;
     if(!validDeskTransientConsultationV1(supplied,true)||JSON.stringify(deskConsultationRefV1(supplied))!==JSON.stringify(result.consultation))return false;
-    consultation=supplied;consultationIds.push(consultation.receiptId);
+    consultation=supplied;consultationIds.push(consultation.receiptId);consultedText.push(consultation);
    }
    const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
     sourceId:s.source.sourceId,citation:s.citation,origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt
@@ -673,18 +690,9 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // ALL durable free-text fields, even if the response omits the consultation
     // citation or surrounds copied text with original words. This conservative
     // exact-overlap check is not a copyright or independent truth detector.
-    if(consultations.size){
-     const norm=(v:string)=>v.normalize("NFKC").replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().toLowerCase();
-     const durable=[parsed.passFinding,...parsed.hypotheses.flatMap(raw=>{const c=record(raw);return [c.statement,c.reasoningSummary];}),
-      ...parsed.leads.flatMap(raw=>{const l=record(raw);return [l.question,l.rationale];})].map(v=>norm(String(v)));
-     const overlap=64;
-     for(const c of consultations.values()){
-      const source=norm(c.text!);
-      for(let i=0;i+overlap<=source.length;i++){
-       if(durable.some(v=>v.includes(source.slice(i,i+overlap))))fail("TRANSIENT_VERBATIM_OUTPUT_DENIED");
-      }
-     }
-    }
+    const durable=[parsed.passFinding,...parsed.hypotheses.flatMap(raw=>{const c=record(raw);return [c.statement,c.reasoningSummary];}),
+     ...parsed.leads.flatMap(raw=>{const l=record(raw);return [l.question,l.rationale];})].map(String);
+    if(transientVerbatimOverlapV1(durable,consultations.values()))fail("TRANSIENT_VERBATIM_OUTPUT_DENIED");
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();
@@ -702,6 +710,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    if(toolIds.has(calls[0].id))fail("TOOL_RESPONSE_REPLAY");
    if(receipts.length>=MAX_TOOLS)fail("TOOL_RESPONSE_LIMIT");
    const block=calls[0],call=canonicalTool(block.name,block.input,enabled,leads);
+   if(typeof call.input.query==="string"&&transientVerbatimOverlapV1([call.input.query],consultations.values()))fail("TRANSIENT_VERBATIM_QUERY_DENIED");
    if(choice.type==="tool"&&call.name!==choice.name)fail("RESEARCH_TOOL_REQUIRED");
    if(failedOperations.has(call.name)||((call.name==="search_web"||call.name==="search_news")&&
     failedHosts.has(options.discoveryHosts?.[call.name]??""))){

@@ -2693,7 +2693,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(page.sources).toEqual([]);expect(page.consultation).toBeUndefined();
   expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
  },20000);
- it.each(["original","statement","reasoning","pass","lead_question","lead_rationale"] as const)("examines non-retainable text without persisting publisher expression (%s)",async mode=>{
+ it.each(["original","statement","reasoning","pass","lead_question","lead_rationale","tool_query"] as const)("examines non-retainable text without persisting publisher expression (%s)",async mode=>{
   const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))},true);
   h.disabled.add("fixture_transient_disclosure");
   const question="What does the archival programme report about the recording?";
@@ -2716,6 +2716,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    expect(JSON.parse(String(stored.resultText)).consultation).not.toHaveProperty("text");
    const copied=new TextDecoder().decode(textBytes).slice(4,74);
    const wrapped="A provisional account: "+copied+"; still unverified.";
+   if(mode==="tool_query")return tool("search_web",{query:wrapped});
    return result({stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify({hypotheses:[{
     statement:mode==="statement"?wrapped:"The programme provides an attributed performer claim, not independently established identity.",
     sourceIds:[],consultationIds:[latest.consultation.receiptId],fieldKey:"performer",noteKind:"attributed_claim",
@@ -2740,7 +2741,12 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
    readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
    authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:verify,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:20,now:()=>NOW});
   if(mode!=="original"){
-   await expect(run).rejects.toThrow("TRANSIENT_VERBATIM_OUTPUT_DENIED");
+   await expect(run).rejects.toThrow(mode==="tool_query"?"TRANSIENT_VERBATIM_QUERY_DENIED":"TRANSIENT_VERBATIM_OUTPUT_DENIED");
+   if(mode==="tool_query"){
+    expect(h.tavily).toHaveBeenCalledTimes(1);
+    expect(h.receipts.size).toBe(2);
+    expect(h.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1")).toHaveLength(2);
+   }
    expect(passes).toHaveLength(0);
    expect(transport).toHaveBeenCalledTimes(3);
    expect(verify).not.toHaveBeenCalled();
