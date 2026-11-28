@@ -2635,7 +2635,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const question="What does the archival programme report about the recording?";
   const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
   const model="claude-haiku-5-5",passes:InvestigationPassV1[]=[];
-  const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,now:()=>NOW,
+  const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,allowNotebook:true,now:()=>NOW,
    authorizeEnvelope:async b=>({requestSha256:b.requestSha256,policyRef:"fixture:host-envelope",validUntil:expiry,modelDisclosureAllowed:true}),
    authorizeTool:async()=>true});
   let round=0;
