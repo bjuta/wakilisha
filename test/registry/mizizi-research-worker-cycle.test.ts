@@ -718,7 +718,7 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    predecessorFingerprint:"0".repeat(64),reopeningMode:"terminal_retry" as const,
    question:"What original sources can establish the recording version?"};
   const verify=vi.fn(async(candidate:typeof event,id:typeof identity,previous:InvestigationPassV1|undefined)=>
-   candidate===event&&id.caseId===CASE&&previous===undefined);
+   JSON.stringify(candidate)===JSON.stringify(event)&&id.caseId===CASE&&previous===undefined);
   const deps={identity,store,maxNewPasses:1,maxTotalPasses:3,costBudgetUnits:20,now:()=>NOW,
    readSources:async()=>[],analyze:async()=>{throw Error("NO_EVIDENCE_MODEL");},
    verifyFinding:async()=>({verified:false,verificationRef:null})};
