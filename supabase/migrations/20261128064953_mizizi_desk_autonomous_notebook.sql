@@ -1,6 +1,18 @@
--- UNSEALED forward candidate for the existing Slice 1 authority correction.
--- Do not execute on hosted databases. Mint via pinned CLI and qualify first.
--- This changes transient access only; receipt admission/disclosure remains closed.
+-- Issue #1441. CLI 2.107.0 generated this exact path on the isolated Mac.
+-- Unsealed candidate for disposable replay; no hosted execution authorized by this file.
+-- No source-use grants, seed rows, provider calls, job dispatch or canonical writes.
+begin;
+set local lock_timeout='5s';
+set local statement_timeout='90s';
+do $guard$ begin
+ if current_user<>'postgres'
+ or to_regclass('mizizi_private.desk_factual_notes_v1') is null
+ or to_regprocedure('public.mizizi_read_desk_factual_notes_v1(jsonb)') is null
+ or to_regprocedure('public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[])') is not null
+ or has_schema_privilege('service_role','mizizi_private','USAGE')
+ or has_schema_privilege('authenticated','mizizi_private','USAGE')
+ then raise exception 'STOP_MIZIZI_AUTONOMOUS_NOTEBOOK_PREIMAGE';end if;
+end $guard$;
 -- Exact deployed migration-306 preimages; abort on unexpected drift.
 do $wk_preimage$
 begin
@@ -2459,3 +2471,17 @@ begin
  if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
   raise exception 'Desk journal lease expired' using errcode='55000';end if;
 end $function$;
+
+-- Preserve the private storage/authority boundary after creating the overload.
+do $postflight$ begin
+ if not has_function_privilege('service_role','public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[])','EXECUTE')
+ or has_function_privilege('anon','public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[])','EXECUTE')
+ or has_function_privilege('authenticated','public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[])','EXECUTE')
+ or has_function_privilege('service_role','mizizi_private.persist_desk_agent_notes_v1(uuid,text,uuid,text,jsonb)','EXECUTE')
+ or has_function_privilege('service_role','mizizi_private.desk_factual_note_packet_v1(jsonb,uuid[])','EXECUTE')
+ or has_table_privilege('service_role','mizizi_private.desk_factual_notes_v1','INSERT')
+ or has_table_privilege('service_role','mizizi_private.desk_custody_policy_versions_v1','INSERT')
+ or exists(select 1 from mizizi_private.desk_custody_policy_versions_v1 where transient_provider_processing_ref is not null or transient_provider_credential_sha256 is not null)
+ then raise exception 'STOP_MIZIZI_AUTONOMOUS_NOTEBOOK_POSTFLIGHT';end if;
+end $postflight$;
+commit;
