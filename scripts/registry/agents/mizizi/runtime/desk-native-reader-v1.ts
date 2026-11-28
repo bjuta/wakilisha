@@ -1,0 +1,484 @@
+/** Native public HTTPS acquisition for MIZIZI. Node server only.
+ * No browser execution, parser, persistence or model disclosure. Each redirect
+ * is a new independently authorized, conservatively precharged acquisition.
+ * The runtime must supply durable authority and a network-level egress fence.
+ */
+import {createHash} from "node:crypto";
+import {Resolver} from "node:dns/promises";
+import {request as httpsRequest} from "node:https";
+import {isIP} from "node:net";
+import {checkServerIdentity} from "node:tls";
+import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
+
+const UUID=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+const MAX_BYTES=2_000_000;
+const MAX_REDIRECTS=3;
+const MAX_DURATION_MS=20_000;
+type Target=Readonly<{url:string;hostname:string;address:string}>;
+type HopResponse=Readonly<{status:number;location?:string;contentType?:string;
+ body:Uint8Array;headers?:Readonly<Record<string,string>>;processingRestricted?:boolean}>;
+type NativeReadRequest=Readonly<{scope:DeskSearchScopeV1;url:string}>;
+type NativeReadAuthority=Readonly<{policyRef:string;validUntil:string;
+ acquisitionAllowed:true;zeroIncrementalSpendAllowed:true}>;
+type NativeReadOptions=Readonly<{
+ /** Must validate exact URL against current lease and independently reviewed
+  * source access policy (terms, robots, authorization). No blanket public grant. */
+ authorize:(scope:DeskSearchScopeV1,url:string)=>Promise<NativeReadAuthority|null>;
+ /** Atomic durable one-hop precharge/consume against current policy and
+  * existing compute/egress limits. Includes failed/indeterminate requests. */
+ precharge:(scope:DeskSearchScopeV1,target:Target,authority:NativeReadAuthority)=>Promise<boolean>;
+ now?:()=>number;
+ /** Test seams only. Production uses the native resolver and direct TLS path. */
+ resolve4?:(hostname:string,signal:AbortSignal)=>Promise<readonly string[]>;
+ readPinned?:(target:Target,signal:AbortSignal)=>Promise<HopResponse>;
+}>;
+function fail(code:string):never{throw Error("MIZIZI_DESK_NATIVE_"+code);}
+/** Created at the checked pinned HTTP response boundary. An arbitrary
+ * transport exception with the same message is not a confirmed response. */
+export class DeskNativeHttpUnavailableV1 extends Error{
+ constructor(readonly status:number){
+  super("MIZIZI_DESK_NATIVE_SOURCE_UNAVAILABLE_HTTP_"+status);
+ }
+}
+
+/** Deliberately IPv4-only until equally strong IPv6 handling is proven.
+ * Reject non-global, special-use, documentation, benchmarking and multicast
+ * ranges. This is not a substitute for an environment-level egress ACL. */
+export function isPublicDeskIpv4V1(address:string):boolean{
+ if(isIP(address)!==4)return false;
+ const [a,b,c]=address.split(".").map(Number);
+ return !(a===0||a===10||a===127||a>=224||
+  (a===100&&b>=64&&b<=127)||(a===169&&b===254)||
+  (a===172&&b>=16&&b<=31)||(a===192&&b===168)||
+  (a===192&&b===0&&(c===0||c===2))||(a===192&&b===88&&c===99)||
+  (a===198&&(b===18||b===19))||(a===198&&b===51&&c===100)||
+  (a===203&&b===0&&c===113));
+}
+function publicUrl(raw:string,base?:string):URL{
+ if(typeof raw!=="string"||raw.length<1||raw.length>2048||/[\p{Cc}\p{Cf}\\]/u.test(raw))
+  fail("URL_DENIED");
+ let u:URL;
+ try{u=new URL(raw,base);}catch{fail("URL_DENIED");}
+ const h=u.hostname;
+ if(u.protocol!=="https:"||u.username||u.password||u.port||
+  isIP(h)||h.startsWith("[")||h.endsWith(".")||
+  !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(h)||
+  /(?:^|\.)(localhost|local|internal|test|invalid|example|onion|home|lan|arpa)$/i.test(h))
+  fail("URL_DENIED");
+ // Never intentionally handle signed/private URLs or credentials in query.
+ for(const key of u.searchParams.keys()){
+  if(/(?:token|signature|password|passwd|secret|credential|session|api[-_]?key|authorization|^sig$|^auth$|^key$|^x-amz-|^x-goog-)/i.test(key))
+   fail("URL_CREDENTIAL_DENIED");
+ }
+ u.hash="";
+ return u;
+}
+async function resolveNative(hostname:string,signal:AbortSignal):Promise<string[]>{
+ const resolver=new Resolver({timeout:3000,tries:1});
+ const cancel=()=>resolver.cancel();
+ if(signal.aborted)fail("DEADLINE");
+ signal.addEventListener("abort",cancel,{once:true});
+ try{return await resolver.resolve4(hostname);}
+ catch{fail("DNS_UNCONFIRMED");}
+ finally{signal.removeEventListener("abort",cancel);}
+}
+function contentType(value:unknown):string{
+ if(typeof value!=="string")fail("CONTENT_TYPE_DENIED");
+ const type=value.split(";")[0].trim().toLowerCase();
+ if(!["text/html","application/xhtml+xml","text/plain","application/pdf"].includes(type))
+  fail("CONTENT_TYPE_DENIED");
+ return type;
+}
+/** Connect to the validated IP directly, retaining TLS SNI, certificate
+ * hostname checking and the HTTP Host for the approved origin. No second
+ * DNS lookup, pooled socket, credential forwarding or automatic redirects. */
+const BROWSER_MIMES:Readonly<Record<string,readonly string[]>>=Object.freeze({
+ document:["text/html","application/xhtml+xml"],
+ script:["text/javascript","application/javascript","application/ecmascript","text/ecmascript"],
+ stylesheet:["text/css"],
+ image:["image/png","image/jpeg","image/webp","image/gif","image/svg+xml","image/avif","image/x-icon"],
+ font:["font/woff","font/woff2","application/font-woff","application/octet-stream"],
+ xhr:["application/json","text/plain","text/html","application/xml","text/xml"],
+ fetch:["application/json","text/plain","text/html","application/xml","text/xml"],
+});
+// Restrictive source directives are negative signals only, never a use grant.
+export function deskProcessingRestrictedV1(value:unknown):boolean{
+ if(value===undefined||value===null)return false;
+ const raw=Array.isArray(value)?value.join(","):value;
+ return typeof raw!=="string"||raw.length>16000||
+  /(?:^|[\s,:;])(?:noai|noimageai|notrain|noarchive|nosnippet|none)(?:$|[\s,:;])/i.test(raw)||
+  /(?:^|[\s,;])max-snippet\s*:\s*0(?:$|[\s,;])/i.test(raw);
+}
+const BROWSER_RESPONSE_HEADERS=["content-security-policy","content-security-policy-report-only","x-content-type-options",
+ "x-frame-options","referrer-policy","cross-origin-resource-policy","cross-origin-opener-policy",
+ "cross-origin-embedder-policy","access-control-allow-origin","access-control-allow-methods",
+ "access-control-allow-headers","access-control-expose-headers","vary","permissions-policy"] as const;
+function browserContentType(value:unknown,resourceType:string):string{
+ if(typeof value!=="string"||value.length>200||/[\r\n\0]/.test(value)||
+  !BROWSER_MIMES[resourceType]?.includes(value.split(";")[0].trim().toLowerCase()))
+  fail("CONTENT_TYPE_DENIED");
+ return value;
+}
+async function readNative(target:Target,signal:AbortSignal,browserType?:string,tavilyBody?:string):Promise<HopResponse>{
+ const url=publicUrl(target.url);
+ if(url.hostname!==target.hostname||!isPublicDeskIpv4V1(target.address))fail("PIN_DENIED");
+ if(tavilyBody!==undefined&&(url.href!=="https://api.tavily.com/search"||browserType!=="fetch"||Buffer.byteLength(tavilyBody)>4096))fail("DISCOVERY_POST_DENIED");
+ return new Promise((resolve,reject)=>{
+  let settled=false;
+  const finish=(err:Error|null,value?:HopResponse)=>{
+   if(settled)return;
+   settled=true;
+   if(err)reject(err);else resolve(value!);
+  };
+  const req=httpsRequest({
+   hostname:target.address,port:443,path:url.pathname+url.search,method:tavilyBody===undefined?"GET":"POST",
+   servername:target.hostname,agent:false,rejectUnauthorized:true,minVersion:"TLSv1.2",
+   checkServerIdentity:(_name,cert)=>checkServerIdentity(target.hostname,cert),
+   maxHeaderSize:16384,signal,
+   headers:{Host:target.hostname,"User-Agent":"WAKILISHA-MIZIZI/1.0 (https://wakilisha.africa)",
+    Accept:browserType?BROWSER_MIMES[browserType].join(","):"text/html,application/xhtml+xml,text/plain,application/pdf",
+    "Accept-Encoding":"identity",Connection:"close",...(tavilyBody===undefined?{}:{
+    "Content-Type":"application/json","Content-Length":String(Buffer.byteLength(tavilyBody)),"X-Tavily-Access-Mode":"keyless"})},
+  },res=>{
+   const stop=(code:string)=>{finish(Error("MIZIZI_DESK_NATIVE_"+code));res.destroy();req.destroy();};
+   if(res.socket.remoteAddress!==target.address){stop("PEER_PIN_MISMATCH");return;}
+   const status=res.statusCode??0;
+   if([301,302,303,307,308].includes(status)){
+    const location=res.headers.location;
+    if(typeof location!=="string"){stop("REDIRECT_DENIED");return;}
+    finish(null,{status,location,body:new Uint8Array()});res.destroy();req.destroy();return;
+   }
+   if(status!==200){finish(null,{status,body:new Uint8Array()});res.destroy();req.destroy();return;}
+   if(res.headers["content-encoding"]&&res.headers["content-encoding"]!=="identity"){
+    stop("CONTENT_ENCODING_DENIED");return;
+   }
+   const declared=res.headers["content-length"];
+   if(declared!==undefined&&(!/^\d+$/.test(declared)||Number(declared)>MAX_BYTES)){
+    stop("RESPONSE_TOO_LARGE");return;
+   }
+   let type:string;
+   try{type=browserType?browserContentType(res.headers["content-type"],browserType):contentType(res.headers["content-type"]);}catch{stop("CONTENT_TYPE_DENIED");return;}
+   const headers:Record<string,string>={};
+   if(browserType)for(const name of BROWSER_RESPONSE_HEADERS){
+    const raw=res.headers[name];
+    if(raw===undefined)continue;
+    // Preserve security and CORS policy. Never forward Set-Cookie,
+    // Location on 200, authentication or arbitrary upstream headers.
+    if(typeof raw!=="string"||raw.length>16000||/[\r\n\0]/.test(raw)){
+     stop("RESPONSE_HEADER_DENIED");return;
+    }
+    headers[name]=raw;
+   }
+   const chunks:Buffer[]=[];let size=0;
+   res.on("data",(chunk:Buffer)=>{
+    size+=chunk.length;
+    if(size>MAX_BYTES){stop("RESPONSE_TOO_LARGE");return;}
+    chunks.push(chunk);
+   });
+   res.once("aborted",()=>stop("BODY_UNCONFIRMED"));
+   res.once("error",()=>stop("BODY_UNCONFIRMED"));
+   res.once("end",()=>{
+    if(!res.complete||(declared!==undefined&&size!==Number(declared))){stop("BODY_UNCONFIRMED");return;}
+    finish(null,{status,contentType:type,body:Buffer.concat(chunks,size),processingRestricted:deskProcessingRestrictedV1(res.headers["x-robots-tag"]),...(browserType?{headers}:{} )});
+   });
+  });
+  req.once("error",()=>finish(Error("MIZIZI_DESK_NATIVE_TRANSPORT_UNCONFIRMED")));
+  req.end(tavilyBody);
+ });
+}
+export function createDeskNativeReaderV1(options:NativeReadOptions){
+ if(typeof options?.authorize!=="function"||typeof options.precharge!=="function")
+  fail("TRUSTED_AUTHORITY_REQUIRED");
+ const now=options.now??Date.now,resolve4=options.resolve4??resolveNative,read=options.readPinned??readNative;
+ return async(input:NativeReadRequest)=>{
+  const s=input?.scope;
+  if(!s||![s.jobId,s.caseId,s.workspaceId].every(id=>typeof id==="string"&&UUID.test(id))||
+   !Number.isSafeInteger(s.expectedRevision)||s.expectedRevision<1||
+   typeof s.workerId!=="string"||!/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(s.workerId)||
+   typeof s.leaseExpiresAt!=="string"||!Number.isFinite(Date.parse(s.leaseExpiresAt))||
+   Date.parse(s.leaseExpiresAt)<=now())fail("SCOPE_DENIED");
+  const scope=Object.freeze({...s}),lease=Date.parse(scope.leaseExpiresAt);
+  const end=Math.min(lease,now()+MAX_DURATION_MS);
+  const signal=AbortSignal.timeout(Math.max(1,end-now()));
+  const live=()=>{if(signal.aborted||now()>=end)fail("DEADLINE");};
+  const approved=(a:NativeReadAuthority|null):a is NativeReadAuthority=>
+   !!a&&a.acquisitionAllowed===true&&a.zeroIncrementalSpendAllowed===true&&
+   typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
+   typeof a.validUntil==="string"&&Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=lease;
+  let url=publicUrl(input.url),first=url.href;
+  const seen=new Set<string>(),redirects:string[]=[],hopSha256:string[]=[];
+  for(let hop=0;hop<=MAX_REDIRECTS;hop++){
+   live();
+   if(seen.has(url.href))fail("REDIRECT_LOOP");
+   seen.add(url.href);
+   const authority=await options.authorize(scope,url.href);
+   live();if(!approved(authority))fail("ACQUISITION_DENIED");
+   const addresses=await resolve4(url.hostname,signal);
+   live();
+   if(!Array.isArray(addresses)||addresses.length<1||addresses.length>32||
+    addresses.some(address=>!isPublicDeskIpv4V1(address)))fail("DNS_ADDRESS_DENIED");
+   const target=Object.freeze({url:url.href,hostname:url.hostname,address:addresses[0]});
+   if(await options.precharge(scope,target,authority)!==true)fail("ZERO_COST_BUDGET_UNAVAILABLE");
+   // Exact descriptor digest used by the durable native resource adapter.
+   // It is not a grant or a claim that billing/response bytes are verified.
+   hopSha256.push(createHash("sha256").update(JSON.stringify({scope,target})).digest("hex"));
+   live();
+   const fresh=await options.authorize(scope,url.href);
+   live();if(!approved(fresh)||fresh.policyRef!==authority.policyRef||!approved(authority))
+    fail("ACQUISITION_AUTHORITY_CHANGED");
+   const response=await read(target,signal);
+   live();
+   if(!response||!(response.body instanceof Uint8Array)||response.body.byteLength>MAX_BYTES)
+    fail("RESPONSE_TOO_LARGE");
+   const after=await options.authorize(scope,url.href);
+   live();if(!approved(after)||after.policyRef!==authority.policyRef)fail("ACQUISITION_AUTHORITY_CHANGED");
+   if([301,302,303,307,308].includes(response.status)){
+    if(hop===MAX_REDIRECTS||typeof response.location!=="string")fail("REDIRECT_DENIED");
+    redirects.push(url.href);
+    url=publicUrl(response.location,url.href);continue;
+   }
+   if(response.status!==200){
+   if(Number.isInteger(response.status)&&response.status>=100&&response.status<=599)throw new DeskNativeHttpUnavailableV1(response.status);
+   fail("SOURCE_UNAVAILABLE");
+  }
+   const type=contentType(response.contentType);
+   const body=Uint8Array.from(response.body);
+   if(body.length===0||(type==="application/pdf"&&new TextDecoder().decode(body.subarray(0,5))!=="%PDF-"))
+    fail("BODY_UNCONFIRMED");
+   return Object.freeze({contract:"mizizi.desk_native_read.v1" as const,scope,requestedUrl:first,
+    finalUrl:url.href,redirects:Object.freeze(redirects),hopSha256:Object.freeze(hopSha256),
+    retrievedAt:new Date(now()).toISOString(),
+    contentType:type,byteLength:body.length,sha256:createHash("sha256").update(body).digest("hex"),
+    body,processingRestricted:response.processingRestricted===true||deskProcessingRestrictedV1(response.headers?.["x-robots-tag"]),sourceRetentionAuthorized:false as const,externalModelProcessingAuthorized:false as const,
+    identityVerified:false as const});
+  }
+  fail("REDIRECT_DENIED");
+ };
+}
+
+
+// Bounded robots exclusion method check for the honest WAKILISHA-MIZIZI
+// product token. A robots permit is not a source licence, consent, model
+// disclosure grant, or proof that other applicable terms permit use.
+const ROBOTS_PRODUCT="wakilisha-mizizi";
+const ROBOTS_LIMIT=512*1024;
+type RobotsRule=Readonly<{allow:boolean;pattern:string;weight:number}>;
+type RobotsPolicy=Readonly<{rules:readonly RobotsRule[];delayDenied:boolean}>;
+function robotsPath(raw:string):string|null{
+ if(/[\p{Cc}\p{Cf}]/u.test(raw)||/%(?![a-f0-9]{2})/i.test(raw))return null;
+ // Match percent-encoded reserved octets without decoding them into
+ // separators/wildcards. Decode unreserved octets, as in RFC 9309.
+ return raw.replace(/%[a-f0-9]{2}|[^\x20-\x7e]/giu,v=>{
+  if(v.startsWith("%")){
+   const c=String.fromCharCode(parseInt(v.slice(1),16));
+   return /^[A-Za-z0-9._~-]$/.test(c)?c:v.toUpperCase();
+  }
+  return encodeURIComponent(v).toUpperCase();
+ });
+}
+function parseDeskRobotsV1(bytes:Uint8Array):RobotsPolicy|null{
+ if(!(bytes instanceof Uint8Array)||bytes.length>ROBOTS_LIMIT)return null;
+ let value:string;try{value=new TextDecoder("utf-8",{fatal:true}).decode(bytes);}catch{return null;}
+ const groups:{agents:string[];rules:RobotsRule[];delayDenied:boolean;hasRule:boolean}[]=[];
+ let group:typeof groups[number]|undefined;
+ for(const raw of value.split(/\r\n|\n|\r/)){
+  const line=raw.split("#",1)[0].trim();
+  if(!line)continue;
+  const m=/^([a-zA-Z][a-zA-Z_-]*)\s*:\s*(.*)$/.exec(line);
+  if(!m)return null; // Not a confirmed robots document (e.g. HTML error).
+  const key=m[1].toLowerCase(),v=m[2].trim();
+  if(key==="user-agent"){
+   if(!/^(?:[a-zA-Z_-]+|\*)$/.test(v))return null;
+   if(!group||group.hasRule){
+    group={agents:[],rules:[],delayDenied:false,hasRule:false};groups.push(group);
+   }
+   group.agents.push(v.toLowerCase());
+  }else if(key==="allow"||key==="disallow"||key==="crawl-delay"){
+   if(!group)continue;
+   group.hasRule=true;
+   if(key==="crawl-delay"){
+    // No sleeping, guessed rate budget or bypass of a site's expressed
+    // delay. Nonzero/ambiguous delay is unavailable in this bounded lease.
+    if(!/^0(?:\.0+)?$/.test(v))group.delayDenied=true;
+    continue;
+   }
+   if(!v)continue;
+   if(v.length>2048||!v.startsWith("/")||v.includes(" "))return null;
+   const pattern=robotsPath(v);if(pattern===null)return null;
+   group.rules.push({allow:key==="allow",pattern,weight:pattern.replace(/\*|\$$/g,"").length});
+  }
+ }
+ const named=groups.filter(g=>g.agents.includes(ROBOTS_PRODUCT));
+ const chosen=named.length?named:groups.filter(g=>g.agents.includes("*"));
+ return Object.freeze({rules:Object.freeze(chosen.flatMap(g=>g.rules)),delayDenied:chosen.some(g=>g.delayDenied)});
+}
+function robotsRuleMatches(path:string,pattern:string):boolean{
+ const anchored=pattern.endsWith("$"),rule=anchored?pattern.slice(0,-1):pattern;
+ if(!rule.includes("*"))return anchored?path===rule:path.startsWith(rule);
+ // Literal fragment scan instead of attacker-controlled regular expressions.
+ // All paths, rules and document bytes are bounded; no regex backtracking.
+ const parts=rule.split("*"),first=parts.shift()!,last=parts.pop()!;
+ if(!path.startsWith(first))return false;
+ let at=first.length;
+ for(const part of parts){const next=path.indexOf(part,at);if(next<0)return false;at=next+part.length;}
+ if(anchored)return path.endsWith(last)&&path.length-last.length>=at;
+ return path.indexOf(last,at)>=0;
+}
+export function deskRobotsAllowsV1(bytes:Uint8Array,url:string):boolean{
+ let target:URL;try{target=publicUrl(url);}catch{return false;}
+ const p=parseDeskRobotsV1(bytes),path=robotsPath(target.pathname+target.search);
+ if(!p||p.delayDenied||path===null)return false;
+ let weight=-1,allowed=true;
+ for(const rule of p.rules)if(robotsRuleMatches(path,rule.pattern)){
+  if(rule.weight>weight){weight=rule.weight;allowed=rule.allow;}
+  else if(rule.weight===weight&&rule.allow)allowed=true;
+ }
+ return allowed;
+}
+/** One origin check per exact lease, no automatic retry or retained source
+ * expression. The reader is the existing pinned, independently authorized,
+ * durably precharged native transport. 404/410 alone mean no robots document;
+ * explicit access denial, rate limits, transport ambiguity, invalid type,
+ * cross-origin redirects and malformed policies are unavailable, not permits. */
+export function createDeskPublicMethodGateV1(options:Readonly<{
+ scope:DeskSearchScopeV1;
+ readRobots:(url:string)=>Promise<{finalUrl:string;contentType:string;body:Uint8Array}>;
+ now?:()=>number;
+}>){
+ const now=options.now??Date.now,cache=new Map<string,Promise<RobotsPolicy|null>>();
+ const lease=Date.parse(options.scope.leaseExpiresAt);
+ return async(url:string)=>{
+  if(!Number.isFinite(lease)||lease<=now())return false;
+  let target:URL;try{target=publicUrl(url);}catch{return false;}
+  if(target.href!==url)return false;
+  let pending=cache.get(target.origin);
+  if(!pending){
+   if(cache.size>=16)return false;
+   pending=(async()=>{
+    const robots=target.origin+"/robots.txt";
+    try{
+     const result=await options.readRobots(robots);
+     if(result.finalUrl!==robots||result.contentType!=="text/plain")return null;
+     return parseDeskRobotsV1(result.body);
+    }catch(e){
+     if(e instanceof DeskNativeHttpUnavailableV1&&[404,410].includes(e.status))
+      return {rules:[],delayDenied:false};
+     return null;
+    }
+   })();
+   cache.set(target.origin,pending);
+  }
+  const p=await pending,path=robotsPath(target.pathname+target.search);
+  if(lease<=now()||!p||p.delayDenied||path===null)return false;
+  let weight=-1,allowed=true;
+  for(const rule of p.rules)if(robotsRuleMatches(path,rule.pattern)){
+   if(rule.weight>weight){weight=rule.weight;allowed=rule.allow;}
+   else if(rule.weight===weight&&rule.allow)allowed=true;
+  }
+  return allowed;
+ };
+}
+
+export type DeskBrowserResourceBindingV1=Readonly<{
+ scope:DeskSearchScopeV1;url:string;resourceType:string;topLevelUrl:string;
+}>;
+type BrowserResourceReadOptionsV1=Readonly<{
+ /** Must independently bind disclosure, source access, tool and session
+  * permission to this exact request; no model-issued authority. */
+ authorize:(binding:DeskBrowserResourceBindingV1,requestSha256:string)=>Promise<NativeReadAuthority|null>;
+ /** Durable host acquisition reservation, including the selected IP and
+  * exact browser binding. No refund for unknown/failed transmission. */
+ precharge:(binding:DeskBrowserResourceBindingV1,target:Target,authority:NativeReadAuthority,
+  requestSha256:string)=>Promise<boolean>;
+ now?:()=>number;
+ /** Tests only; the real composition must use the pinned TLS implementation. */
+ resolve4?:NativeReadOptions["resolve4"];
+ readPinned?:(target:Target,signal:AbortSignal,resourceType:string)=>Promise<HopResponse>;
+}>;
+/** Fixed zero-charge Tavily discovery transport, not a general POST proxy.
+ * Query is derived from the already authorized public chart request. No key,
+ * arbitrary headers, user-specified endpoint, redirects or automatic retry. */
+export function createDeskTavilyDiscoveryReaderV1(options:BrowserResourceReadOptionsV1,query:string,count:number,operation:"search_web"|"search_news"){
+ if(typeof query!=="string"||query.length<3||query.length>300||query.trim()!==query||/[\p{Cc}\p{Cf}]/u.test(query)||
+  !Number.isSafeInteger(count)||count<1||count>10||!["search_web","search_news"].includes(operation))fail("DISCOVERY_POST_DENIED");
+ const body=JSON.stringify({query,topic:operation==="search_news"?"news":"general",search_depth:"basic",max_results:count,
+  include_answer:false,include_raw_content:false,include_images:false,auto_parameters:false});
+ const read=createDeskBrowserResourceReaderV1({...options,readPinned:options.readPinned??((target,signal,kind)=>readNative(target,signal,kind,body))});
+ return async(binding:DeskBrowserResourceBindingV1,requestSha256:string,signal:AbortSignal)=>{
+  if(binding?.url!=="https://api.tavily.com/search"||binding.topLevelUrl!==binding.url||binding.resourceType!=="fetch")fail("DISCOVERY_POST_DENIED");
+  return read(binding,requestSha256,signal);
+ };
+}
+/** One authorized browser resource hop, not a generic proxy. Shared native
+ * TLS/DNS/byte boundary; no Chromium headers, credentials or direct network.
+ * Never follow redirects here. Caller must separately authorize next hop.
+ * No default policy, finance or host network-isolation claim.
+ */
+export function createDeskBrowserResourceReaderV1(options:BrowserResourceReadOptionsV1){
+ if(typeof options?.authorize!=="function"||typeof options.precharge!=="function")
+  fail("TRUSTED_AUTHORITY_REQUIRED");
+ const now=options.now??Date.now,resolve4=options.resolve4??resolveNative,
+  read=options.readPinned??readNative;
+ return async(binding:DeskBrowserResourceBindingV1,requestSha256:string,parentSignal:AbortSignal)=>{
+  const s=binding?.scope;
+  if(!s||Object.keys(s).sort().join(",")!=="caseId,expectedRevision,jobId,leaseExpiresAt,workerId,workspaceId"||
+   ![s.jobId,s.caseId,s.workspaceId].every(id=>typeof id==="string"&&UUID.test(id))||
+   !Number.isSafeInteger(s.expectedRevision)||s.expectedRevision<1||
+   typeof s.workerId!=="string"||!/^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(s.workerId)||
+   typeof s.leaseExpiresAt!=="string"||!Number.isFinite(Date.parse(s.leaseExpiresAt))||
+   Date.parse(s.leaseExpiresAt)<=now())fail("SCOPE_DENIED");
+  if(Object.keys(binding).sort().join(",")!=="resourceType,scope,topLevelUrl,url"||
+   typeof binding.resourceType!=="string"||!Object.hasOwn(BROWSER_MIMES,binding.resourceType)||
+   !/^[a-f0-9]{64}$/.test(requestSha256)||createHash("sha256").update(JSON.stringify(binding)).digest("hex")!==requestSha256||
+   !(parentSignal instanceof AbortSignal))fail("BROWSER_BINDING_DENIED");
+  const url=publicUrl(binding.url),top=publicUrl(binding.topLevelUrl);
+  if(url.href!==binding.url||top.href!==binding.topLevelUrl||
+   (binding.resourceType==="document"&&url.href!==top.href))fail("BROWSER_BINDING_DENIED");
+  const exact=Object.freeze({...binding,scope:Object.freeze({...s})});
+  const lease=Date.parse(s.leaseExpiresAt),end=Math.min(lease,now()+MAX_DURATION_MS);
+  const signal=AbortSignal.any([parentSignal,AbortSignal.timeout(Math.max(1,end-now()))]);
+  const live=()=>{if(signal.aborted||now()>=end)fail("DEADLINE");};
+  const approved=(a:NativeReadAuthority|null):a is NativeReadAuthority=>
+   !!a&&a.acquisitionAllowed===true&&a.zeroIncrementalSpendAllowed===true&&
+   typeof a.policyRef==="string"&&/^[A-Za-z0-9._:/-]{8,200}$/.test(a.policyRef)&&
+   typeof a.validUntil==="string"&&Date.parse(a.validUntil)>now()&&Date.parse(a.validUntil)<=lease;
+  live();
+  const authority=await options.authorize(exact,requestSha256);
+  live();if(!approved(authority))fail("ACQUISITION_DENIED");
+  const addresses=await resolve4(url.hostname,signal);
+  live();
+  if(!Array.isArray(addresses)||addresses.length<1||addresses.length>32||
+   addresses.some(a=>!isPublicDeskIpv4V1(a)))fail("DNS_ADDRESS_DENIED");
+  const target=Object.freeze({url:url.href,hostname:url.hostname,address:addresses[0]});
+  if(await options.precharge(exact,target,authority,requestSha256)!==true)fail("ZERO_COST_BUDGET_UNAVAILABLE");
+  live();
+  const fresh=await options.authorize(exact,requestSha256);
+  live();if(!approved(fresh)||fresh.policyRef!==authority.policyRef||!approved(authority))fail("ACQUISITION_AUTHORITY_CHANGED");
+  const response=await read(target,signal,exact.resourceType);
+  live();
+  if(!response||!(response.body instanceof Uint8Array)||response.body.byteLength>MAX_BYTES)fail("RESPONSE_TOO_LARGE");
+  const after=await options.authorize(exact,requestSha256);
+  live();if(!approved(after)||after.policyRef!==authority.policyRef)fail("ACQUISITION_AUTHORITY_CHANGED");
+  if([301,302,303,307,308].includes(response.status)){
+   if(typeof response.location!=="string"||response.body.byteLength!==0)fail("REDIRECT_DENIED");
+   const location=publicUrl(response.location,url.href).href;
+   return Object.freeze({requestSha256,status:response.status,location});
+  }
+  if(response.status!==200){
+   if(Number.isInteger(response.status)&&response.status>=100&&response.status<=599)throw new DeskNativeHttpUnavailableV1(response.status);
+   fail("SOURCE_UNAVAILABLE");
+  }
+  // Do not introduce expressly restricted resources into a rendered observation.
+  if(response.processingRestricted===true||deskProcessingRestrictedV1(response.headers?.["x-robots-tag"]))fail("SOURCE_PROCESSING_RESTRICTED");
+  const type=browserContentType(response.contentType,exact.resourceType),body=Uint8Array.from(response.body);
+  if(body.length<1)fail("BODY_UNCONFIRMED");
+  const headers:Record<string,string>={};
+  for(const [name,value] of Object.entries(response.headers??{})){
+   if(!(BROWSER_RESPONSE_HEADERS as readonly string[]).includes(name)||
+    typeof value!=="string"||value.length>16000||/[\r\n\0]/.test(value))fail("RESPONSE_HEADER_DENIED");
+   headers[name]=value;
+  }
+  return Object.freeze({requestSha256,status:200,contentType:type,body,
+   sha256:createHash("sha256").update(body).digest("hex"),headers:Object.freeze(headers)});
+ };
+}

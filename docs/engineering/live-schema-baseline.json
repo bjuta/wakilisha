@@ -1,17 +1,17 @@
 {
   "projectRef": "pgzizndxdyhqmtyywjmt",
   "schema": "public,editorial",
-  "generatedAt": "2026-11-23T06:37:34Z",
+  "generatedAt": "2026-11-28T10:17:00Z",
   "typesSha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
   "authoritativeMigrationDirectory": "supabase/migrations",
-  "migrationCount": 275,
-  "latestMigration": "20261123062500_share_instagram_story_platform_v1.sql",
+  "migrationCount": 309,
+  "latestMigration": "20261128100418_mizizi_terminal_integrated_research_retry.sql",
   "schemaSeal": {
     "mode": "disposable_ci",
     "sourceProjectRef": "unlinked-local-ci",
-    "baseMainSha": "6ef30a13919cd05dfa52b20088fb270e7ab53a60",
-    "replayCandidateHeadSha": "6f98ec9aa19fc0f7525444e29b6096afe3af1fea",
-    "workflowRunId": 45124718656,
-    "migrationHead": "20261123062500"
+    "baseMainSha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
+    "replayCandidateHeadSha": "85fbde0952428b2161bbd45742117396275313a2",
+    "workflowRunId": 46134033048,
+    "migrationHead": "20261128100418"
   }
 }

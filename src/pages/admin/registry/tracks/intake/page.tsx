@@ -1,3 +1,5 @@
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
+import { matchesOriginalAppleChartSong } from "@/services/chartsPrivate/chartReviewContext";
 import {
   useCallback,
   useEffect,
@@ -10,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkSelect } from "@/components/design-system/primitives/Select";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkTextField, WkSearchField } from "@/components/design-system/primitives/Field";
 
 
 
@@ -33,10 +36,14 @@ interface RegistryArtistHit {
   status: string;
 }
 
+type IntakeRecovery =
+  | { state: "draft" | "active"; track_id: string; title: string }
+  | { state: "blocked" };
+
 interface IntakeRow {
   suggestion_id: string;
   status: string;
-  intake_origin: "playlist_editor" | "public_contribution" | "artist_submission";
+  intake_origin: "playlist_editor" | "public_contribution" | "artist_submission" | "chart_studio";
   source_contribution_id: string | null;
   contribution_status: string | null;
   contribution_payload: Record<string, unknown>;
@@ -66,6 +73,7 @@ interface IntakeRow {
   canonical_track_title: string | null;
   canonicalized_track_id: string | null;
   canonicalized_track_title: string | null;
+  recovery?: IntakeRecovery | null;
   artist_credits: ArtistCredit[];
 }
 
@@ -241,6 +249,8 @@ export default function TrackIntakePage() {
     useState<Record<string, boolean>>({});
   const [trackSearchAttempted, setTrackSearchAttempted] =
     useState<Record<string, boolean>>({});
+  const [trackSearchFailed, setTrackSearchFailed] =
+    useState<Record<string, boolean>>({});
   const trackSearchSequence = useRef<Record<string, number>>({});
   const [selectedTrack, setSelectedTrack] =
     useState<Record<string, RegistryTrackHit | null>>({});
@@ -248,6 +258,9 @@ export default function TrackIntakePage() {
     useState<Record<string, string>>({});
   const [reviewNotes, setReviewNotes] =
     useState<Record<string, string>>({});
+  const [chartCreditName,setChartCreditName]=useState<Record<string,string>>({});
+  const [chartCreditNote,setChartCreditNote]=useState<Record<string,string>>({});
+  const [chartCreditEvidence,setChartCreditEvidence]=useState<Record<string,string>>({});
 
   const [artistQuery, setArtistQuery] =
     useState<Record<string, string>>({});
@@ -367,6 +380,8 @@ export default function TrackIntakePage() {
           ? reason.message
           : "Track Intake could not be loaded.",
       );
+      // A failed refresh must not leave an old mutation target actionable.
+      setQueue((current) => ({ ...current, rows: [], total: 0 }));
     } finally {
       setLoading(false);
     }
@@ -516,6 +531,8 @@ export default function TrackIntakePage() {
     const requestId =
       (trackSearchSequence.current[suggestionId] ?? 0) + 1;
     trackSearchSequence.current[suggestionId] = requestId;
+    setTrackHits((current) => ({ ...current, [suggestionId]: [] }));
+    setTrackSearchFailed((current) => ({ ...current, [suggestionId]: false }));
 
     const trimmed = value.trim();
     if (trimmed.length < 2) {
@@ -646,7 +663,12 @@ export default function TrackIntakePage() {
         ...current,
         [suggestionId]: [],
       }));
+      // Transport failure is not a successful zero-result duplicate check.
       setTrackSearchAttempted((current) => ({
+        ...current,
+        [suggestionId]: false,
+      }));
+      setTrackSearchFailed((current) => ({
         ...current,
         [suggestionId]: true,
       }));
@@ -945,6 +967,34 @@ export default function TrackIntakePage() {
     }
   }
 
+  async function appendChartCredit(row:IntakeRow) {
+    const id=row.suggestion_id;
+    if(row.intake_origin!=="chart_studio"||row.status!=="needs_review"){
+      setError("New chart credits require an open, verified Chart-origin intake case.");
+      return;
+    }
+    const name=(chartCreditName[id]??"").trim();
+    const explanation=(chartCreditNote[id]??"").trim();
+    const evidence=(chartCreditEvidence[id]??"").trim();
+    if(!name||name.length>300||explanation.length<40||!/^https:\/\//.test(evidence)){
+      setError("Enter the separately verified Artist name, a substantial explanation, and HTTPS evidence.");
+      return;
+    }
+    setBusy("chart-credit:"+id);setError(null);
+    try{
+      await untypedRpc("admin_append_charts2_track_intake_credit_v1",{
+        p_suggestion_id:id,p_observed_name:name,
+        p_review_note:explanation,p_evidence_url:evidence,
+      });
+      setChartCreditName(old=>({...old,[id]:""}));
+      setChartCreditNote(old=>({...old,[id]:""}));
+      setChartCreditEvidence(old=>({...old,[id]:""}));
+      await loadQueue();
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:"Credit staging rejected.");
+    }finally{setBusy(null);}
+  }
+
   async function searchProvider(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
     const provider =
@@ -1011,12 +1061,13 @@ export default function TrackIntakePage() {
 
   async function inspectProvider(
     row: IntakeRow,
-    hit: ProviderSearchHit,
+    hit: Pick<ProviderSearchHit, "provider" | "providerEntityId">,
   ) {
     const suggestionId = row.suggestion_id;
 
     setBusy(`provider-inspect:${suggestionId}`);
     setError(null);
+    setProviderInspection((current) => ({ ...current, [suggestionId]: null }));
 
     try {
       const { data, error: invokeError } =
@@ -1039,8 +1090,21 @@ export default function TrackIntakePage() {
       const inspection =
         (data?.result ?? null) as ProviderInspection | null;
 
-      if (!inspection) {
-        throw new Error("Provider returned no track evidence.");
+      if (!inspection || inspection.provider !== hit.provider ||
+          inspection.providerEntityId !== hit.providerEntityId) {
+        throw new Error("Provider did not return the requested track evidence.");
+      }
+
+      const exactAppleChartSong = row.intake_origin === "chart_studio" &&
+        row.provider_key === "apple_music" &&
+        hit.provider === "apple_music" &&
+        hit.providerEntityId === row.provider_object_id;
+      if (exactAppleChartSong && (
+          !matchesOriginalAppleChartSong(hit.providerEntityId, row.provider_title ?? "", data?.raw) ||
+          inspection.source?.storefrontOrMarket !== "ke" ||
+          !inspection.title?.trim()
+      )) {
+        throw new Error("Apple catalogue evidence does not match the original chart song. Nothing was staged.");
       }
 
       const inspectionFields = {
@@ -1304,12 +1368,15 @@ export default function TrackIntakePage() {
 
   async function createCanonicalTrack(row: IntakeRow) {
     const suggestionId = row.suggestion_id;
+    if (row.recovery !== null) {
+      setError("Refresh the Intake recovery state before creating a track.");
+      return;
+    }
     const observedTitle =
-      preferredObservedTrackTitle(
-        suggestionId,
-      ) ??
-      row.submitted_track_title ??
-      row.provider_title;
+      row.intake_origin === "chart_studio"
+        ? row.submitted_track_title ?? row.provider_title
+        : preferredObservedTrackTitle(suggestionId) ??
+          row.submitted_track_title ?? row.provider_title;
     const title =
       (
         newCanonicalTitle[suggestionId] ??
@@ -1319,6 +1386,12 @@ export default function TrackIntakePage() {
 
     if (!title) {
       setError("Confirm the canonical track title first.");
+      return;
+    }
+
+    if (trackSearching[suggestionId] || !trackSearchAttempted[suggestionId] ||
+        trackSearchFailed[suggestionId] || (trackHits[suggestionId] ?? []).length > 0) {
+      setError("Complete a successful Registry search before creating a new track.");
       return;
     }
 
@@ -1359,44 +1432,81 @@ export default function TrackIntakePage() {
         );
       }
 
-      await reconcileReviewedArtistCredits(
-        row,
-        registryTrackId,
-      );
-      await applyReviewedProfiles(
-        row,
-        registryTrackId,
-      );
-      await admitConfirmedProviderLinks(
-        suggestionId,
-        registryTrackId,
-      );
-
-      await untypedRpc(
-        "admin_activate_registry_track_intake_v1",
-        {
-          p_suggestion_id: suggestionId,
-        },
-      );
-
-      await finalizeCanonicalization(
-        row,
-        registryTrackId,
-      );
-
+      await completeDraftTrack(row, registryTrackId);
       await loadQueue();
     } catch (reason) {
+      await loadQueue();
       setError(
         reason instanceof Error
           ? reason.message
-          : "Canonical Registry track could not be created.",
+          : "Canonical Registry track could not be created. Review the refreshed Intake state before retrying.",
       );
     } finally {
       setBusy(null);
     }
   }
 
+  async function completeDraftTrack(row: IntakeRow, registryTrackId: string) {
+    await reconcileReviewedArtistCredits(row, registryTrackId);
+    await applyReviewedProfiles(row, registryTrackId);
+    await admitConfirmedProviderLinks(row.suggestion_id, registryTrackId);
+    await untypedRpc("admin_activate_registry_track_intake_v1", {
+      p_suggestion_id: row.suggestion_id,
+    });
+    await finalizeCanonicalization(row, registryTrackId);
+  }
+
+  async function resumeCanonicalTrack(row: IntakeRow) {
+    const prior = row.recovery;
+    if (!prior || prior.state === "blocked") return;
+    setBusy("canonical-resume:" + row.suggestion_id);
+    setError(null);
+    try {
+      // Reread the existing authority after interruption, never a cached ID.
+      const envelope = await untypedRpc("admin_get_registry_track_intake_queue", {
+        p_status: "all", p_limit: 1, p_offset: 0,
+        p_suggestion_id: row.suggestion_id, p_playlist_item_id: null,
+      }) as QueueEnvelope;
+      const fresh = envelope?.rows?.[0];
+      const recovery = fresh?.recovery;
+      if (!fresh || fresh.suggestion_id !== row.suggestion_id ||
+          fresh.status !== "needs_review" || !recovery ||
+          recovery.state === "blocked" || recovery.state !== prior.state ||
+          recovery.track_id !== prior.track_id || recovery.title !== prior.title) {
+        throw new Error("Intake recovery state changed. Review the refreshed item.");
+      }
+      if (recovery.state === "draft") {
+        // Replay the exact reviewed create grant, with its original title.
+        // The existing broker verifies the same caller and review fingerprint.
+        const identity = await untypedRpc("admin_create_registry_track_intake_identity_v1", {
+          p_suggestion_id: fresh.suggestion_id, p_title: recovery.title,
+        });
+        if (identity?.track?.track_id !== recovery.track_id ||
+            identity?.track?.status !== "draft" || identity?.verifier_status !== "passed" ||
+            identity?.idempotent_replay !== true) {
+          throw new Error("The existing draft identity could not be verified.");
+        }
+        await completeDraftTrack(fresh, recovery.track_id);
+      } else {
+        // Activation already passed. Do not repeat creation or child writes.
+        // The finalizer independently revalidates every current child receipt.
+        await finalizeCanonicalization(fresh, recovery.track_id);
+      }
+      await loadQueue();
+    } catch (reason) {
+      await loadQueue();
+      setError(reason instanceof Error ? reason.message :
+        "Intake recovery did not complete. Review the refreshed state before retrying.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function resolve(row: IntakeRow) {
+    if (row.recovery !== null) {
+      setError("Review the existing Track Intake recovery state first.");
+      return;
+    }
     const registryTrackId =
       row.canonical_track_id ??
       selectedTrack[row.suggestion_id]?.id ??
@@ -1438,6 +1548,10 @@ export default function TrackIntakePage() {
   }
 
   async function reject(row: IntakeRow) {
+    if (row.recovery !== null) {
+      setError("Resolve the existing Track Intake recovery state before rejecting.");
+      return;
+    }
     const note =
       (reviewNotes[row.suggestion_id] ?? "").trim();
 
@@ -1523,6 +1637,7 @@ export default function TrackIntakePage() {
   return (
     <div className="min-h-screen bg-wk-bg px-5 py-6 text-wk-text">
       <div className="mx-auto max-w-7xl">
+      <ChartReviewReturnContext />
         <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">
@@ -1566,19 +1681,12 @@ export default function TrackIntakePage() {
 
         {!deepSuggestion && !deepPlaylistItem ? (
           <section className="mb-5 grid gap-3 lg:grid-cols-[1fr_220px]">
-            <div className="flex items-center gap-2 rounded-xl border border-wk-border bg-wk-surface px-3">
-              <WkIcon
-                name="Search"
-                size={15}
-                className="text-wk-text-faint"
-              />
-              <input
+            <WkSearchField
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(value) => setQuery(value)}
                 placeholder="Search title, artist, provider or Playlist"
-                className="h-11 w-full bg-transparent text-sm outline-none"
+                ariaLabel="Search title, artist, provider or Playlist"
               />
-            </div>
             <WkSelect
               value={status}
               onChange={(value) => setStatus(value)}
@@ -1633,7 +1741,7 @@ export default function TrackIntakePage() {
               Nothing waiting here
             </h2>
             <p className="mt-1 text-sm text-wk-text-muted">
-              Track Intake items appear when Playlist editors, Artist teams,
+              Track Intake items appear when Charts Studio, Playlist editors, Artist teams,
               or Community suggestions send music to the Registry for review.
             </p>
           </div>
@@ -1684,16 +1792,16 @@ export default function TrackIntakePage() {
                     Boolean(credit.registry_artist_id),
                 );
               const observedCanonicalTitle =
-                preferredObservedTrackTitle(
-                  suggestionId,
-                ) ??
-                row.submitted_track_title ??
-                row.provider_title;
+                row.intake_origin === "chart_studio"
+                  ? row.submitted_track_title ?? row.provider_title
+                  : preferredObservedTrackTitle(suggestionId) ??
+                    row.submitted_track_title ?? row.provider_title;
               const canonicalTitle =
                 newCanonicalTitle[suggestionId] ??
                 observedCanonicalTitle ??
                 "";
 
+              const isChartOrigin = row.intake_origin === "chart_studio";
               const isPublicContribution =
                 row.intake_origin ===
                 "public_contribution";
@@ -1768,6 +1876,12 @@ export default function TrackIntakePage() {
                                 Artist submission
                               </span>
                             ) : null}
+
+                            {isChartOrigin && (
+                              <span className="rounded-full bg-wk-brand-soft px-2 py-1 text-[9px] font-black uppercase text-wk-brand">
+                                Charts Studio
+                              </span>
+                            )}
 
                             {row.provider_key ? (
                               <span className="rounded-full bg-wk-surface-raised px-2 py-1 text-[9px] font-bold uppercase text-wk-text-muted">
@@ -1899,6 +2013,22 @@ export default function TrackIntakePage() {
                             </div>
                           </div>
                         </div>
+                      ) : isChartOrigin ? (
+                        <div className="rounded-xl bg-wk-surface-raised p-3">
+                          <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
+                            Chart source observation
+                          </div>
+                          <p className="mt-1 font-bold text-wk-text">
+                            {row.provider_title ?? row.submitted_track_title ?? "Title not supplied"}
+                          </p>
+                          <p className="mt-2 break-words text-xs text-wk-text-muted">
+                            Native source ID: {row.provider_object_id ?? "Not supplied"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-wk-text-muted">
+                            This intake is bound to an original chart observation, not a Playlist.
+                            Provider evidence and Artist credits require separate review.
+                          </p>
+                        </div>
                       ) : (
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="rounded-xl bg-wk-surface-raised p-3">
@@ -1954,6 +2084,24 @@ export default function TrackIntakePage() {
                           </button>
                         </div>
 
+                        {row.intake_origin === "chart_studio" &&
+                          row.provider_key === "apple_music" &&
+                          row.provider_object_id && /^[0-9]{6,20}$/.test(row.provider_object_id) &&
+                          row.provider_title?.trim() && (
+                          <div className="mt-3 space-y-2 rounded-lg border border-wk-border bg-wk-bg p-3">
+                            <p className="text-xs font-bold text-wk-text">Original Apple Music song</p>
+                            <p className="break-words text-xs text-wk-text-muted">
+                              Inspect the exact song ID from the chart. Catalogue evidence is separate from the original chart credit.
+                            </p>
+                            <button type="button" disabled={busy !== null}
+                              onClick={() => void inspectProvider(row, {
+                                provider: "apple_music", providerEntityId: row.provider_object_id!,
+                              })}
+                              className="wk-button wk-button-ghost wk-button-sm disabled:opacity-40">
+                              Inspect Original Apple Song
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-4 grid gap-2 sm:grid-cols-[150px_1fr_auto]">
                           <WkSelect
                             value={chosenProvider}
@@ -1974,7 +2122,7 @@ export default function TrackIntakePage() {
                             </option>
                           </WkSelect>
 
-                          <input
+                          <WkSearchField
                             value={
                               providerQuery[suggestionId] ??
                               [
@@ -1987,14 +2135,14 @@ export default function TrackIntakePage() {
                                 .filter(Boolean)
                                 .join(" ")
                             }
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setProviderQuery((current) => ({
                                 ...current,
                                 [suggestionId]:
-                                  event.target.value,
+                                  value,
                               }))
                             }
-                            className="h-10 rounded-lg border border-wk-border bg-wk-bg px-3 text-xs outline-none"
+                            ariaLabel="Search provider catalog"
                             placeholder="Search provider catalog"
                           />
 
@@ -2020,7 +2168,8 @@ export default function TrackIntakePage() {
                                   onClick={() =>
                                     void inspectProvider(row, hit)
                                   }
-                                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-wk-surface-raised"
+                                  disabled={busy !== null}
+                                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-wk-surface-raised disabled:opacity-40"
                                 >
                                   {hit.artworkUrl ? (
                                     <img
@@ -2060,6 +2209,13 @@ export default function TrackIntakePage() {
                               </span>
                             </div>
 
+                            {row.intake_origin === "chart_studio" && (
+                              <div className="mb-3 space-y-1 rounded-lg border border-wk-border p-3 text-xs">
+                                <p className="break-words font-bold text-wk-text">{inspection.title || "Title not supplied"}</p>
+                                <p className="break-words text-wk-text-muted">Catalogue Artist: {inspection.artistDisplayName || "Not supplied"}</p>
+                                <p className="text-wk-text-muted">This is provider evidence, not a reviewed Artist identity or credit role.</p>
+                              </div>
+                            )}
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-wk-border bg-wk-bg p-3">
                               <div>
                                 <div className="text-[10px] font-black uppercase tracking-wide text-wk-text-faint">
@@ -2350,13 +2506,14 @@ export default function TrackIntakePage() {
                             Open provider evidence
                           </a>
                         ) : null}
-                        <a
-                          href={`/admin/content/playlists/${row.playlist_id}`}
-                          className="wk-button wk-button-ghost wk-button-sm"
-                        >
-                          <WkIcon name="ArrowLeft" size={14} />
-                          Back to Playlist
-                        </a>
+                        {row.playlist_id &&
+                          <a
+                            href={`/admin/content/playlists/${row.playlist_id}`}
+                            className="wk-button wk-button-ghost wk-button-sm"
+                          >
+                            <WkIcon name="ArrowLeft" size={14} />
+                            Back to Playlist
+                          </a>}
                       </div>
                     </div>
 
@@ -2388,6 +2545,45 @@ export default function TrackIntakePage() {
                               </a>
                             </div>
 
+                            {row.intake_origin==="chart_studio" &&
+                              <div className="mt-4 space-y-3 rounded-xl border border-wk-border p-3">
+                                <p className="text-xs font-bold">Add a Separately Verified Artist Credit</p>
+                                <p className="text-xs leading-5 text-wk-text-muted">
+                                  The original credit is retained as evidence. Enter each additional
+                                  Artist separately. Every new credit begins Unresolved. Primary,
+                                  Featured, and co-primary decisions are made through the
+                                  existing reviewed Artist-credit controls below.
+                                </p>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-name-${suggestionId}`}>
+                                  Artist Name
+                                </label>
+                                <WkTextField id={`chart-credit-name-${suggestionId}`} value={chartCreditName[suggestionId]??""}
+                                  onChange={value=>setChartCreditName(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Artist Name"
+                                  placeholder="Independently verified Artist name"/>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-note-${suggestionId}`}>
+                                  Identity and Credit Evidence
+                                </label>
+                                <WkTextField multiline id={`chart-credit-note-${suggestionId}`}
+                                  value={chartCreditNote[suggestionId]??""} rows={3}
+                                  onChange={value=>setChartCreditNote(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Identity and Credit Evidence"
+                                  placeholder="Describe the evidence for this exact Artist credit"/>
+                                <label className="block text-xs font-bold" htmlFor={`chart-credit-url-${suggestionId}`}>
+                                  Evidence URL
+                                </label>
+                                <WkTextField id={`chart-credit-url-${suggestionId}`} value={chartCreditEvidence[suggestionId]??""}
+                                  onChange={value=>setChartCreditEvidence(v=>({...v,[suggestionId]:value}))}
+                                  ariaLabel="Evidence URL"
+                                  placeholder="https://"/>
+                                <button type="button" className="wk-button wk-button-ghost wk-button-sm"
+                                  disabled={busy!==null||!(chartCreditName[suggestionId]??"").trim()||
+                                    (chartCreditNote[suggestionId]??"").trim().length<40||
+                                    !(chartCreditEvidence[suggestionId]??"").startsWith("https://")}
+                                  onClick={()=>void appendChartCredit(row)}>
+                                  {busy==="chart-credit:"+suggestionId?"Adding Credit…":"Add Unresolved Credit"}
+                                </button>
+                              </div>}
                             <div className="mt-3 space-y-3">
                               {(row.artist_credits ?? []).map(
                                 (credit) => {
@@ -2487,14 +2683,14 @@ export default function TrackIntakePage() {
                                           </option>
                                         </WkSelect>
 
-                                        <input
+                                        <WkTextField
                                           value={queryValue}
-                                          onChange={(event) => {
+                                          onChange={(value) => {
                                             setArtistQuery(
                                               (current) => ({
                                                 ...current,
                                                 [key]:
-                                                  event.target.value,
+                                                  value,
                                               }),
                                             );
 
@@ -2520,7 +2716,7 @@ export default function TrackIntakePage() {
                                             }
                                           }}
                                           placeholder="Search Registry artist"
-                                          className="h-10 min-w-0 rounded-lg border border-wk-border bg-wk-surface px-3 text-xs outline-none focus:border-wk-brand"
+                                          ariaLabel="Search Registry artist"
                                         />
 
                                         <button
@@ -2717,7 +2913,33 @@ export default function TrackIntakePage() {
                             enrichment evidence are reviewed.
                           </p>
 
-                          {row.canonical_track_id ? (
+                          {row.recovery !== null ? (
+                            <div className="mt-3 space-y-2 rounded-lg border border-wk-border bg-wk-bg p-3">
+                              <p className="text-sm font-bold text-wk-text">Intake recovery</p>
+                              {row.recovery && row.recovery.state !== "blocked" ? (
+                                <>
+                                  <p className="break-words text-xs font-semibold text-wk-text">{row.recovery.title}</p>
+                                  <p className="break-all text-xs text-wk-text-muted">{row.recovery.track_id}</p>
+                                  <p className="text-xs text-wk-text-muted">
+                                    {row.recovery.state === "draft"
+                                      ? "The existing draft has a verified creation receipt. Resume the same reviewed identity."
+                                      : "The Track has a verified activation receipt. Complete Intake finalization without creating another Track."}
+                                  </p>
+                                  <button type="button"
+                                    disabled={busy !== null || hasUnsavedEnrichment}
+                                    onClick={() => void resumeCanonicalTrack(row)}
+                                    className="wk-button wk-button-primary wk-button-sm disabled:opacity-40">
+                                    {busy === "canonical-resume:" + suggestionId ? "Resuming..." :
+                                      row.recovery.state === "draft" ? "Resume verified draft" : "Complete Intake finalization"}
+                                  </button>
+                                </>
+                              ) : (
+                                <p role="alert" className="text-xs text-wk-warning">
+                                  Recovery authority is unavailable or incomplete. Reload and review the existing Registry receipts before proceeding.
+                                </p>
+                              )}
+                            </div>
+                          ) : row.canonical_track_id ? (
                             <div className="mt-3 rounded-xl border border-wk-brand/20 bg-wk-brand-soft p-3">
                               <div className="flex items-center gap-2">
                                 <WkIcon
@@ -2743,30 +2965,31 @@ export default function TrackIntakePage() {
                             </div>
                           ) : (
                             <>
-                          <div className="mt-3 flex items-center gap-2 rounded-lg border border-wk-border bg-wk-surface px-3">
-                            <WkIcon
-                              name="Search"
-                              size={14}
-                              className="text-wk-text-faint"
-                            />
-                            <input
+                          <div className="mt-3 flex items-center gap-2">
+                            <WkSearchField
                               value={
                                 trackQuery[suggestionId] ??
                                 row.submitted_track_title ??
                                 row.provider_title ??
                                 ""
                               }
-                              onChange={(event) =>
-                                void searchTracks(
-                                  suggestionId,
-                                  event.target.value,
-                                )
-                              }
+                              onChange={(value) => void searchTracks(suggestionId, value)}
                               placeholder="Search by track, artist, or ISRC"
-                              className="h-10 w-full bg-transparent text-sm outline-none"
+                              ariaLabel="Search by track, artist, or ISRC"
                             />
+                            <button type="button" disabled={busy !== null || !!trackSearching[suggestionId]}
+                              onClick={() => void searchTracks(suggestionId,
+                                trackQuery[suggestionId] ?? row.submitted_track_title ?? row.provider_title ?? "")}
+                              className="wk-button wk-button-ghost wk-button-sm shrink-0 disabled:opacity-40">
+                              Search
+                            </button>
                           </div>
 
+                          {trackSearchFailed[suggestionId] && (
+                            <p role="alert" className="mt-2 text-xs text-wk-danger">
+                              Registry search failed. Retry before creating a track.
+                            </p>
+                          )}
                           {trackSearching[suggestionId] ? (
                             <div className="mt-2 flex items-center gap-2 text-xs text-wk-text-muted">
                               <WkIcon name="Loader2" size={13} className="animate-spin" />
@@ -2830,13 +3053,14 @@ export default function TrackIntakePage() {
 
                           {!trackSearching[suggestionId] &&
                           trackSearchAttempted[suggestionId] &&
+                          !trackSearchFailed[suggestionId] &&
                           (trackHits[suggestionId] ?? []).length === 0 ? (
                             <div className="mt-2 rounded-lg border border-wk-border bg-wk-surface-raised p-3">
                               <div className="text-xs font-bold text-wk-text">
-                                No active Registry track matches this search.
+                                No active Registry tracks returned for this search.
                               </div>
                               <p className="mt-1 text-xs leading-5 text-wk-text-muted">
-                                Search by track title, artist, or ISRC. If this is genuinely new, create its canonical track from the reviewed intake evidence.
+                                Check title, artist, and ISRC where available. The Registry checks for identity conflicts before creating a track.
                               </p>
 
                               {allArtistCreditsResolved ? (
@@ -2851,19 +3075,19 @@ export default function TrackIntakePage() {
                                     <span className="text-[10px] font-black uppercase text-wk-text-muted">
                                       Canonical track title
                                     </span>
-                                    <input
+                                    <WkTextField
                                       value={canonicalTitle}
-                                      onChange={(event) =>
+                                      onChange={(value) =>
                                         setNewCanonicalTitle(
                                           (current) => ({
                                             ...current,
                                             [suggestionId]:
-                                              event.target.value,
+                                              value,
                                           }),
                                         )
                                       }
                                       placeholder="Confirm canonical track title"
-                                      className="mt-1 w-full rounded-lg border border-wk-border bg-wk-surface px-3 py-2 text-sm outline-none focus:border-wk-brand"
+                                      ariaLabel="Canonical track title"
                                     />
                                   </label>
                                   <div className="mt-2 flex flex-wrap gap-1">
@@ -2928,19 +3152,19 @@ export default function TrackIntakePage() {
                             </>
                           )}
 
-                          <textarea
+                          <WkTextField multiline
                             value={
                               reviewNotes[suggestionId] ?? ""
                             }
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setReviewNotes((current) => ({
                                 ...current,
                                 [suggestionId]:
-                                  event.target.value,
+                                  value,
                               }))
                             }
                             placeholder="Registry review note. Required when rejecting."
-                            className="mt-3 min-h-[90px] w-full resize-y rounded-lg border border-wk-border bg-wk-surface p-3 text-sm outline-none focus:border-wk-brand"
+                            ariaLabel="Registry review note"
                           />
 
                           <WkCheckbox checked={
@@ -2968,6 +3192,7 @@ export default function TrackIntakePage() {
                               onClick={() => void resolve(row)}
                               disabled={
                                 busy !== null ||
+                                row.recovery !== null ||
                                 (
                                   !row.canonical_track_id &&
                                   !selectedTrack[suggestionId]
@@ -2983,7 +3208,7 @@ export default function TrackIntakePage() {
 
                             <button
                               onClick={() => void reject(row)}
-                              disabled={busy !== null}
+                              disabled={busy !== null || row.recovery !== null}
                               className="wk-button wk-button-ghost disabled:opacity-40"
                             >
                               <WkIcon name="X" size={14} />

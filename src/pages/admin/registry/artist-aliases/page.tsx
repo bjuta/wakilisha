@@ -1,3 +1,5 @@
+import { ChartAliasReview } from "@/components/admin/charts/ChartAliasReview";
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
@@ -581,6 +583,8 @@ export default function ArtistAliasesPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f7f2] space-y-5">
+      <ChartReviewReturnContext consequence="artist_alias" />
+      <ChartAliasReview />
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 rounded-2xl border px-5 py-3 text-[13px] font-bold shadow-xl transition-all ${

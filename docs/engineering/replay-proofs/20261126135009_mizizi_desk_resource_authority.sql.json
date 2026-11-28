@@ -1,0 +1,32 @@
+{
+  "proof_mode": "charts2_disposable_ci_clean_replay_v1",
+  "migration_file": "supabase/migrations/20261126135009_mizizi_desk_resource_authority.sql",
+  "migration_sha256": "80b3b5229b4ca8b8303e4f1cefc26db7cf2becd3c11a7393f37c540086e99475",
+  "base_main_sha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
+  "replay_candidate_head_sha": "d5ac54bf23c97e063eaaf18b3b1c3db47038c5c0",
+  "replay_environment": "supabase-local-unlinked",
+  "hosted_preview_used": false,
+  "production_mutation": false,
+  "workflow_name": "MIZIZI Slice 1 Disposable PostgreSQL Proof",
+  "workflow_run_id": 45833610932,
+  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/45833610932",
+  "workflow_conclusion": "success",
+  "workflow_event": "pull_request",
+  "ci_markers": [
+    "WK_CI_NO_REMOTE_TARGET=PASS",
+    "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS",
+    "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
+  ],
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "cleanup": "pass",
+  "schema_types_sha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
+  "schema_migration_count": 287,
+  "schema_migration_head": "20261126135009",
+  "verified_at": "2026-11-26T13:57:01Z",
+  "notes": "Exact candidate SQL and genuine local operator/service JWT jobs SUCCESS. Actual logs WK_AUTH_MIZIZI_DESK_SHARED_RESOURCE_PRECHARGE_MODEL_BROWSER_NATIVE=PASS; WK_CI_LOCAL_GOTRUE_REST_MIGRATION_REPLAY=PASS; WK_CI_LOCAL_AUTH_USERS_MEMBERSHIPS_AND_VOLUMES_DESTROYED=PASS; WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS; WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS. Synthetic owner policy/tariff/credential and receipt fixtures; no live provider/billing proof. Existing type digest unchanged; no fresh generation claimed. No hosted change."
+}

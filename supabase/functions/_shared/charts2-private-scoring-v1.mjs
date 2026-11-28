@@ -3,6 +3,8 @@
 // Registry/MIZIZI provider bindings; browser claims are never identity authority.
 // No Registry writes, editions, score persistence, publishing or schedule.
 import {listCharts2SourceContracts} from './charts2-original-candidate.mjs';
+import {YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE,YOUTUBE_EXPORT_PERIOD_AUTHORITY,
+  YOUTUBE_EXPORT_PARSER_VERSION} from './charts2-youtube-official-export.mjs';
 
 export const CHARTS2_PRIVATE_METHODOLOGY_V1 = Object.freeze({
   version: 'consumption_led_cultural_presence_v1',
@@ -53,11 +55,27 @@ function readReceipt(receipt){
   if(!receipt || typeof receipt!=='object' || Array.isArray(receipt))
     fail('charts2_scoring_receipt_invalid');
   const {contract,policy}=labelSource(receipt.source_key);
+  const officialExport=receipt.capture_mode===YOUTUBE_EXPORT_MODE;
+  if(officialExport){
+    const ending=receipt.provider_week_ending_date;
+    const end=typeof ending==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(ending)
+      ? Date.parse(ending+'T00:00:00Z'):NaN;
+    if(receipt.source_key!=='youtube_ke'||
+       receipt.source_endpoint!==YOUTUBE_EXPORT_ENDPOINT||receipt.method_revision!==null||
+       receipt.original_content_type!=='text/csv'||receipt.parser_version!==YOUTUBE_EXPORT_PARSER_VERSION||
+       receipt.native_period_authority!==YOUTUBE_EXPORT_PERIOD_AUTHORITY||
+       receipt.provider_updated_at!=null||receipt.observed_depth!==100||
+       !Number.isFinite(end)||new Date(end).toISOString().slice(0,10)!==ending||
+       new Date(end).getUTCDay()!==4||!validDate(receipt.observed_at)||
+       Date.parse(receipt.observed_at)<end+86400000)
+      fail('charts2_scoring_youtube_export_unqualified');
+  }else if(receipt.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY)
+    fail('charts2_scoring_youtube_export_unqualified');
   if(receipt.receipt_schema!=='charts2-original-receipt/v1' ||
      !UUID.test(receipt.id) ||
-     receipt.market!=='KE'||receipt.source_endpoint!==contract.first_party_endpoint||
-     receipt.capture_mode!=='service_original'||
-     !positiveInteger(receipt.method_revision)||
+     receipt.market!=='KE'||
+     (!officialExport&&(receipt.source_endpoint!==contract.first_party_endpoint||
+       receipt.capture_mode!=='service_original'||!positiveInteger(receipt.method_revision)))||
      receipt.original_bucket!=='charts2-evidence-private-v1'||
      !SHA.test(receipt.original_sha256)||
      !positiveInteger(receipt.original_byte_length)||
@@ -74,20 +92,21 @@ function readReceipt(receipt){
        ? receipt.observed_status!=='succeeded'
        : receipt.observed_status!=='partial_depth'))
     fail('charts2_scoring_unqualified_receipt');
-  if(receipt.source_key==='youtube_ke') {
+  if(receipt.source_key==='youtube_ke'&&!officialExport) {
     if(receipt.native_period_authority!=='provider_declared_end_date'||
        !/^\d{4}-\d{2}-\d{2}$/.test(receipt.provider_week_ending_date??''))
       fail('charts2_scoring_youtube_period_unqualified');
   } else if(receipt.native_period_authority==='provider_declared_end_date' &&
             !validDate(receipt.provider_week_ending_date))
     fail('charts2_scoring_provider_period_invalid');
-  const ext=receipt.source_key==='youtube_ke'?'.json':
+  const ext=officialExport?'.csv':receipt.source_key==='youtube_ke'?'.json':
     receipt.source_key==='shazam_ke'?'.csv':'.html';
   const key=receipt.source_key+'/'+receipt.original_sha256.slice(0,2)+'/'+
     receipt.original_sha256+ext;
   if(receipt.original_object_key!==key)
     fail('charts2_scoring_original_key_mismatch');
-  const byRank=new Map();
+  const byRank=new Map(),exportIds=new Set();
+  let previousViews=Infinity;
   for(const o of receipt.observations){
     if(!o||typeof o!=='object'||!positiveInteger(o.rank)||
        o.rank>contract.depth||byRank.has(o.rank)||
@@ -95,11 +114,43 @@ function readReceipt(receipt){
        (o.provider_track_id!=null &&
          (typeof o.provider_track_id!=='string'||!o.provider_track_id.trim())))
       fail('charts2_scoring_observation_unqualified');
+    if(officialExport){
+      if(o.rank!==byRank.size+1||typeof o.provider_track_id!=='string'||
+         !/^[A-Za-z0-9_-]{11}$/.test(o.provider_track_id)||exportIds.has(o.provider_track_id)||
+         o.provider_url!=='https://www.youtube.com/watch?v='+o.provider_track_id||
+         typeof o.artist!=='string'||!o.artist.trim()||o.artist.length>500||
+         o.title.length>500||/[\u0000-\u001f\u007f]/.test(o.title+o.artist)||
+         !Number.isSafeInteger(o.view_count)||o.view_count<0||o.view_count>999999999999999||
+         o.view_count>previousViews)fail('charts2_scoring_youtube_export_rows_unqualified');
+      exportIds.add(o.provider_track_id);previousViews=o.view_count;
+    }
     byRank.set(o.rank,o);
   }
   for(let n=1;n<=receipt.observed_depth;n++)
     if(!byRank.has(n))fail('charts2_scoring_rank_gap');
   return {receipt,policy,contract,ordered:[...byRank.values()].sort((a,b)=>a.rank-b.rank)};
+}
+function receiptCoverage({receipt,contract,policy}){
+  return {
+    source_key:receipt.source_key,receipt_id:receipt.id,source_weight_points:policy.weight_points,
+    expected_depth:contract.depth,observed_depth:receipt.observed_depth,
+    observed_status:receipt.observed_status,observed_at:receipt.observed_at,
+    provider_updated_at:receipt.provider_updated_at??null,
+    provider_week_ending_date:receipt.provider_week_ending_date??null,
+    native_period_authority:receipt.native_period_authority??'unknown',
+    original_sha256:receipt.original_sha256,
+  };
+}
+// Partial-set source health only. Does not score or resolve recordings.
+export function summarizeCharts2SourceCoverageV1(receipts){
+  if(!Array.isArray(receipts)||receipts.length>SOURCE_KEYS.length)
+    fail('charts2_scoring_receipt_set_incomplete');
+  const seen=new Set();
+  return receipts.map(receipt=>{
+    if(seen.has(receipt?.source_key))fail('charts2_scoring_duplicate_source_receipt');
+    const value=readReceipt(receipt);seen.add(receipt.source_key);
+    return receiptCoverage(value);
+  });
 }
 function indexAuthoritativeLinks(links){
   if(!Array.isArray(links))fail('charts2_scoring_registry_links_invalid');
@@ -122,6 +173,26 @@ function indexAuthoritativeLinks(links){
   }
   return index;
 }
+function indexReviewedShazamObservations(rows){
+  if(!Array.isArray(rows))fail('charts2_scoring_observation_reviews_invalid');
+  const index=new Map();
+  for(const row of rows){
+    if(!row || typeof row!=='object' || row.source_key!=='shazam_ke' ||
+       !UUID.test(row.id) || !UUID.test(row.receipt_id) ||
+       !SHA.test(row.original_sha256) ||
+       !positiveInteger(row.rank) || row.rank>200 ||
+       row.provider_track_id!=null ||
+       typeof row.title!=='string'||!row.title.trim() ||
+       !['approve','revoke'].includes(row.action))
+      fail('charts2_scoring_observation_review_unqualified');
+    const key=row.receipt_id+'\0'+row.original_sha256+'\0'+row.rank;
+    if(index.has(key))fail('charts2_scoring_observation_review_conflict');
+    // The immutable latest event is supplied only from the server-side SQL
+    // private reader. Revocations preserve provenance but award no points.
+    index.set(key,row);
+  }
+  return index;
+}
 /**
  * A preview of source-rank credits, NOT a frozen edition or chart ranking.
  *
@@ -129,7 +200,7 @@ function indexAuthoritativeLinks(links){
  * Production receipts; registry_links ONLY after server-side Registry read.
  * Neither parameter is a browser-submitted identity decision.
  */
-export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
+export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[],observation_reviews=[]}={}){
   if(!Array.isArray(receipts)||receipts.length!==SOURCE_KEYS.length)
     fail('charts2_scoring_receipt_set_incomplete');
   const perSource=new Map();
@@ -142,52 +213,67 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
   if(SOURCE_KEYS.some(s=>!perSource.has(s)))
     fail('charts2_scoring_receipt_set_incomplete');
   const bindings=indexAuthoritativeLinks(registry_links);
+  const reviewedShazam=indexReviewedShazamObservations(observation_reviews);
   const scores=new Map(),unresolved=[],conflicts=[],coverage=[];
   const seenCanonicalBySource=new Map();
   for(const source_key of SOURCE_KEYS){
     const {receipt,contract,policy,ordered}=perSource.get(source_key);
-    coverage.push({
-      source_key,receipt_id:receipt.id,source_weight_points:policy.weight_points,
-      expected_depth:contract.depth,observed_depth:receipt.observed_depth,
-      observed_status:receipt.observed_status,observed_at:receipt.observed_at,
-      provider_updated_at:receipt.provider_updated_at??null,
-      provider_week_ending_date:receipt.provider_week_ending_date??null,
-      native_period_authority:receipt.native_period_authority??'unknown',
-      original_sha256:receipt.original_sha256,
-    });
+    coverage.push(receiptCoverage({receipt,contract,policy}));
     for(const o of ordered){
       const observation={
         source_key,receipt_id:receipt.id,rank:o.rank,
         provider_track_id:o.provider_track_id??null,
         title:o.title,artist:o.artist??null,
       };
+      let binding=null,review=null,track_id=null;
       if(!o.provider_track_id){
-        unresolved.push({...observation,reason:'provider_recording_id_missing'});
-        continue;
+        if(source_key!=='shazam_ke'){
+          unresolved.push({...observation,reason:'provider_recording_id_missing'});
+          continue;
+        }
+        review=reviewedShazam.get(receipt.id+'\0'+receipt.original_sha256+'\0'+o.rank)??null;
+        if(review?.action!=='approve'){
+          unresolved.push({...observation,reason:'provider_recording_id_missing'});
+          continue;
+        }
+        if(review.title!==o.title ||
+           (review.artist??null)!==(o.artist??null) ||
+           review.track_status!=='active' || !UUID.test(review.track_id??'') ||
+           typeof review.review_note!=='string' ||
+           review.review_note.trim().length<40 ||
+           typeof review.evidence_url!=='string' ||
+           !/^https:\/\//.test(review.evidence_url) ||
+           !SHA.test(review.event_fingerprint??'')){
+          conflicts.push({...observation,reason:'shazam_review_identity_invalid'});
+          continue;
+        }
+        track_id=review.track_id.toLowerCase();
+      } else {
+        const key=policy.provider_key+'\0'+o.provider_track_id;
+        const matches=(bindings.get(key)??[]).filter(link=>{
+          if(link.match_method!=='manual')return true;
+          const proof=link.review_evidence;
+          return proof?.charts2_studio_review_v1===true &&
+            proof?.source_key===source_key && proof?.receipt_id===receipt.id &&
+            proof?.original_sha256===receipt.original_sha256 &&
+            proof?.provider_track_id===o.provider_track_id &&
+            typeof proof?.review_note==='string' &&
+            proof.review_note.trim().length>=40 &&
+            typeof proof?.evidence_url==='string' &&
+            /^https:\/\//.test(proof.evidence_url) &&
+            Number(link.match_confidence)===1;
+        });
+        if(matches.length===0){
+          unresolved.push({...observation,reason:'registry_authoritative_link_missing'});
+          continue;
+        }
+        if(new Set(matches.map(m=>m.track_id)).size!==1){
+          conflicts.push({...observation,reason:'registry_provider_identity_conflict'});
+          continue;
+        }
+        binding=matches[0];
+        track_id=binding.track_id.toLowerCase();
       }
-      const key=policy.provider_key+'\0'+o.provider_track_id;
-      const matches=(bindings.get(key)??[]).filter(link=>{
-        if(link.match_method!=='manual')return true;
-        const proof=link.review_evidence;
-        return proof?.charts2_studio_review_v1===true &&
-          proof?.source_key===source_key && proof?.receipt_id===receipt.id &&
-          proof?.original_sha256===receipt.original_sha256 &&
-          proof?.provider_track_id===o.provider_track_id &&
-          typeof proof?.review_note==='string' &&
-          proof.review_note.trim().length>=40 &&
-          typeof proof?.evidence_url==='string' &&
-          /^https:\/\//.test(proof.evidence_url) &&
-          Number(link.match_confidence)===1;
-      });
-      if(matches.length===0){
-        unresolved.push({...observation,reason:'registry_authoritative_link_missing'});
-        continue;
-      }
-      if(new Set(matches.map(m=>m.track_id)).size!==1){
-        conflicts.push({...observation,reason:'registry_provider_identity_conflict'});
-        continue;
-      }
-      const binding=matches[0],track_id=binding.track_id.toLowerCase();
       const canonicalKey=source_key+'\0'+track_id;
       if(seenCanonicalBySource.has(canonicalKey)){
         conflicts.push({...observation,reason:'duplicate_source_recording',
@@ -201,7 +287,9 @@ export function scoreCharts2PrivatePreviewV1({receipts,registry_links=[]}={}){
       current.source_contributions.push({
         source_key,receipt_id:receipt.id,rank:o.rank,depth:contract.depth,
         weight_points:policy.weight_points,credit_units:units,
-        credit_points:displayPoints(units),registry_provider_link_id:binding.id,
+        credit_points:displayPoints(units),
+        ...(review?{registry_observation_resolution_id:review.id}:
+          {registry_provider_link_id:binding.id}),
       });
       scores.set(track_id,current);
     }

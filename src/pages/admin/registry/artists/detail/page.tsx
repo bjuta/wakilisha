@@ -15,6 +15,8 @@ import type { ResolvedRelation } from "@/hooks/useRelatedEntities";
 import { DiscographyPanel } from "./components/DiscographyPanel";
 import { TopSongsPanel } from "./components/TopSongsPanel";
 import { WkSelect } from "@/components/design-system/primitives/Select";
+import { RegistryChoiceField } from "@/components/admin/registry/RegistryChoiceField";
+import { artistSchema } from "@/services/registry/admin/entitySchemas";
 import { Modal } from "@/components/design-system/primitives/Modal";
 
 /* ─── Types ─── */
@@ -506,48 +508,30 @@ export default function ArtistDetailPage() {
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Artist Type
                 </label>
-                <WkSelect
+                <RegistryChoiceField
+                  field={artistSchema.editableFields.find(field => field.key === "artist_type")!}
                   value={draft.artist_type}
                   onChange={(value) => patchDraft({ artist_type: value })}
-                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
-                >
-                  <option value="">Select type</option>
-                  <option value="solo">Solo</option>
-                  <option value="group">Group</option>
-                  <option value="band">Band</option>
-                  <option value="duo">Duo</option>
-                  <option value="collective">Collective</option>
-                  <option value="unknown">Unknown</option>
-                </WkSelect>
+                />
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Gender
                 </label>
-                <WkSelect
+                <RegistryChoiceField
+                  field={artistSchema.editableFields.find(field => field.key === "gender")!}
                   value={draft.gender}
                   onChange={(value) => patchDraft({ gender: value })}
-                  triggerClassName="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text outline-none focus:border-wk-brand cursor-pointer"
-                >
-                  <option value="">Select</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="group">Group</option>
-                  <option value="unknown">Unknown</option>
-                </WkSelect>
+                />
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-wk-text-muted mb-2">
                   Origin (ISO2)
                 </label>
-                <input
-                  type="text"
+                <RegistryChoiceField
+                  field={artistSchema.editableFields.find(field => field.key === "origin_iso2")!}
                   value={draft.origin_iso2}
-                  onChange={(e) => patchDraft({ origin_iso2: e.target.value.toUpperCase().slice(0, 2) })}
-                  placeholder="KE, NG, TZ..."
-                  maxLength={2}
-                  className="w-full rounded-lg border border-wk-border bg-wk-bg-subtle px-3 py-2.5 text-[13px] text-wk-text placeholder:text-wk-text-faint outline-none focus:border-wk-brand uppercase"
+                  onChange={(value) => patchDraft({ origin_iso2: value })}
                 />
               </div>
               <div>

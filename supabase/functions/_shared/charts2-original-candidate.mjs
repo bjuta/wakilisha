@@ -13,6 +13,8 @@ import {
   CHARTS2_YOUTUBE_KE_CHART_RESPONSE_URL,
 } from './charts2-source-parsers.mjs';
 import {parseYouTubeKenyaWeeklyCandidate} from './charts2-youtube-native-row.mjs';
+import {parseYouTubeKenyaOfficialExport,YOUTUBE_EXPORT_ENDPOINT,YOUTUBE_EXPORT_MODE}
+  from './charts2-youtube-official-export.mjs';
 
 const MAX_ORIGINAL_BYTES = 4_000_000;
 const UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
@@ -60,6 +62,27 @@ function toBytes(value) {
     value.byteLength > MAX_ORIGINAL_BYTES) fail('charts2_original_bytes_invalid');
   return value;
 }
+/** Recheck bytes at every private research read. Receipt metadata by itself is
+ * not proof that the stored original is present and unchanged. No provider
+ * access, new source permission, or identity conclusion is implied.
+ */
+export async function verifyCharts2OriginalBytesV1(receipt,original_bytes) {
+  if (!receipt || receipt.original_bucket !== 'charts2-evidence-private-v1' ||
+      typeof receipt.original_object_key !== 'string' || !receipt.original_object_key ||
+      typeof receipt.original_sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(receipt.original_sha256) ||
+      !Number.isSafeInteger(receipt.original_byte_length) ||
+      receipt.original_byte_length < 1 || receipt.original_byte_length > MAX_ORIGINAL_BYTES)
+    fail('charts2_original_receipt_invalid');
+  if (!(original_bytes instanceof Uint8Array) ||
+      original_bytes.byteLength !== receipt.original_byte_length)
+    fail('charts2_original_bytes_mismatch');
+  const digest = await crypto.subtle.digest('SHA-256', original_bytes);
+  const hash = Array.from(new Uint8Array(digest), x =>
+    x.toString(16).padStart(2,'0')).join('');
+  if (hash !== receipt.original_sha256) fail('charts2_original_bytes_mismatch');
+  return true;
+}
 function toText(bytes) {
   try { return new TextDecoder('utf-8', {fatal: true}).decode(bytes); }
   catch { fail('charts2_original_utf8_invalid'); }
@@ -68,10 +91,15 @@ function parseJson(bytes) {
   try { return JSON.parse(toText(bytes)); }
   catch { fail('charts2_original_json_invalid'); }
 }
-function endpointAllowed(sourceKey, endpoint) {
+function endpointAllowed(sourceKey, endpoint, officialExport=false) {
   if (typeof endpoint !== 'string' || endpoint.length > 2048)
     fail('charts2_source_endpoint_missing');
   const spec = SOURCE_CONTRACTS[sourceKey];
+  if(officialExport){
+    if(sourceKey!=='youtube_ke'||endpoint!==YOUTUBE_EXPORT_ENDPOINT)
+      fail('charts2_source_endpoint_unreviewed');
+    return;
+  }
   // An exact chart URL prevents title-only/unrelated Shazam and Mdundo
   // pages from ever being recorded as the selected national ranking.
   if (!spec.first_party_endpoint || endpoint !== spec.first_party_endpoint)
@@ -126,11 +154,15 @@ export function charts2YouTubeNativeWeeklyPost(sourceKey, endpoint, targetPeriod
  */
 export async function decodeCharts2Original({
   source_key, original_bytes, endpoint, observed_at, target_period_key = null,
+  capture_mode = null, operator_export_acknowledgement = null,
 } = {}) {
   if (!Object.hasOwn(SOURCE_CONTRACTS, source_key))
     fail('charts2_source_not_selected');
   if (!validUtc(observed_at)) fail('charts2_observed_time_invalid');
-  endpointAllowed(source_key, endpoint);
+  const officialExport=capture_mode===YOUTUBE_EXPORT_MODE;
+  if(!officialExport&&operator_export_acknowledgement!==null)
+    fail('charts2_export_acknowledgement_wrong_mode');
+  endpointAllowed(source_key, endpoint, officialExport);
   const bytes = toBytes(original_bytes);
   let parsed;
   switch (source_key) {
@@ -150,8 +182,10 @@ export async function decodeCharts2Original({
       if (typeof target_period_key !== 'string' ||
         !/^weekly:\d{8}:\d{8}:ke$/.test(target_period_key))
         fail('charts2_youtube_target_period_missing');
-      parsed = parseYouTubeKenyaWeeklyCandidate(
-        parseJson(bytes), target_period_key, {endpoint});
+      parsed = officialExport
+        ? parseYouTubeKenyaOfficialExport(toText(bytes),target_period_key,{
+            endpoint,observed_at,acknowledgement:operator_export_acknowledgement})
+        : parseYouTubeKenyaWeeklyCandidate(parseJson(bytes),target_period_key,{endpoint});
       break;
     default:
       fail('charts2_source_not_selected');
@@ -183,6 +217,7 @@ export async function decodeCharts2Original({
     evidence_only: true, can_score: false, can_publish: false,
     source_endpoint: endpoint, target_period_key, status,
     native_period: parsed.native_period ?? 'unknown',
+    ...(officialExport?{native_period_authority:parsed.native_period_authority}:{}),
     provider_updated_at: parsed.provider_updated_at ?? null,
     provider_week_ending_date: parsed.provider_week_ending_date ?? null,
     declared_depth: contract.depth, observed_depth: parsed.rows.length,

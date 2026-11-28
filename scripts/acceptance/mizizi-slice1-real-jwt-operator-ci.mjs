@@ -18,13 +18,28 @@ function environment(){
  }
  return values;
 }
+// Only print exact, checked-in fixture constants and PostgreSQL SQLSTATE.
+ // Never emit SQL, raw stderr, DETAIL, CONTEXT, values, tokens or keys.
+const fixtureSource=readFileSync(new URL("./charts2-real-jwt-registry-ci.mjs",import.meta.url),"utf8");
+const safeSqlStops=new Set([...fixtureSource.matchAll(/raise exception '((?:STOP|ROLLBACK)_[A-Z0-9_]{1,100})'/gi)].map(m=>m[1]));
+const safeSqlNotices=new Set([...fixtureSource.matchAll(/raise notice '(WK_AUTH_[A-Z0-9_]{1,100}=PASS)'/gi)].map(m=>m[1]));
 function localSql(query,container){
  const result=spawnSync("docker",["exec","-i",container,"psql","-X","-q",
-  "-A","-t","-v","ON_ERROR_STOP=1","-U","supabase_admin","-d","postgres"],
+  "-A","-t","-v","ON_ERROR_STOP=1","-v","VERBOSITY=verbose","-U","supabase_admin","-d","postgres"],
   {input:query,encoding:"utf8",timeout:180000,maxBuffer:512*1024});
- if(result.error||result.status!==0)throw new Error(
-  "LOCAL_SQL_"+String((result.stderr||"").match(/ERROR:\s*([^\n]+)/)?.[1]||
-  "UNKNOWN").replace(/[^A-Za-z0-9_]/g,"_").slice(0,110));
+ const stderr=typeof result.stderr==="string"?result.stderr:"";
+ for(const line of stderr.split(/\r?\n/)){
+  const notice=line.match(/^NOTICE:\s*(?:[0-9A-Z]{5}:\s*)?(WK_AUTH_[A-Z0-9_]{1,100}=PASS)\s*$/);
+  if(notice&&safeSqlNotices.has(notice[1]))console.log(notice[1]);
+ }
+ if(result.error||result.status!==0){
+  const error=stderr.match(/^ERROR:\s*([0-9A-Z]{5}):\s*([^\r\n]+)$/m);
+  const state=error?.[1]??"UNKNOWN",message=error?.[2]?.trim();
+  const stop=safeSqlStops.has(message)?message:null;
+  console.error("WK_AUTH_SQLSTATE="+state);
+  if(stop)console.error("WK_AUTH_SQL_ASSERTION="+stop);
+  throw Error(stop?"LOCAL_SQL_"+stop:"LOCAL_SQL_STATE_"+state);
+ }
  return result.stdout.trim();
 }
 function requireDenied(result,sqlstate,label){
@@ -601,6 +616,15 @@ async function main(){
   "STOP_C18_CONCURRENT_CAS_OR_REGISTRY_REVIEW_AUDIT_DRIFT");
  console.log("WK_AUTH_C18_GENUINE_CONCURRENT_REVIEWERS_SINGLE_CAS_JOURNAL=PASS");
  console.log("WK_AUTH_O25_STALE_BROWSER_INDEPENDENT_DB_EVENT_NONINTERFERENCE=PASS");
+
+ // Charts 2.0 uses the same actual GoTrue/JWT and locally replayed
+ // Registry schema. Synthetic source fixtures are NOT signed-in Charts Studio
+ // browser acceptance for real songs.
+ const {verifyCharts2RealJwtRegistryV1}=await import(
+  "./charts2-real-jwt-registry-ci.mjs");
+ await verifyCharts2RealJwtRegistryV1({
+  api,sql:(query)=>localSql(query,db),first,second,subscriber,reviewer,service:admin,
+ });
 
  // Capability re-evaluation with an unchanged genuine JWT.
  localSql("UPDATE public.user_role_assignments SET expires_at="+

@@ -3,6 +3,7 @@
 // preflight, methodology, programme and Registry tracks from trusted DB reads;
 // passing client-controlled objects here would NOT establish authority.
 // No database calls, mutation, actor impersonation or publication is possible.
+import {YOUTUBE_EXPORT_PERIOD_AUTHORITY} from './charts2-youtube-official-export.mjs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA = /^[0-9a-f]{64}$/;
 const SOURCES = Object.freeze({
@@ -79,10 +80,18 @@ export function inspectCharts2FrozenEditionProjectionV1({freeze,preflight,progra
        current.provider_week_ending_date !== row.provider_week_ending_date ||
        current.provider_updated_at !== row.provider_updated_at)
       fail('source_original_changed');
-    if(row.source_key === 'youtube_ke' &&
-       (row.native_period_authority !== 'provider_declared_end_date' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(row.provider_week_ending_date ?? '')))
-      fail('native_youtube_period_missing');
+    if(row.source_key === 'youtube_ke') {
+      if(!['provider_declared_end_date',YOUTUBE_EXPORT_PERIOD_AUTHORITY].includes(row.native_period_authority)||
+         !/^\d{4}-\d{2}-\d{2}$/.test(row.provider_week_ending_date ?? ''))
+        fail('native_youtube_period_missing');
+      if(row.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY){
+        const end=Date.parse(row.provider_week_ending_date+'T00:00:00Z');
+        if(!Number.isFinite(end)||new Date(end).toISOString().slice(0,10)!==row.provider_week_ending_date||
+           new Date(end).getUTCDay()!==4||Date.parse(row.observed_at)<end+86400000)
+          fail('native_youtube_period_missing');
+      }
+    }else if(row.native_period_authority===YOUTUBE_EXPORT_PERIOD_AUTHORITY)
+      fail('unqualified_receipt');
     receipts.set(row.source_key,row);
   }
   if(SOURCE_NAMES.some(s => !receipts.has(s)))fail('five_receipts_required');
@@ -131,13 +140,18 @@ export function inspectCharts2FrozenEditionProjectionV1({freeze,preflight,progra
          c.rank > s.depth || c.source_weight_points !== s.weight ||
          c.receipt_id !== receipt.receipt_id ||
          c.original_sha256 !== receipt.original_sha256 ||
-         !UUID.test(c.registry_provider_link_id ?? '') ||
+         !(c.source_key === 'shazam_ke'
+           ? (UUID.test(c.registry_observation_resolution_id ?? '') &&
+              c.registry_provider_link_id == null)
+           : (UUID.test(c.registry_provider_link_id ?? '') &&
+              c.registry_observation_resolution_id == null)) ||
          c.credit_units !== s.weight * (200/s.depth) * (s.depth-c.rank+1))
         fail('source_credit_invalid');
       const same = current.source_contributions.find(x=>x.source_key===c.source_key);
       if(!same || same.receipt_id !== c.receipt_id ||
          same.original_sha256 !== c.original_sha256 ||
          same.registry_provider_link_id !== c.registry_provider_link_id ||
+         same.registry_observation_resolution_id !== c.registry_observation_resolution_id ||
          same.rank !== c.rank || same.credit_units !== c.credit_units)
         fail('current_source_credit_changed');
       used.add(c.source_key);sum += c.credit_units;

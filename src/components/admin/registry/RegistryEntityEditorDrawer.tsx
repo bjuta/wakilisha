@@ -14,7 +14,9 @@ import {
 import { normalizeSlug, validateField } from "@/services/registry/admin/fieldNormalization";
 import { calculateCompleteness, completenessLabel, completenessTone } from "@/services/registry/admin/completeness";
 import { supabase } from "@/lib/supabase";
-import { WkSelect } from "@/components/design-system/primitives/Select";
+import { WkTextField } from "@/components/design-system/primitives/Field";
+import { WkButton } from "@/components/design-system/primitives/Button";
+import { RegistryChoiceField } from "./RegistryChoiceField";
 import { WakilishaToggle } from "@/components/design-system/primitives/WakilishaToggle";
 import { Sheet } from "@/components/design-system/primitives/Sheet";
 import { WkNumberField } from "@/components/design-system/primitives/NumberField";
@@ -78,6 +80,7 @@ const FIELD_GROUPS: Record<string, string[]> = {
   Identity: ["display_name", "title", "slug", "sort_name"],
   Classification: [
     "origin_iso2",
+    "country_code",
     "artist_type",
     "gender",
     "release_type",
@@ -418,21 +421,21 @@ export default function RegistryEntityEditorDrawer({
     if (!saveResult) return "";
     if (saveResult.ok) {
       return saveResult.warnings.length > 0
-        ? "border-amber-300 bg-amber-50 text-amber-800"
-        : "border-emerald-300 bg-emerald-50 text-emerald-800";
+        ? "border-wk-warning bg-wk-warning-soft text-wk-warning"
+        : "border-wk-success bg-wk-success-soft text-wk-success";
     }
     if (saveResult.errorCode === "stale_update") {
-      return "border-orange-300 bg-orange-50 text-orange-800";
+      return "border-wk-warning bg-wk-warning-soft text-wk-warning";
     }
     if (saveResult.errorCode === "duplicate_key") {
-      return "border-red-300 bg-red-50 text-red-800";
+      return "border-wk-danger bg-wk-danger-soft text-wk-danger";
     }
-    return "border-red-300 bg-red-50 text-red-800";
+    return "border-wk-danger bg-wk-danger-soft text-wk-danger";
   };
 
   const footer = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-[#697062]">
+      <p className="text-xs text-wk-text-muted">
         {hasChanges
           ? `${dirtyFields.length} field${dirtyFields.length > 1 ? "s" : ""} changed. Save to persist.`
           : "No changes to save."}
@@ -442,7 +445,7 @@ export default function RegistryEntityEditorDrawer({
           <button
             type="button"
             onClick={handleDiscard}
-            className="flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-4 py-2.5 text-sm font-black text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-all whitespace-nowrap"
+            className="flex items-center gap-1.5 rounded-xl border border-wk-border bg-wk-surface px-4 py-2.5 text-sm font-black text-wk-text hover:border-wk-brand hover:text-wk-brand transition-all whitespace-nowrap"
           >
             <i className="ri-arrow-go-back-line" />
             Discard
@@ -452,7 +455,7 @@ export default function RegistryEntityEditorDrawer({
           type="button"
           onClick={handleSave}
           disabled={saving || !hasChanges}
-          className="flex items-center gap-1.5 rounded-xl bg-[#85c441] px-5 py-2.5 text-sm font-black text-[#102006] shadow-sm transition-all hover:bg-[#76b33a] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
+          className="flex items-center gap-1.5 rounded-xl bg-wk-brand px-5 py-2.5 text-sm font-black text-wk-brand-on shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none whitespace-nowrap"
         >
           {saving ? (
             <>
@@ -488,63 +491,63 @@ export default function RegistryEntityEditorDrawer({
       footer={footer}
       bodyClassName="!p-0"
     >
-      <div className="border-b border-[#e8ece2] bg-[#fbfcf8] px-5 py-4 sm:px-6 sm:py-5">
+      <div data-wk-registry-editor-header className="border-b border-wk-divider bg-wk-surface px-5 py-4 sm:px-6 sm:py-5">
         <div className="mb-2 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#c5dd9e] bg-[#eef7df] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#5f8f2f]">
+          <span className="inline-flex items-center gap-1 rounded-full border border-wk-brand bg-wk-brand-soft px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-wk-brand">
             <i className="ri-database-2-line text-xs" />
             {entityType}
           </span>
           {hasChanges ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1 rounded-full border border-wk-warning bg-wk-warning-soft px-2 py-1 text-[10px] font-black uppercase tracking-wider text-wk-warning">
+              <span className="h-1.5 w-1.5 rounded-full bg-wk-warning animate-pulse" />
               Unsaved
             </span>
           ) : null}
         </div>
-        <h2 className="truncate text-xl font-black tracking-tight text-[#171712] sm:text-2xl">
+        <h2 className="truncate text-xl font-black tracking-tight text-wk-text sm:text-2xl">
           {displayName}
         </h2>
-        <p className="mt-1 truncate font-mono text-[11px] text-[#858c7e]">
+        <p className="mt-1 truncate font-mono text-[11px] text-wk-text-muted">
           {String(entity[schema.idField] ?? "")}
         </p>
       </div>
       <div className="px-5 py-5 sm:px-6">
 
             {/* Quality summary */}
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 mb-6">
-              <div className="rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3.5 relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#85c441]" />
+            <div data-wk-registry-editor-metrics className="grid gap-3 grid-cols-2 sm:grid-cols-4 mb-6">
+              <div className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3.5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-wk-brand" />
                 <div className="flex items-center gap-2 mb-1">
-                  <i className="ri-pie-chart-2-fill text-[#85c441] text-sm" />
-                  <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">Complete</p>
+                  <i className="ri-pie-chart-2-fill text-wk-brand text-sm" />
+                  <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">Complete</p>
                 </div>
-                <p className="text-2xl font-black text-[#171712]">{quality.completeness}%</p>
+                <p className="text-2xl font-black text-wk-text">{quality.completeness}%</p>
               </div>
-              <div className="rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3.5 relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
+              <div className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3.5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-wk-warning" />
                 <div className="flex items-center gap-2 mb-1">
-                  <i className="ri-alert-fill text-amber-500 text-sm" />
-                  <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">Missing</p>
+                  <i className="ri-alert-fill text-wk-warning text-sm" />
+                  <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">Missing</p>
                 </div>
-                <p className="text-2xl font-black text-[#171712]">{quality.missingFields.length}</p>
+                <p className="text-2xl font-black text-wk-text">{quality.missingFields.length}</p>
               </div>
-              <div className="rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3.5 relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-400" />
+              <div className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3.5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-wk-success" />
                 <div className="flex items-center gap-2 mb-1">
-                  <i className="ri-flag-fill text-emerald-500 text-sm" />
-                  <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">Status</p>
+                  <i className="ri-flag-fill text-wk-success text-sm" />
+                  <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">Status</p>
                 </div>
-                <p className="text-lg font-black text-[#171712] truncate">
+                <p className="text-lg font-black text-wk-text truncate">
                   {String(draft.status ?? "active")}
                 </p>
               </div>
-              <div className="rounded-2xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3.5 relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#9aa292]" />
+              <div className="rounded-2xl border border-wk-border bg-wk-surface px-4 py-3.5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-wk-border-strong" />
                 <div className="flex items-center gap-2 mb-1">
-                  <i className="ri-time-fill text-[#9aa292] text-sm" />
-                  <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">Updated</p>
+                  <i className="ri-time-fill text-wk-text-muted text-sm" />
+                  <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">Updated</p>
                 </div>
-                <p className="text-xs font-bold text-[#5d6557]">{updatedAt}</p>
+                <p className="text-xs font-bold text-wk-text-muted">{updatedAt}</p>
               </div>
             </div>
 
@@ -557,19 +560,19 @@ export default function RegistryEntityEditorDrawer({
                   {completenessLabel(quality.state)}
                 </span>
                 {quality.missingFields.length > 0 && (
-                  <span className="text-xs text-[#8a9283]">
+                  <span className="text-xs text-wk-text-muted">
                     Missing: {quality.missingFields.join(", ")}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2 w-full sm:w-36">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef1e8]">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-wk-surface-strong">
                   <div
-                    className="h-full rounded-full bg-[#85c441] transition-all duration-500"
+                    className="h-full rounded-full bg-wk-brand transition-all duration-500"
                     style={{ width: `${quality.completeness}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-bold text-[#8a9283] tabular-nums w-8 text-right">
+                <span className="text-[10px] font-bold text-wk-text-muted tabular-nums w-8 text-right">
                   {quality.completeness}%
                 </span>
               </div>
@@ -624,7 +627,7 @@ export default function RegistryEntityEditorDrawer({
                               setValidationErrors({});
                               onSaved(saveResult.currentEntity!);
                             }}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-orange-300 bg-white px-4 py-2 text-xs font-black text-orange-800 hover:border-orange-400 transition-colors"
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-wk-warning bg-wk-surface px-4 py-2 text-xs font-black text-wk-warning hover:border-wk-warning transition-colors"
                           >
                             <i className="ri-refresh-line" />
                             Load latest version
@@ -640,15 +643,15 @@ export default function RegistryEntityEditorDrawer({
                             : "A unique value conflict occurred."}
                         </p>
                         {saveResult.conflictingEntity && (
-                          <div className="mt-2 rounded-xl border border-red-200 bg-white px-3 py-2.5">
-                            <p className="text-[11px] font-bold text-[#71796b]">
+                          <div className="mt-2 rounded-xl border border-wk-danger bg-wk-surface px-3 py-2.5">
+                            <p className="text-[11px] font-bold text-wk-text-muted">
                               Conflicting {entityType}
                             </p>
-                            <p className="text-sm font-bold text-[#171712]">
+                            <p className="text-sm font-bold text-wk-text">
                               {String(saveResult.conflictingEntity.title ?? "Unknown")}
                             </p>
                             {saveResult.conflictingEntity.slug && (
-                              <p className="text-xs font-mono text-[#858c7e]">
+                              <p className="text-xs font-mono text-wk-text-muted">
                                 {String(saveResult.conflictingEntity.slug)}
                               </p>
                             )}
@@ -661,7 +664,7 @@ export default function RegistryEntityEditorDrawer({
                                     navigate(`/admin/registry/${entityType}s/${slug}`);
                                   }
                                 }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#171712] hover:border-[#85c441] transition-colors"
+                                className="inline-flex items-center gap-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-text hover:border-wk-brand transition-colors"
                               >
                                 <i className="ri-external-link-line" />
                                 View existing
@@ -669,7 +672,7 @@ export default function RegistryEntityEditorDrawer({
                               <button
                                 type="button"
                                 onClick={handleGenerateNewSlug}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#171712] hover:border-[#85c441] transition-colors"
+                                className="inline-flex items-center gap-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-text hover:border-wk-brand transition-colors"
                               >
                                 <i className="ri-sparkling-line" />
                                 Generate new slug
@@ -677,7 +680,7 @@ export default function RegistryEntityEditorDrawer({
                               <button
                                 type="button"
                                 onClick={() => setSaveResult(null)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#dfe4d8] bg-white px-3 py-1.5 text-xs font-bold text-[#71796b] hover:border-[#85c441] transition-colors"
+                                className="inline-flex items-center gap-1 rounded-lg border border-wk-border bg-wk-surface px-3 py-1.5 text-xs font-bold text-wk-text-muted hover:border-wk-brand transition-colors"
                               >
                                 <i className="ri-pencil-line" />
                                 Keep editing
@@ -704,8 +707,8 @@ export default function RegistryEntityEditorDrawer({
                 return (
                   <fieldset key={group.label}>
                     <legend className="mb-3 flex items-center gap-2">
-                      <span className="h-4 w-1 rounded-full bg-[#85c441]" />
-                      <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#71796b]">
+                      <span className="h-4 w-1 rounded-full bg-wk-brand" />
+                      <span className="text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-muted">
                         {group.label}
                       </span>
                     </legend>
@@ -746,25 +749,25 @@ export default function RegistryEntityEditorDrawer({
 
             {/* System fields (collapsible) */}
             {schema.readonlyFields.length > 0 && (
-              <div className="mt-8 border-t border-[#e8ece2] pt-6">
+              <div className="mt-8 border-t border-wk-divider pt-6">
                 <button
                   type="button"
                   onClick={() => setShowSystemFields(!showSystemFields)}
                   className="flex w-full items-center justify-between group"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="h-4 w-1 rounded-full bg-[#9aa292]" />
-                    <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#71796b]">
+                    <span className="h-4 w-1 rounded-full bg-wk-border-strong" />
+                    <span className="text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-muted">
                       System fields
                     </span>
-                    <span className="rounded-full bg-[#eef1e8] px-1.5 py-0.5 text-[9px] font-bold text-[#8a9283]">
+                    <span className="rounded-full bg-wk-surface-strong px-1.5 py-0.5 text-[9px] font-bold text-wk-text-muted">
                       {schema.readonlyFields.length}
                     </span>
                   </span>
                   <i
-                    className={`ri-arrow-down-s-line text-[#9aa292] transition-transform duration-200 ${
+                    className={`ri-arrow-down-s-line text-wk-text-muted transition-transform duration-200 ${
                       showSystemFields ? "rotate-180" : ""
-                    } group-hover:text-[#71796b]`}
+                    } group-hover:text-wk-text-muted`}
                   />
                 </button>
 
@@ -773,11 +776,11 @@ export default function RegistryEntityEditorDrawer({
                     {schema.readonlyFields.map((field) => (
                       <div key={field.key}>
                         <label className="grid gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-wide text-[#8a9283]">
+                          <span className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">
                             {field.label}
                           </span>
-                          <div className="flex h-10 items-center rounded-xl border border-[#dfe4d8] bg-[#f0f3ec] px-3">
-                            <span className="truncate font-mono text-xs text-[#858c7e]">
+                          <div className="flex h-10 items-center rounded-xl border border-wk-border bg-wk-surface-raised px-3">
+                            <span className="truncate font-mono text-xs text-wk-text-muted">
                               {field.type === "date" && entity[field.key]
                                 ? new Intl.DateTimeFormat("en-GB", {
                                     day: "2-digit",
@@ -797,41 +800,41 @@ export default function RegistryEntityEditorDrawer({
 
             {/* ─── Release Rich-Data Panel ─── */}
             {entityType === "release" && (
-              <div className="mt-8 border-t border-[#e8ece2] pt-6">
+              <div className="mt-8 border-t border-wk-divider pt-6">
                 <button
                   type="button"
                   onClick={() => setShowRichPanel(!showRichPanel)}
                   className="flex w-full items-center justify-between group"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="h-4 w-1 rounded-full bg-[#85c441]" />
-                    <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#71796b]">
+                    <span className="h-4 w-1 rounded-full bg-wk-brand" />
+                    <span className="text-[11px] font-black uppercase tracking-[0.12em] text-wk-text-muted">
                       Release Content
                     </span>
                     {richData && (
-                      <span className="rounded-full bg-[#eef7df] px-1.5 py-0.5 text-[9px] font-bold text-[#5f8f2f]">
+                      <span className="rounded-full bg-wk-brand-soft px-1.5 py-0.5 text-[9px] font-bold text-wk-brand">
                         {richData.tracks.length} tracks
                       </span>
                     )}
                   </span>
                   <i
-                    className={`ri-arrow-down-s-line text-[#9aa292] transition-transform duration-200 ${
+                    className={`ri-arrow-down-s-line text-wk-text-muted transition-transform duration-200 ${
                       showRichPanel ? "rotate-180" : ""
-                    } group-hover:text-[#71796b]`}
+                    } group-hover:text-wk-text-muted`}
                   />
                 </button>
 
                 {showRichPanel && (
                   <div className="mt-4 space-y-4 animate-[slideIn_200ms_ease-out]">
                     {richDataLoading && (
-                      <div className="flex items-center gap-2 text-xs text-[#858c7e]">
+                      <div className="flex items-center gap-2 text-xs text-wk-text-muted">
                         <i className="ri-loader-4-line animate-spin" />
                         Loading tracks and artists…
                       </div>
                     )}
 
                     {!richDataLoading && !richData && (
-                      <p className="text-xs text-[#858c7e]">No track data available.</p>
+                      <p className="text-xs text-wk-text-muted">No track data available.</p>
                     )}
 
                     {richData && (
@@ -843,10 +846,10 @@ export default function RegistryEntityEditorDrawer({
                             <img
                               src={String(entity.artwork_url)}
                               alt=""
-                              className="h-16 w-16 shrink-0 rounded-xl object-cover border border-[#dfe4d8]"
+                              className="h-16 w-16 shrink-0 rounded-xl object-cover border border-wk-border"
                             />
                           ) : (
-                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-[#dfe4d8] bg-[#f0f3ec] text-xs font-black text-[#8a9283]">
+                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-wk-border bg-wk-surface-raised text-xs font-black text-wk-text-muted">
                               <i className="ri-album-line text-lg" />
                             </div>
                           )}
@@ -855,12 +858,12 @@ export default function RegistryEntityEditorDrawer({
                             {/* Release type + date */}
                             <div className="flex items-center gap-2">
                               {entity.release_type && (
-                                <span className="inline-flex items-center rounded-full bg-[#eef7df] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#5f8f2f]">
+                                <span className="inline-flex items-center rounded-full bg-wk-brand-soft px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-wk-brand">
                                   {String(entity.release_type)}
                                 </span>
                               )}
                               {entity.release_date && (
-                                <span className="text-[10px] font-semibold text-[#858c7e]">
+                                <span className="text-[10px] font-semibold text-wk-text-muted">
                                   {String(entity.release_date)}
                                 </span>
                               )}
@@ -869,10 +872,10 @@ export default function RegistryEntityEditorDrawer({
                             {/* Label */}
                             {richData.label && (
                               <div className="flex items-center gap-1.5">
-                                <i className="ri-building-2-line text-[10px] text-[#9aa292]" />
+                                <i className="ri-building-2-line text-[10px] text-wk-text-muted" />
                                 <a
                                   href={`/admin/registry/labels/${richData.label.slug}`}
-                                  className="text-xs font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate"
+                                  className="text-xs font-bold text-wk-text hover:text-wk-brand transition-colors truncate"
                                 >
                                   {richData.label.name}
                                 </a>
@@ -885,10 +888,10 @@ export default function RegistryEntityEditorDrawer({
                               if (!primary) return null;
                               return (
                                 <div className="flex items-center gap-1.5">
-                                  <i className="ri-user-line text-[10px] text-[#9aa292]" />
+                                  <i className="ri-user-line text-[10px] text-wk-text-muted" />
                                   <a
                                     href={`/admin/registry/artists/${primary.artist_slug}`}
-                                    className="text-xs font-bold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate"
+                                    className="text-xs font-bold text-wk-text hover:text-wk-brand transition-colors truncate"
                                   >
                                     {primary.artist_name_text}
                                   </a>
@@ -898,11 +901,11 @@ export default function RegistryEntityEditorDrawer({
 
                             {/* Track count + total duration */}
                             <div className="flex items-center gap-3">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#697062]">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-wk-text-muted">
                                 <i className="ri-list-check text-xs" />
                                 {richData.tracks.length} track{richData.tracks.length !== 1 ? "s" : ""}
                               </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#697062]">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-wk-text-muted">
                                 <i className="ri-timer-line text-xs" />
                                 {formatDurationMs(richData.tracks.reduce((sum, t) => sum + t.duration_ms, 0))}
                               </span>
@@ -917,7 +920,7 @@ export default function RegistryEntityEditorDrawer({
                               href={releasePublicUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[11px] font-bold text-wk-text hover:border-wk-brand hover:text-wk-brand transition-colors"
                             >
                               <i className="ri-external-link-line text-xs" />
                               View Public Page
@@ -925,7 +928,7 @@ export default function RegistryEntityEditorDrawer({
                           )}
                           <a
                             href={`/admin/registry/releases/${entity.slug || entity.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#dfe4d8] bg-white px-3 py-2 text-[11px] font-bold text-[#171712] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-wk-border bg-wk-surface px-3 py-2 text-[11px] font-bold text-wk-text hover:border-wk-brand hover:text-wk-brand transition-colors"
                           >
                             <i className="ri-file-list-3-line text-xs" />
                             Full Detail Page
@@ -934,11 +937,11 @@ export default function RegistryEntityEditorDrawer({
 
                         {/* Description / NLG excerpt */}
                         {entity.description && (
-                          <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-1.5">
+                          <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3">
+                            <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted mb-1.5">
                               Description
                             </p>
-                            <p className="text-xs text-[#5d6557] leading-relaxed line-clamp-4">
+                            <p className="text-xs text-wk-text-muted leading-relaxed line-clamp-4">
                               {String(entity.description)}
                             </p>
                           </div>
@@ -951,8 +954,8 @@ export default function RegistryEntityEditorDrawer({
 
                         {/* Featured artists summary */}
                         {richData.releaseArtists.filter((ra) => !ra.is_primary).length > 0 && (
-                          <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-2">
+                          <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3">
+                            <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted mb-2">
                               Featured Artists
                             </p>
                             <div className="flex flex-wrap gap-1.5">
@@ -962,10 +965,10 @@ export default function RegistryEntityEditorDrawer({
                                   <a
                                     key={ra.artist_id}
                                     href={`/admin/registry/artists/${ra.artist_slug}`}
-                                    className="inline-flex items-center gap-1 rounded-full border border-[#dfe4d8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#2d3329] hover:border-[#85c441] hover:text-[#5f8f2f] transition-colors"
+                                    className="inline-flex items-center gap-1 rounded-full border border-wk-border bg-wk-surface px-2.5 py-1 text-[11px] font-semibold text-wk-text-soft hover:border-wk-brand hover:text-wk-brand transition-colors"
                                   >
                                     {ra.artist_name_text}
-                                    <span className="text-[9px] text-[#9aa292]">{ra.role}</span>
+                                    <span className="text-[9px] text-wk-text-muted">{ra.role}</span>
                                   </a>
                                 ))}
                             </div>
@@ -973,33 +976,33 @@ export default function RegistryEntityEditorDrawer({
                         )}
 
                         {/* Mini tracklist */}
-                        <div className="rounded-xl border border-[#dfe4d8] overflow-hidden">
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-[#fbfcf8] border-b border-[#e8ece2]">
-                            <i className="ri-list-ordered text-xs text-[#9aa292]" />
-                            <span className="text-[10px] font-black uppercase tracking-wide text-[#71796b]">
+                        <div className="rounded-xl border border-wk-border overflow-hidden">
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-wk-surface border-b border-wk-divider">
+                            <i className="ri-list-ordered text-xs text-wk-text-muted" />
+                            <span className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted">
                               Tracklist
                             </span>
                           </div>
-                          <div className="divide-y divide-[#eef1ea]">
+                          <div className="divide-y divide-wk-divider">
                             {richData.tracks.slice(0, 20).map((track) => {
                               const featured = getFeaturedForTrack(track.track_id, richData.trackArtists);
                               return (
                                 <div
                                   key={track.track_id}
-                                  className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-[#fbfcf8] transition-colors"
+                                  className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-wk-surface transition-colors"
                                 >
                                   {/* Track number */}
-                                  <span className="w-6 text-right text-[10px] font-extrabold text-[#9aa292] tabular-nums shrink-0">
+                                  <span className="w-6 text-right text-[10px] font-extrabold text-wk-text-muted tabular-nums shrink-0">
                                     {track.track_number}
                                   </span>
 
                                   {/* Artwork thumbnail */}
-                                  <div className="w-7 h-7 shrink-0 rounded-md overflow-hidden bg-[#f0f3ec] border border-[#dfe4d8]">
+                                  <div className="w-7 h-7 shrink-0 rounded-md overflow-hidden bg-wk-surface-raised border border-wk-border">
                                     {track.track_artwork_url ? (
                                       <img src={track.track_artwork_url} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center">
-                                        <i className="ri-music-line text-[10px] text-[#c5ccba]" />
+                                        <i className="ri-music-line text-[10px] text-wk-text-faint" />
                                       </div>
                                     )}
                                   </div>
@@ -1008,18 +1011,18 @@ export default function RegistryEntityEditorDrawer({
                                   <div className="flex-1 min-w-0">
                                     <a
                                       href={`/admin/registry/tracks/${track.track_slug}`}
-                                      className="text-[12px] font-extrabold text-[#171712] hover:text-[#5f8f2f] transition-colors truncate block"
+                                      className="text-[12px] font-extrabold text-wk-text hover:text-wk-brand transition-colors truncate block"
                                     >
                                       {track.track_title}
                                     </a>
                                     {featured.length > 0 && (
                                       <div className="flex flex-wrap items-center gap-x-1 mt-0.5">
-                                        <span className="text-[9px] text-[#9aa292]">ft.</span>
+                                        <span className="text-[9px] text-wk-text-muted">ft.</span>
                                         {featured.map((fa, i) => (
                                           <a
                                             key={fa.artist_id}
                                             href={`/admin/registry/artists/${fa.artist_slug}`}
-                                            className="text-[10px] font-medium text-[#697062] hover:text-[#5f8f2f] transition-colors"
+                                            className="text-[10px] font-medium text-wk-text-muted hover:text-wk-brand transition-colors"
                                           >
                                             {fa.artist_name_text}{i < featured.length - 1 ? "," : ""}
                                           </a>
@@ -1029,15 +1032,15 @@ export default function RegistryEntityEditorDrawer({
                                   </div>
 
                                   {/* Duration */}
-                                  <span className="text-[10px] font-semibold text-[#9aa292] tabular-nums shrink-0">
+                                  <span className="text-[10px] font-semibold text-wk-text-muted tabular-nums shrink-0">
                                     {formatDurationMs(track.duration_ms)}
                                   </span>
 
                                   {/* Status */}
                                   <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${
-                                    track.track_status === "active" ? "bg-emerald-50 text-emerald-700" :
-                                    track.track_status === "draft" ? "bg-amber-50 text-amber-700" :
-                                    "bg-gray-100 text-gray-500"
+                                    track.track_status === "active" ? "bg-wk-success-soft text-wk-success" :
+                                    track.track_status === "draft" ? "bg-wk-warning-soft text-wk-warning" :
+                                    "bg-wk-surface-raised text-wk-text-muted"
                                   }`}>
                                     {track.track_status}
                                   </span>
@@ -1047,11 +1050,11 @@ export default function RegistryEntityEditorDrawer({
 
                             {richData.tracks.length > 20 && (
                               <div className="px-4 py-2.5 text-center">
-                                <p className="text-[10px] font-semibold text-[#9aa292]">
+                                <p className="text-[10px] font-semibold text-wk-text-muted">
                                   +{richData.tracks.length - 20} more tracks ·{" "}
                                   <a
                                     href={`/admin/registry/releases/${entity.slug || entity.id}`}
-                                    className="text-[#5f8f2f] hover:underline"
+                                    className="text-wk-brand hover:underline"
                                   >
                                     View full detail page
                                   </a>
@@ -1096,17 +1099,17 @@ function ProviderMetadataChips({ metadata }: { metadata: Record<string, unknown>
   if (chips.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-[#dfe4d8] bg-[#fbfcf8] px-4 py-3">
-      <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-2">
+    <div className="rounded-xl border border-wk-border bg-wk-surface px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted mb-2">
         Provider Metadata
       </p>
       <div className="space-y-1.5">
         {chips.map((chip) => (
           <div key={chip.label} className="flex items-start gap-2">
-            <i className={`${chip.icon} text-[10px] text-[#9aa292] mt-0.5 shrink-0`} />
+            <i className={`${chip.icon} text-[10px] text-wk-text-muted mt-0.5 shrink-0`} />
             <div className="min-w-0">
-              <span className="text-[9px] font-bold uppercase text-[#9aa292]">{chip.label}</span>
-              <p className="text-[11px] text-[#5d6557] truncate">{chip.value}</p>
+              <span className="text-[9px] font-bold uppercase text-wk-text-muted">{chip.label}</span>
+              <p className="text-[11px] text-wk-text-muted truncate">{chip.value}</p>
             </div>
           </div>
         ))}
@@ -1131,189 +1134,47 @@ function FieldCard({
   error?: string;
 }) {
   const strValue = value === null || value === undefined ? "" : String(value);
-  const fieldId = `field-${field.key}`;
-
   const renderInput = () => {
-    if (field.type === "textarea") {
-      return (
-        <div className="relative">
-          <textarea
-            id={fieldId}
-            value={strValue}
-            onChange={(e) => onChange(e.target.value)}
-            rows={4}
-            className={`w-full rounded-xl border bg-[#f8f9f4] px-3 py-3 text-sm outline-none transition-all resize-y min-h-[88px] focus:bg-white ${
-              error
-                ? "border-red-400 focus:border-red-500"
-                : isDirty
-                  ? "border-amber-300 focus:border-[#85c441]"
-                  : "border-[#dfe4d8] focus:border-[#85c441]"
-            }`}
-          />
-          {isDirty && !error && (
-            <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            </span>
-          )}
-        </div>
-      );
-    }
-
     if (field.type === "select") {
-      return (
-        <div className="relative">
-          <WkSelect
-            id={fieldId}
-            value={strValue}
-            onChange={(value) => onChange(value)}
-            triggerClassName={`h-11 w-full appearance-none rounded-xl border bg-[#f8f9f4] pl-3 pr-9 text-sm outline-none transition-all focus:bg-white ${
-              error
-                ? "border-red-400 focus:border-red-500"
-                : isDirty
-                  ? "border-amber-300 focus:border-[#85c441]"
-                  : "border-[#dfe4d8] focus:border-[#85c441]"
-            }`}
-          >
-            {(field.options ?? []).map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </WkSelect>
-        </div>
-      );
+      return <RegistryChoiceField field={field} value={value} onChange={onChange} />;
     }
-
     if (field.type === "boolean") {
       return (
         <div className="flex items-center gap-3">
-          <WakilishaToggle
-            value={Boolean(value)}
-            onChange={onChange}
-            size="sm"
-            ariaLabel={`Toggle ${field.label}`}
-          />
-          <span className="text-sm font-semibold text-[#2d3329]">
-            {value ? "Yes" : "No"}
-          </span>
+          <WakilishaToggle value={Boolean(value)} onChange={onChange} size="sm"
+            ariaLabel={`Toggle ${field.label}`} />
+          <span className="text-sm font-semibold text-wk-text-soft">{value ? "Yes" : "No"}</span>
         </div>
       );
     }
-
-    if (field.type === "slug") {
-      return (
-        <div className="flex gap-2">
-          <input
-            id={fieldId}
-            value={strValue}
-            onChange={(e) => onChange(e.target.value)}
-            className={`h-11 flex-1 rounded-xl border bg-[#f8f9f4] px-3 text-sm font-mono outline-none transition-all focus:bg-white ${
-              error
-                ? "border-red-400 focus:border-red-500"
-                : isDirty
-                  ? "border-amber-300 focus:border-[#85c441]"
-                  : "border-[#dfe4d8] focus:border-[#85c441]"
-            }`}
-          />
-          <button
-            type="button"
-            onClick={() => onChange(normalizeSlug(displayName))}
-            className="flex items-center gap-1 rounded-xl border border-[#dfe4d8] bg-white px-3 text-xs font-black text-[#5d6557] hover:border-[#85c441] hover:text-[#5f8f2f] transition-all whitespace-nowrap"
-          >
-            <i className="ri-sparkling-line" />
-            Generate
-          </button>
-        </div>
-      );
-    }
-
     if (field.type === "number") {
-      return (
-        <WkNumberField
-          value={strValue}
-          onChange={(value) => onChange(String(value))}
-          ariaLabel={field.label}
-          showSteppers={false}
-          groupClassName={`h-11 bg-[#f8f9f4] ${
-            error
-              ? "border-red-400"
-              : isDirty
-                ? "border-amber-300"
-                : "border-[#dfe4d8]"
-          }`}
-          inputClassName="px-3 text-left text-sm"
-        />
-      );
+      return <WkNumberField value={strValue} onChange={(next) => onChange(Number.isNaN(next) ? "" : String(next))}
+        ariaLabel={field.label} showSteppers={false} />;
     }
-
     if (field.type === "date") {
-      return (
-        <WkDatePicker
-          value={strValue}
-          onChange={onChange}
-          label={field.label}
-          showLabel={false}
-          triggerClassName={`h-11 bg-[#f8f9f4] text-sm ${
-            error
-              ? "border-red-400"
-              : isDirty
-                ? "border-amber-300"
-                : "border-[#dfe4d8]"
-          }`}
-        />
-      );
+      return <WkDatePicker value={strValue} onChange={onChange} label={field.label} showLabel={false} />;
     }
-
-    return (
-      <div className="relative">
-        <input
-          id={fieldId}
-          type="text"
-          value={strValue}
-          onChange={(e) => onChange(e.target.value)}
-          className={`h-11 w-full rounded-xl border bg-[#f8f9f4] px-3 text-sm outline-none transition-all focus:bg-white ${
-            field.type === "url" || field.type === "text"
-              ? "font-mono"
-              : ""
-          } ${
-            error
-              ? "border-red-400 focus:border-red-500"
-              : isDirty
-                ? "border-amber-300 focus:border-[#85c441]"
-                : "border-[#dfe4d8] focus:border-[#85c441]"
-          }`}
-        />
-        {isDirty && !error && (
-          <span className="absolute top-1/2 right-2.5 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-          </span>
-        )}
+    const control = <WkTextField value={strValue} onChange={onChange} ariaLabel={field.label}
+      required={field.required} invalid={Boolean(error)} multiline={field.type === "textarea"} />;
+    return field.type === "slug" ? (
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1">{control}</div>
+        <WkButton variant="ghost" onClick={() => onChange(normalizeSlug(displayName))}>Generate</WkButton>
       </div>
-    );
+    ) : control;
   };
 
   return (
-    <div>
-      <label htmlFor={fieldId} className="grid gap-1.5">
-        <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-[#71796b]">
-          {field.label}
-          {field.required && (
-            <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-red-100 text-[9px] font-black text-red-600">
-              *
-            </span>
-          )}
-        </span>
+    <div data-wk-registry-field={field.key} className="min-w-0">
+      <div className="grid min-w-0 gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-wk-text-muted">
+          <span>{field.label}{field.required ? " *" : ""}</span>
+          {isDirty && <span className="rounded-full bg-wk-warning-soft px-2 py-0.5 text-[10px] normal-case text-wk-warning">Changed</span>}
+        </div>
         {renderInput()}
-      </label>
-      {field.helpText && (
-        <p className="mt-1.5 text-[11px] text-[#858c7e]">{field.helpText}</p>
-      )}
-      {error && (
-        <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-red-600">
-          <i className="ri-error-warning-fill text-xs" />
-          {error}
-        </p>
-      )}
+      </div>
+      {field.helpText && <p className="mt-1.5 text-xs text-wk-text-muted">{field.helpText}</p>}
+      {error && <p role="alert" className="mt-1.5 text-xs font-semibold text-wk-danger">{error}</p>}
     </div>
   );
 }

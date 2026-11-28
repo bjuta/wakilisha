@@ -1,0 +1,32 @@
+{
+  "proof_mode": "charts2_disposable_ci_clean_replay_v1",
+  "migration_file": "supabase/migrations/20261127152546_mizizi_desk_same_case_recall.sql",
+  "migration_sha256": "d0fda334bd0e6d4f5e5d885a764aba01e24239315ace1f7435ce8b6fcb1c4561",
+  "base_main_sha": "9847216a6946ae89f0eb52684a27231ce6e4b15d",
+  "replay_candidate_head_sha": "ee4b88848164a5bb10fb325e02df3b4d9c69dff3",
+  "replay_environment": "supabase-local-unlinked",
+  "hosted_preview_used": false,
+  "production_mutation": false,
+  "workflow_name": "MIZIZI Slice 1 Disposable PostgreSQL Proof",
+  "workflow_run_id": 46030189127,
+  "workflow_run_url": "https://github.com/bjuta/wakilisha/actions/runs/46030189127",
+  "workflow_conclusion": "success",
+  "workflow_event": "pull_request",
+  "ci_markers": [
+    "WK_CI_NO_REMOTE_TARGET=PASS",
+    "WK_CI_LOCAL_MIGRATION_REPLAY_FINISHED=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_DB_SECURITY=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_ROLLBACK=PASS",
+    "WK_CHARTS2_LOCAL_PRIVATE_EVIDENCE_SQL=PASS",
+    "WK_CI_LOCAL_CONTAINERS_AND_VOLUMES_DESTROYED=PASS"
+  ],
+  "baseline_replay": "pass",
+  "candidate_apply": "pass",
+  "verifier": "pass",
+  "cleanup": "pass",
+  "schema_types_sha256": "d3f8200df45b4669119ed4f7a60d6fc1c8d68afa2ab3c798755678b995ddfdf8",
+  "schema_migration_count": 304,
+  "schema_migration_head": "20261127152546",
+  "verified_at": "2026-11-27T16:07:04Z",
+  "notes": "Exact genuine pull_request workflow #46030189127 SUCCESS, SQL job 140611720729 and JWT job 140611721403. Replay log lists exactly all 304 repository migration filenames. JWT log confirms native recall, second yield, third lease stale-pass fence, unexamined reference, forged lead denial, recall revocation, operational convergence and cleanup. Committed public/editorial type blob unchanged from 303; no fresh type generation or hosted application claimed."
+}

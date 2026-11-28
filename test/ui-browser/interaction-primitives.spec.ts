@@ -571,3 +571,319 @@ test("Article Credit selects other existing writers and Registry Authors without
     await page.unroute("https://example.supabase.co/rest/v1/rpc/**");
   }
 });
+
+
+/** Render the actual Artists page with read-only local fixture responses. */
+test("Registry Artists theme follows shared tokens across list, panels and publish confirmation", async ({ page }) => {
+  test.skip(process.env.WK_REGISTRY_ARTISTS_UI_FIXTURE !== "1", "Run with isolated Registry Artists browser fixture credentials");
+  const artist = {
+    id: "10b940ff-3382-42b3-a81b-30e4028297d",
+    display_name: "WK Draft Artist Theme Fixture",
+    slug: "wk-draft-artist-theme-fixture",
+    normalized_name: "wk draft artist theme fixture",
+    status: "draft",
+    origin_iso2: null,
+    public_image_url: null,
+    updated_at: "2026-11-26T08:14:03Z",
+  };
+  const unexpected: string[] = [];
+  let listReads = 0;
+  await page.route("https://example.supabase.co/**", async (route) => {
+    const request = route.request();
+    const method = request.method();
+    const path = new URL(request.url()).pathname;
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, HEAD, OPTIONS",
+      "access-control-allow-headers": request.headers()["access-control-request-headers"] ?? "*",
+      "access-control-expose-headers": "content-range",
+    };
+    if (method === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: cors });
+    } else if (method === "GET" && path === "/functions/v1/admin-router/registry/entities") {
+      listReads++;
+      await route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ ok: true, data: [artist] }) });
+    } else if (method === "HEAD" && path === "/rest/v1/registry_artists") {
+      await route.fulfill({ status: 200, headers: { ...cors, "content-range": "0-0/1" } });
+    } else {
+      unexpected.push(method + " " + path);
+      await route.abort();
+    }
+  });
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.goto("/test/ui-browser/fixtures/interaction.html?fixture=registry-artists");
+  const root = page.locator("[data-wk-registry-artists]");
+  const card = root.locator("[data-wk-registry-artist-card]");
+  await expect(card).toHaveCount(1);
+  await expect(card.getByText(artist.display_name, { exact: true })).toBeVisible();
+  await expect(root.locator("[data-wk-registry-artist-panel]")).toHaveCount(3);
+  const backgrounds: Record<string, string> = {};
+  for (const theme of ["dark", "light"]) {
+    await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
+    for (const width of [1200, 768, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      // The Artist card transitions its background on a theme switch. Poll
+      // actual computed styles to exact token equality, never accept a stale
+      // palette or skip the card. Bound the settling time to one second.
+      const readPalette = () => root.evaluate(el => {
+        const probe = document.createElement("span");
+        document.body.appendChild(probe);
+        const color = (token: string) => {
+          probe.style.backgroundColor = "var(--wk-" + token + ")";
+          return getComputedStyle(probe).backgroundColor;
+        };
+        const expectedBg = color("bg");
+        const expectedSurface = color("surface");
+        probe.style.color = "var(--wk-text)";
+        const expectedText = getComputedStyle(probe).color;
+        probe.remove();
+        const surfaces = Array.from(el.querySelectorAll("[data-wk-registry-artist-card], [data-wk-registry-artist-filters], [data-wk-registry-artist-panel]"));
+        return {
+          background: getComputedStyle(el).backgroundColor,
+          text: getComputedStyle(el).color,
+          expectedBg, expectedSurface, expectedText,
+          surfaces: surfaces.map(node => ({
+            name: node.getAttribute("data-wk-registry-artist-panel") ??
+              (node.hasAttribute("data-wk-registry-artist-card") ? "artist-card" : "filters"),
+            actual: getComputedStyle(node).backgroundColor,
+          })),
+        };
+      });
+      await expect.poll(async () => {
+        const palette = await readPalette();
+        return [
+          ...(palette.background === palette.expectedBg ? [] : [`root background ${palette.background} != ${palette.expectedBg}`]),
+          ...(palette.text === palette.expectedText ? [] : [`root text ${palette.text} != ${palette.expectedText}`]),
+          ...(palette.surfaces.length === 5 ? [] : [`surface count ${palette.surfaces.length} != 5`]),
+          ...palette.surfaces.filter(s => s.actual !== palette.expectedSurface)
+            .map(s => `${s.name}: ${s.actual} != ${palette.expectedSurface}`),
+        ];
+      }, { timeout: 1000, intervals: [50, 100, 150], message: `${theme} palette at ${width}px` }).toEqual([]);
+      const metrics = await readPalette();
+      expect(metrics.background).toBe(metrics.expectedBg);
+      expect(metrics.text).toBe(metrics.expectedText);
+      expect(metrics.surfaces.map(s => s.actual)).toEqual(Array(5).fill(metrics.expectedSurface));
+      backgrounds[theme] = metrics.background;
+    }
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await card.getByRole("button", { name: "Select " + artist.display_name }).click();
+    await root.getByRole("button", { name: "Publish (1)", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish 1 artist?" });
+    await expect(dialog.getByText(artist.display_name, { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Yes, publish 1" })).toBeVisible();
+    const modalPalette = await page.locator("[data-wk-modal-panel]").evaluate(el => {
+      const probe = document.createElement("span");
+      probe.style.backgroundColor = "var(--wk-surface)";
+      document.body.appendChild(probe);
+      const expected = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { actual: getComputedStyle(el).backgroundColor, expected };
+    });
+    expect(modalPalette.actual).toBe(modalPalette.expected);
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await root.getByRole("button", { name: "Clear selection" }).click();
+    await card.getByTitle("Quick edit").click();
+    const editor = page.getByRole("dialog", { name: "Edit artist" });
+    await expect(editor.getByRole("textbox", { name: "Artist name", exact: true })).toHaveValue(artist.display_name);
+    await expect(editor.getByRole("combobox", { name: "Country", exact: true })).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Artist type", exact: true })).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Gender", exact: true })).toBeVisible();
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+  }
+  expect(backgrounds.dark).not.toBe(backgrounds.light);
+  expect(listReads).toBeGreaterThan(0);
+  expect(unexpected).toEqual([]);
+});
+
+
+/** Shared editor test, using actual production components and no remote writes. */
+test("Registry Artists theme and shared Registry editor fields remain legible and owned across entity schemas", async ({ page }) => {
+  test.skip(process.env.WK_REGISTRY_ARTISTS_UI_FIXTURE !== "1", "Run in isolated Registry editor acceptance");
+  test.setTimeout(90_000);
+  const unexpected: string[] = [];
+  await page.route("https://example.supabase.co/**", async route => {
+    const method = route.request().method();
+    const path = new URL(route.request().url()).pathname;
+    const headers = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": route.request().headers()["access-control-request-headers"] ?? "*",
+    };
+    if (method === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (method === "GET" && ["/rest/v1/registry_release_tracks", "/rest/v1/registry_release_artists"].includes(path)) {
+      return route.fulfill({ status: 200, headers, contentType: "application/json", body: "[]" });
+    }
+    unexpected.push(method + " " + path);
+    return route.abort();
+  });
+  for (const kind of ["artist", "track", "release", "label", "genre"]) {
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await page.goto("/test/ui-browser/fixtures/interaction.html?fixture=registry-editor&entity=" + kind);
+    const dialog = page.getByRole("dialog", { name: "Edit " + kind });
+    await expect(dialog).toBeVisible();
+    const nameField = dialog.locator("[data-wk-registry-field=" + (kind === "artist" ? "display_name" : kind === "track" || kind === "release" ? "title" : "name") + "]").getByRole("textbox");
+    await expect(nameField).toHaveValue("WK Registry Editor Fixture");
+    const fields = dialog.locator("[data-wk-registry-field]");
+    const count = await fields.count();
+    expect(count).toBeGreaterThan(3);
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
+      for (const width of [1200, 390]) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect.poll(async () => dialog.evaluate(el => {
+          const probe = document.createElement("span");
+          document.body.appendChild(probe);
+          probe.style.backgroundColor = "var(--wk-surface)";
+          probe.style.color = "var(--wk-text)";
+          const expectedSurface = getComputedStyle(probe).backgroundColor;
+          const expectedText = getComputedStyle(probe).color;
+          probe.remove();
+          const errors: string[] = [];
+          const background = (node: Element): string => {
+            const color = getComputedStyle(node).backgroundColor;
+            return (color === "transparent" || color === "rgba(0, 0, 0, 0)") && node.parentElement ? background(node.parentElement) : color;
+          };
+          for (const node of el.querySelectorAll("[data-wk-registry-editor-header], [data-wk-registry-editor-metrics] > div, [data-wk-sheet-footer]")) {
+            if (background(node) !== expectedSurface) errors.push("surface: " + background(node));
+          }
+          for (const node of el.querySelectorAll("[data-wk-registry-field] input:not([type=hidden]), [data-wk-registry-field] textarea, [data-wk-registry-field] [data-wk-select-trigger]")) {
+            const rect = node.getBoundingClientRect();
+            if (rect.width < 4 || rect.height < 4) continue;
+            const style = getComputedStyle(node);
+            if (background(node) !== expectedSurface || style.color !== expectedText) errors.push("field: " + node.closest("[data-wk-registry-field]")?.getAttribute("data-wk-registry-field") + " " + background(node) + " " + style.color);
+            if (node instanceof HTMLTextAreaElement && style.resize !== "none") errors.push("native resize");
+            if (node instanceof HTMLInputElement && ["number", "date", "url"].includes(node.type)) errors.push("native " + node.type);
+          }
+          // React Aria keeps a native select for form/autofill semantics.
+          // Reject any painted or pointer-reachable native control; geometry
+          // alone does not establish visibility of a clipped hidden wrapper.
+          for (const select of el.querySelectorAll("select")) {
+            const rect = select.getBoundingClientRect();
+            let hidden = false;
+            for (let node: Element | null = select; node && node !== el; node = node.parentElement) {
+              const css = getComputedStyle(node);
+              const box = node.getBoundingClientRect();
+              if (css.display === "none" || css.visibility === "hidden" || Number(css.opacity) === 0 ||
+                  (css.clip !== "auto" && css.clip !== "") ||
+                  (css.clipPath !== "none" && css.clipPath !== "") ||
+                  ((box.width <= 1 || box.height <= 1) && /hidden|clip/.test(css.overflow))) {
+                hidden = true;
+                break;
+              }
+            }
+            const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            if (rect.width > 4 && rect.height > 4 && (!hidden || hit === select)) {
+              errors.push("visible native select: " + select.outerHTML.slice(0, 180));
+            }
+          }
+          return errors;
+        }), { timeout: 2000, message: kind + " " + theme + " " + width }).toEqual([]);
+      }
+      await page.setViewportSize({ width: 1200, height: 800 });
+      await nameField.fill("Edited fixture name");
+      await expect(nameField).toHaveValue("Edited fixture name");
+      await expect(dialog.getByRole("button", { name: /Save 1 change/ })).toBeEnabled();
+      await dialog.getByRole("button", { name: "Discard", exact: true }).click();
+      await expect(nameField).toHaveValue("WK Registry Editor Fixture");
+      if (kind === "artist" || kind === "label") {
+        const country = dialog.getByRole("combobox", { name: "Country", exact: true });
+        await country.fill("Nigeria");
+        await page.getByRole("option", { name: "Nigeria (NG)", exact: true }).click();
+        await expect(country).toHaveValue("Nigeria (NG)");
+        await country.fill("Not set");
+        await page.getByRole("option", { name: "Not set", exact: true }).click();
+        await expect(country).toHaveValue("Not set");
+      }
+      if (kind === "artist") {
+        const type = dialog.getByRole("button", { name: "Artist type", exact: true });
+        await type.click();
+        await page.getByRole("option", { name: "Solo", exact: true }).click();
+        await expect(type).toContainText("Solo");
+        const gender = dialog.getByRole("button", { name: "Gender", exact: true });
+        await gender.click();
+        await page.getByRole("option", { name: "Non-binary", exact: true }).click();
+        await expect(gender).toContainText("Non-binary");
+        await expect(dialog.getByRole("button", { name: /Save 2 changes/ })).toBeEnabled();
+        await dialog.getByRole("button", { name: "Discard", exact: true }).click();
+        await expect(type).toContainText("Not set");
+        await expect(gender).toContainText("Not set");
+      }
+      if (kind === "track") {
+        await expect(dialog.locator("[data-wk-registry-field=duration_ms] input")).toBeVisible();
+        const explicit = dialog.getByRole("switch", { name: "Toggle Explicit" });
+        await explicit.click();
+        await expect(explicit).toHaveAttribute("aria-checked", "true");
+        await dialog.getByRole("button", { name: "Discard", exact: true }).click();
+        await expect(explicit).toHaveAttribute("aria-checked", "false");
+      }
+      if (kind === "release") {
+        await dialog.getByRole("button", { name: "Release date", exact: true }).click();
+        await expect(page.locator("[data-wk-temporal-popover]")).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(page.locator("[data-wk-temporal-popover]")).toHaveCount(0);
+      }
+    }
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page.getByText("Registry editor closed")).toBeVisible();
+  }
+  expect(unexpected).toEqual([]);
+});
+
+
+test("Registry Artists theme contract applies to the other Registry lists", async ({ page }) => {
+  test.skip(process.env.WK_REGISTRY_ARTISTS_UI_FIXTURE !== "1", "Run in isolated Registry list acceptance");
+  test.setTimeout(60_000);
+  const unexpected: string[] = [];
+  await page.route("https://example.supabase.co/**", async route => {
+    const method = route.request().method();
+    const path = new URL(route.request().url()).pathname;
+    const headers = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": route.request().headers()["access-control-request-headers"] ?? "*",
+    };
+    if (method === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (method === "GET" && path === "/functions/v1/admin-router/registry/entities") {
+      return route.fulfill({ status: 200, headers, contentType: "application/json", body: JSON.stringify({ ok: true, data: [{
+        id: "10b940ff-3382-42b3-a81b-30e4028297d",
+        name: "WK Registry List Fixture", title: "WK Registry List Fixture",
+        slug: "wk-registry-list-fixture", status: "draft", release_type: "single",
+        release_date: "2026-11-26", duration_ms: 136594, updated_at: "2026-11-26T08:14:03Z",
+      }] }) });
+    }
+    unexpected.push(method + " " + path);
+    return route.abort();
+  });
+  for (const kind of ["track", "release", "label", "genre"]) {
+    await page.goto("/test/ui-browser/fixtures/interaction.html?fixture=registry-artists&entity=" + kind);
+    const root = page.locator('[data-wk-registry-entity-list="' + kind + 's"]');
+    await expect(root.getByText("WK Registry List Fixture", { exact: true })).toBeVisible();
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate(theme => document.documentElement.setAttribute("data-wk-theme", theme), theme);
+      for (const width of [1200, 390]) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect.poll(async () => root.evaluate(el => {
+          const probe = document.createElement("span");
+          document.body.appendChild(probe);
+          probe.style.backgroundColor = "var(--wk-bg)";
+          const expectedBg = getComputedStyle(probe).backgroundColor;
+          probe.style.backgroundColor = "var(--wk-surface)";
+          const expectedSurface = getComputedStyle(probe).backgroundColor;
+          probe.style.color = "var(--wk-text)";
+          const expectedText = getComputedStyle(probe).color;
+          probe.remove();
+          const errors: string[] = [];
+          if (getComputedStyle(el).backgroundColor !== expectedBg || getComputedStyle(el).color !== expectedText) errors.push("list root");
+          const search = el.querySelector("[data-wk-search-input]");
+          if (!search || getComputedStyle(search).color !== expectedText || getComputedStyle(search).backgroundColor !== expectedSurface) errors.push("search");
+          const cards = el.querySelectorAll(".group.rounded-2xl");
+          if (cards.length !== 1 || Array.from(cards).some(card => getComputedStyle(card).backgroundColor !== expectedSurface)) errors.push("cards");
+          return errors;
+        }), { timeout: 2000, message: kind + " " + theme + " " + width }).toEqual([]);
+      }
+    }
+  }
+  expect(unexpected).toEqual([]);
+});

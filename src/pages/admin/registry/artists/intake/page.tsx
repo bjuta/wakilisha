@@ -1,8 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ChartReviewReturnContext } from "@/components/admin/charts/ChartReviewReturnContext";
 import { supabase } from "@/lib/supabase";
 import { WkIcon } from "@/components/design-system/Icon";
 import { WkCheckbox } from "@/components/design-system/primitives/Checkbox";
+import { WkButton } from "@/components/design-system/primitives/Button";
+import { WkSurface } from "@/components/design-system/primitives/Surface";
+import { WkSearchField } from "@/components/design-system/primitives/Field";
+import { AdminStatusBadge, type AdminStatusTone } from "@/components/design-system/admin/AdminStatusBadge";
 
 
 const INTAKE_API = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/artist-registry-intake`;
@@ -85,20 +90,11 @@ async function invokeIntakeApi(action: string, payload: Record<string, unknown>)
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    exact_match: "bg-[#5f8f2f]/10 text-[#5f8f2f] border-[#5f8f2f]/20",
-    fuzzy_match: "bg-[#c88b1a]/10 text-[#c88b1a] border-[#c88b1a]/20",
-    no_match: "bg-[#c44242]/10 text-[#c44242] border-[#c44242]/20",
-    conflict: "bg-[#c44242]/10 text-[#c44242] border-[#c44242]/20",
-    pending: "bg-[#71796b]/10 text-[#71796b] border-[#71796b]/20",
-    accepted: "bg-[#5f8f2f]/10 text-[#5f8f2f] border-[#5f8f2f]/20",
-    rejected: "bg-[#c44242]/10 text-[#c44242] border-[#c44242]/20",
+  const tones: Record<string, AdminStatusTone> = {
+    exact_match: "success", fuzzy_match: "warning", no_match: "neutral",
+    conflict: "danger", pending: "neutral", accepted: "success", rejected: "danger",
   };
-  return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${colors[status] || colors.pending}`}>
-      {status.replace("_", " ")}
-    </span>
-  );
+  return <AdminStatusBadge status={status} tone={tones[status] ?? "neutral"} />;
 }
 
 // ── Inline artist search component ──
@@ -147,51 +143,50 @@ function ArtistLinkSearch({
   };
 
   return (
-    <div className="relative w-full max-w-xs">
+    <div className="w-full min-w-0 max-w-md">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <input
-            type="text"
+          <WkSearchField
             value={query}
-            onChange={(e) => handleInput(e.target.value)}
-            placeholder={`Search registry for "${recordName}"…`}
+            onChange={handleInput}
+            ariaLabel={`Search Registry for "${recordName}"`}
+            placeholder="Search Registry Artists"
             disabled={picked}
             autoFocus
-            className="w-full rounded-lg border border-[#dfe4d8] bg-[#f8f9f4] px-3 py-1.5 text-[12px] outline-none transition focus:border-[#85c441] focus:bg-white disabled:opacity-50"
           />
           {searching && (
-            <WkIcon name="Loader2" size={12} className="animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-[#858c7e]" />
+            <WkIcon name="Loader2" size={12} className="animate-spin mt-1 text-wk-text-muted" />
           )}
         </div>
-        <button onClick={onCancel} disabled={picked} className="shrink-0 text-[11px] font-semibold text-[#858c7e] hover:text-[#171712] disabled:opacity-30 whitespace-nowrap">
+        <WkButton variant="ghost" onClick={onCancel} disabled={picked} className="wk-button-sm">
           Cancel
-        </button>
+        </WkButton>
       </div>
       {results.length > 0 && !picked && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-xl border border-[#dfe4d8] bg-white shadow-lg">
+        <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-wk-border bg-wk-surface">
           {results.map((artist) => (
             <button
               key={artist.id}
               onClick={() => handlePick(artist)}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#f0f3ec] transition"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-wk-surface-raised transition"
             >
               {artist.public_image_url ? (
                 <img src={artist.public_image_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
               ) : (
-                <div className="h-7 w-7 shrink-0 rounded-full bg-[#e0e5d8] flex items-center justify-center">
-                  <WkIcon name="Mic2" size={11} className="text-[#858c7e]" />
+                <div className="h-7 w-7 shrink-0 rounded-full bg-wk-surface-raised flex items-center justify-center">
+                  <WkIcon name="Mic2" size={11} className="text-wk-text-muted" />
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] font-bold text-[#171712] truncate">{artist.display_name}</p>
-                <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "Not set"} · {artist.status}</p>
+                <p className="text-[12px] font-bold text-wk-text truncate">{artist.display_name}</p>
+                <p className="text-[10px] text-wk-text-muted">{artist.origin_iso2 || "Not set"} · {artist.status}</p>
               </div>
             </button>
           ))}
         </div>
       )}
       {query && !searching && results.length === 0 && !picked && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-xl border border-[#dfe4d8] bg-white px-3 py-3 text-center text-[12px] text-[#858c7e] shadow-lg">
+        <div className="mt-2 rounded-xl border border-wk-border bg-wk-surface-raised px-3 py-3 text-sm text-wk-text-muted">
           No artists found
         </div>
       )}
@@ -202,32 +197,39 @@ function ArtistLinkSearch({
 // ── Linked target display ──
 function LinkedTarget({ artist }: { artist: RegistryArtistHit }) {
   return (
-    <div className="shrink-0 rounded-xl border border-[#85c441]/30 bg-[#5f8f2f]/5 p-3 min-w-[180px] max-w-[220px]">
-      <p className="text-[10px] font-black uppercase tracking-wide text-[#5f8f2f] mb-1">Linked Target</p>
+    <WkSurface className="w-fit max-w-full p-3">
+      <p className="text-[10px] font-black uppercase tracking-wide text-wk-brand mb-1">Linked Target</p>
       <div className="flex items-center gap-2">
         {artist.public_image_url ? (
           <img src={artist.public_image_url} alt="" className="h-8 w-8 rounded-full object-cover" />
         ) : (
-          <div className="h-8 w-8 rounded-full bg-[#e0e5d8] flex items-center justify-center">
-            <WkIcon name="Mic2" size={12} className="text-[#858c7e]" />
+          <div className="h-8 w-8 rounded-full bg-wk-surface-raised flex items-center justify-center">
+            <WkIcon name="Mic2" size={12} className="text-wk-text-muted" />
           </div>
         )}
         <div className="min-w-0">
-          <p className="text-[13px] font-bold text-[#171712] truncate">{artist.display_name}</p>
-          <p className="text-[10px] text-[#858c7e]">{artist.origin_iso2 || "No country"} · {artist.status}</p>
+          <p className="text-[13px] font-bold text-wk-text truncate">{artist.display_name}</p>
+          <p className="text-[10px] text-wk-text-muted">{artist.origin_iso2 || "No country"} · {artist.status}</p>
         </div>
       </div>
-    </div>
+    </WkSurface>
   );
 }
 
 export default function ArtistIntakePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const chartRun=searchParams.has("chart_source");
+  const candidateRun=searchParams.get("run");
+  const chartRunId=candidateRun &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateRun)
+      ?candidateRun:null;
+  const initialChartRun=useRef(chartRunId);
   const [csvText, setCsvText] = useState("");
-  const [runId, setRunId] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(initialChartRun.current);
   const [summary, setSummary] = useState<MatchSummary | null>(null);
   const [records, setRecords] = useState<StagingRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("exact_match");
+  const [activeTab, setActiveTab] = useState<string>(initialChartRun.current?"no_match":"exact_match");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -314,6 +316,12 @@ export default function ArtistIntakePage() {
     const result = await invokeIntakeApi("get_run_summary", { runId: id });
     if (result.ok) setSummary(result.summary);
   }
+
+  useEffect(()=>{
+    if(!initialChartRun.current)return;
+    void loadSummary(initialChartRun.current);
+    void loadResults(initialChartRun.current,"no_match");
+  },[]);
 
   async function handleTabChange(tab: string) {
     setActiveTab(tab);
@@ -417,10 +425,10 @@ export default function ArtistIntakePage() {
   }
 
   const tabs = useMemo(() => [
-    { key: "exact_match", label: "Exact Matches", count: summary?.exact_matches || 0, color: "text-[#5f8f2f]" },
-    { key: "fuzzy_match", label: "Fuzzy Matches", count: summary?.fuzzy_matches || 0, color: "text-[#c88b1a]" },
-    { key: "no_match", label: "New Artists", count: summary?.no_matches || 0, color: "text-[#c44242]" },
-    { key: "conflict", label: "Conflicts", count: summary?.conflicts || 0, color: "text-[#c44242]" },
+    { key: "exact_match", label: "Exact Matches", count: summary?.exact_matches || 0, color: "text-wk-brand" },
+    { key: "fuzzy_match", label: "Fuzzy Matches", count: summary?.fuzzy_matches || 0, color: "text-wk-warning" },
+    { key: "no_match", label: "New Artists", count: summary?.no_matches || 0, color: "text-wk-text" },
+    { key: "conflict", label: "Conflicts", count: summary?.conflicts || 0, color: "text-wk-danger" },
   ], [summary]);
 
   const approvedCount = useMemo(() => {
@@ -432,50 +440,57 @@ export default function ArtistIntakePage() {
   }, [records, decisions]);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f2] px-5 py-6 text-[#171712]">
+    <div data-wk-artist-intake className="min-w-0 text-wk-text">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-bold text-[#171712] shadow-xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-wk-border bg-wk-surface px-4 py-3 text-sm font-bold text-wk-text shadow-xl">
           {toast}
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto w-full max-w-5xl min-w-0">
+        <ChartReviewReturnContext />
+        {chartRun && !chartRunId &&
+          <p role="alert" className="mb-4 rounded-xl border border-wk-danger p-4 text-sm text-wk-danger">
+            The chart Artist Intake reference is invalid. Reopen the original song in Charts Studio.
+          </p>}
         {/* Header */}
-        <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="mb-5 flex flex-col items-start gap-3">
           <div>
-            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#5f8f2f]">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-wk-brand">
               Registry
             </p>
             <h1 className="text-3xl font-black tracking-tight">Artist Intake</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#697062]">
-              Import artists from CSV or TSV. The Registry owns canonical truth and prevents duplicate identities.
+            <p className="mt-2 max-w-2xl text-sm text-wk-text-muted">
+              {chartRun?
+                "Review the original chart Artist credit. Choose an existing Registry Artist or approve creating a draft identity. No origin or provider metadata is inferred.":
+                "Import artists from CSV or TSV. The Registry owns canonical truth and prevents duplicate identities."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
+            <WkButton variant="ghost"
               onClick={() => navigate("/admin/registry/artists")}
-              className="rounded-2xl border border-[#dfe4d8] bg-white px-4 py-3 text-sm font-black text-[#171712] shadow-sm transition hover:border-[#85c441] flex items-center gap-2"
+              className="wk-button-sm"
             >
               <WkIcon name="ArrowLeft" size={14} />
               Back to Artists
-            </button>
+            </WkButton>
           </div>
         </header>
 
         {/* Error */}
         {error && (
-          <section className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <section className="mb-4 rounded-2xl border border-wk-danger bg-wk-danger-soft p-4 text-sm font-semibold text-wk-danger">
             <p className="font-bold">{error}</p>
           </section>
         )}
 
         {/* Upload area */}
         {!runId && (
-          <section className="mb-6 rounded-2xl border border-[#dfe4d8] bg-white p-6">
-            <h2 className="mb-3 text-lg font-bold text-[#171712]">Upload Artist CSV / TSV</h2>
-            <div className="mb-4 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-[12px] text-[#697062] leading-relaxed">
-              <p className="font-bold text-[#171712] mb-2">Supported column names (tab or comma delimited):</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
+          <WkSurface className="mb-5 p-4 sm:p-5">
+            <h2 className="mb-3 text-lg font-bold text-wk-text">Upload Artist CSV / TSV</h2>
+            <div className="mb-4 rounded-xl border border-wk-border bg-wk-surface-raised p-4 text-[12px] text-wk-text-muted leading-relaxed">
+              <p className="font-bold text-wk-text mb-2">Supported column names (tab or comma delimited):</p>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
                 <span><strong>artist_id</strong>: Spotify ID</span>
                 <span><strong>artist_name</strong>: Display name</span>
                 <span><strong>origin_country</strong>: ISO2 code (e.g. KE)</span>
@@ -488,7 +503,7 @@ export default function ArtistIntakePage() {
                 <span><strong>latest_release</strong>: Latest album/track</span>
                 <span><strong>top_tracks</strong>: Spotify track IDs</span>
               </div>
-              <p className="mt-2 text-[#858c7e]">
+              <p className="mt-2 text-wk-text-muted">
                 Reviewed CSV evidence can enrich existing artists. New artist identities are created as drafts before any approved evidence is admitted.
               </p>
             </div>
@@ -496,22 +511,23 @@ export default function ArtistIntakePage() {
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               placeholder={`artist_id\tartist_name\torigin_country\tfollowers\tpopularity\tgenres\timage_url\tbiography\n2qUHKed63B8\tBurna Boy\tNG\t13000000\t85\tafrobeats, dancehall\thttps://...\tNigerian artist known for...`}
-              className="mb-4 h-52 w-full rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-4 text-sm font-mono outline-none transition focus:border-[#85c441] focus:bg-white resize-y"
+              aria-label="Artist CSV or TSV"
+              className="wk-input mb-4 min-h-52 w-full min-w-0 resize-none p-4 font-mono text-base"
             />
-            <div className="flex items-center gap-3">
-              <button
+            <div className="flex flex-wrap items-center gap-3">
+              <WkButton variant="primary"
                 onClick={handleUpload}
                 disabled={loading || !csvText.trim()}
-                className="rounded-2xl bg-[#5f8f2f] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#4d7a26] disabled:opacity-40 flex items-center gap-2"
+                className="wk-button-sm"
               >
                 {loading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="Upload" size={14} />}
                 {loading ? "Matching..." : "Upload & Match"}
-              </button>
-              <span className="text-[12px] text-[#858c7e]">
+              </WkButton>
+              <span className="text-[12px] text-wk-text-muted">
                 {csvText.trim() ? `${csvText.split("\n").filter((l) => l.trim()).length - 1} rows detected` : "Paste CSV or TSV above"}
               </span>
             </div>
-          </section>
+          </WkSurface>
         )}
 
         {/* Results */}
@@ -523,32 +539,34 @@ export default function ArtistIntakePage() {
                 <button
                   key={tab.key}
                   onClick={() => handleTabChange(tab.key)}
-                  className={`rounded-2xl border p-4 text-left transition ${
+                  aria-pressed={activeTab === tab.key}
+                  className={`rounded-xl border p-3 text-left transition ${
                     activeTab === tab.key
-                      ? "border-[#85c441] bg-white shadow-sm"
-                      : "border-[#dfe4d8] bg-white hover:border-[#85c441]"
+                      ? "border-wk-brand bg-wk-surface shadow-sm"
+                      : "border-wk-border bg-wk-surface hover:border-wk-brand"
                   }`}
                 >
-                  <p className="text-[11px] font-black uppercase tracking-wide text-[#71796b]">{tab.label}</p>
+                  <p className="text-[11px] font-black uppercase tracking-wide text-wk-text-muted">{tab.label}</p>
                   <p className={`mt-2 text-3xl font-black ${tab.color}`}>{tab.count}</p>
                 </button>
               ))}
             </section>
 
             {/* Tabs */}
-            <section className="mb-4 flex items-center gap-2 border-b border-[#dfe4d8] pb-3">
+            <section className="mb-4 flex flex-wrap items-center gap-2 border-b border-wk-border pb-3">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => handleTabChange(tab.key)}
-                  className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${
+                  aria-pressed={activeTab === tab.key}
+                  className={`wk-button wk-button-sm transition ${
                     activeTab === tab.key
-                      ? "bg-[#5f8f2f] text-white"
-                      : "text-[#71796b] hover:bg-[#f0f3ec]"
+                      ? "bg-wk-brand-soft text-wk-brand"
+                      : "text-wk-text-muted hover:bg-wk-surface-raised"
                   }`}
                 >
                   {tab.label}
-                  <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-black ${activeTab === tab.key ? "bg-white/20 text-white" : "bg-[#f0f3ec] text-[#71796b]"}`}>
+                  <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-black ${activeTab === tab.key ? "bg-wk-surface-raised text-wk-brand" : "bg-wk-surface-raised text-wk-text-muted"}`}>
                     {tab.count}
                   </span>
                 </button>
@@ -557,89 +575,89 @@ export default function ArtistIntakePage() {
 
             {/* Bulk selection bar */}
             {selectedIds.size > 0 && (
-              <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#c88b1a]/30 bg-[#c88b1a]/5 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-wk-warning bg-wk-warning-soft p-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-[13px] font-bold text-[#171712]">
+                  <span className="text-[13px] font-bold text-wk-text">
                     {selectedIds.size} artist{selectedIds.size !== 1 ? "s" : ""} selected
                   </span>
-                  <button onClick={clearSelection} className="text-[12px] font-semibold text-[#858c7e] hover:text-[#171712]">
+                  <WkButton variant="ghost" onClick={clearSelection} className="wk-button-sm">
                     Clear selection
-                  </button>
+                  </WkButton>
                 </div>
-                <div className="flex gap-2">
-                  <button
+                <div className="flex flex-wrap gap-2">
+                  <WkButton variant="ghost"
                     onClick={() => handleBulkDecision("rejected")}
                     disabled={bulkLoading}
-                    className="rounded-xl border border-[#dfe4d8] bg-white px-4 py-2 text-[13px] font-bold text-[#71796b] hover:bg-[#f0f3ec] disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+                    className="wk-button-sm"
                   >
                     {bulkLoading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="X" size={14} />}
                     Reject All Selected
-                  </button>
-                  <button
+                  </WkButton>
+                  <WkButton variant="primary"
                     onClick={() => handleBulkDecision("accepted")}
                     disabled={bulkLoading}
-                    className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#4d7a26] disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+                    className="wk-button-sm"
                   >
                     {bulkLoading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="Check" size={14} />}
                     Approve All Selected
-                  </button>
+                  </WkButton>
                 </div>
               </div>
             )}
 
             {/* Apply bar */}
-            <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#dfe4d8] bg-white p-4">
-              <div className="flex items-center gap-4">
+            <WkSurface className="mb-3 flex flex-wrap items-center gap-3 p-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {records.length > 0 && (
                   <WkCheckbox checked={allPendingSelected} onChange={toggleSelectAll} className="flex items-center gap-2 cursor-pointer select-none">
 
-                    <span className="text-[13px] font-semibold text-[#697062]">
+                    <span className="text-[13px] font-semibold text-wk-text-muted">
                       {allPendingSelected ? "Deselect all" : "Select all pending"}
                     </span>
                   </WkCheckbox>
                 )}
                 <div className="flex items-center gap-3">
-                  <span className="text-[13px] text-[#697062]">
-                    <strong className="text-[#171712]">{approvedCount}</strong> approved
-                    <span className="mx-2 text-[#c8d0be]">|</span>
-                    <strong className="text-[#171712]">{pendingCount}</strong> pending review
+                  <span className="text-[13px] text-wk-text-muted">
+                    <strong className="text-wk-text">{approvedCount}</strong> approved
+                    <span className="mx-2 text-wk-text-faint">|</span>
+                    <strong className="text-wk-text">{pendingCount}</strong> pending review
                   </span>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
+              <div className="flex flex-wrap gap-2">
+                <WkButton variant="ghost"
                   onClick={() => { setRunId(null); setSummary(null); setRecords([]); setDecisions({}); setSelectedIds(new Set()); setLinkedTargets({}); setCsvText(""); }}
-                  className="rounded-xl border border-[#dfe4d8] px-4 py-2 text-[13px] font-bold text-[#71796b] hover:bg-[#f0f3ec]"
+                  className="wk-button-sm"
                 >
                   Cancel
-                </button>
-                <button
+                </WkButton>
+                <WkButton variant="primary"
                   onClick={handleApplyAll}
                   disabled={applyLoading || approvedCount === 0}
-                  className="rounded-xl bg-[#5f8f2f] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#4d7a26] disabled:opacity-40 flex items-center gap-2"
+                  className="wk-button-sm"
                 >
                   {applyLoading ? <WkIcon name="Loader2" size={14} className="animate-spin" /> : <WkIcon name="Check" size={14} />}
                   {applyLoading ? "Applying..." : "Apply Approved"}
-                </button>
+                </WkButton>
               </div>
-            </div>
+            </WkSurface>
 
             {/* Records list */}
             {loading ? (
-              <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-[#dfe4d8] bg-white">
+              <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-wk-border bg-wk-surface">
                 <div className="flex flex-col items-center gap-3">
-                  <WkIcon name="Loader2" size={28} className="animate-spin text-[#5f8f2f]" />
-                  <p className="text-[13px] font-bold text-[#697062]">Loading results…</p>
+                  <WkIcon name="Loader2" size={28} className="animate-spin text-wk-brand" />
+                  <p className="text-[13px] font-bold text-wk-text-muted">Loading results…</p>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 {records.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[#dfe4d8] bg-white px-6 py-16 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f0f3ec]">
-                      <WkIcon name="SearchX" size={28} className="text-[#858c7e]" />
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-wk-border bg-wk-surface px-6 py-16 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wk-surface-raised">
+                      <WkIcon name="SearchX" size={28} className="text-wk-text-muted" />
                     </div>
-                    <p className="text-[16px] font-black text-[#171712]">No records in this category</p>
+                    <p className="text-[16px] font-black text-wk-text">No records in this category</p>
                   </div>
                 ) : (
                   records.map((record) => {
@@ -657,19 +675,12 @@ export default function ArtistIntakePage() {
                     const displayTarget = linkedTarget || record.target_artist;
 
                     return (
-                      <div
+                      <WkSurface
                         key={record.id}
-                        className={`rounded-2xl border bg-white p-4 transition ${
-                          isSelected
-                            ? "border-[#c88b1a] ring-1 ring-[#c88b1a]/30"
-                            : isAccepted
-                            ? "border-[#5f8f2f]/30 bg-[#5f8f2f]/5"
-                            : isRejected
-                            ? "border-[#c44242]/30 bg-[#c44242]/5"
-                            : "border-[#dfe4d8]"
-                        }`}
+                        data-wk-artist-intake-record
+                        className={`p-3 sm:p-4 ${isSelected ? "ring-1 ring-wk-warning" : isAccepted ? "ring-1 ring-wk-success" : isRejected ? "ring-1 ring-wk-danger" : ""}`}
                       >
-                        <div className="flex items-start gap-4">
+                        <div className="flex items-start gap-3">
                           {/* Selection checkbox */}
                           <div className="shrink-0 pt-1">
                             <WkCheckbox
@@ -685,29 +696,29 @@ export default function ArtistIntakePage() {
                             {imageUrl ? (
                               <img src={imageUrl} alt={record.source_artist_name} className="h-14 w-14 rounded-xl object-cover" />
                             ) : (
-                              <div className="h-14 w-14 rounded-xl bg-[#e0e5d8] flex items-center justify-center">
-                                <WkIcon name="Mic2" size={20} className="text-[#858c7e]" />
+                              <div className="h-14 w-14 rounded-xl bg-wk-surface-raised flex items-center justify-center">
+                                <WkIcon name="Mic2" size={20} className="text-wk-text-muted" />
                               </div>
                             )}
                           </div>
 
                           {/* Source info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="text-[15px] font-bold text-[#171712]">{record.source_artist_name}</h3>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="break-words text-[15px] font-bold text-wk-text">{record.source_artist_name}</h3>
                               <StatusBadge status={record.match_status} />
                               {(decisions[record.id]?.status || record.review_status) !== "pending" && (
                                 <StatusBadge status={decisions[record.id]?.status || record.review_status} />
                               )}
                               {displayTarget && (
-                                <span className="inline-flex rounded-full border border-[#5f8f2f]/20 bg-[#5f8f2f]/10 px-2 py-0.5 text-[10px] font-bold text-[#5f8f2f]">
+                                <span className="inline-flex rounded-full border border-wk-brand bg-wk-brand-soft px-2 py-0.5 text-[10px] font-bold text-wk-brand">
                                   Linked
                                 </span>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#858c7e] mb-1.5">
+                            <div className="flex flex-wrap items-center gap-2 text-[12px] text-wk-text-muted mb-1.5">
                               {record.source_origin_iso2 && (
-                                <span className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-bold text-[#71796b]">
+                                <span className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-bold text-wk-text-muted">
                                   {record.source_origin_iso2}
                                 </span>
                               )}
@@ -725,62 +736,61 @@ export default function ArtistIntakePage() {
                             {record.source_genres && record.source_genres.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-1.5">
                                 {record.source_genres.slice(0, 4).map((g) => (
-                                  <span key={g} className="rounded-full bg-[#f0f3ec] px-2 py-0.5 text-[10px] font-semibold text-[#71796b]">{g}</span>
+                                  <span key={g} className="rounded-full bg-wk-surface-raised px-2 py-0.5 text-[10px] font-semibold text-wk-text-muted">{g}</span>
                                 ))}
                                 {record.source_genres.length > 4 && (
-                                  <span className="text-[10px] text-[#a8ad9e]">+{record.source_genres.length - 4} more</span>
+                                  <span className="text-[10px] text-wk-text-faint">+{record.source_genres.length - 4} more</span>
                                 )}
                               </div>
                             )}
                             {/* Bio preview */}
                             {bio && (
-                              <p className="text-[12px] text-[#858c7e] line-clamp-2 max-w-lg">{bio}</p>
+                              <p className="text-[12px] text-wk-text-muted line-clamp-2 max-w-lg">{bio}</p>
                             )}
                             {record.match_reason && (
-                              <p className="mt-1 text-[11px] text-[#a8ad9e]">{record.match_reason}</p>
+                              <p className="mt-1 text-[11px] text-wk-text-faint">{record.match_reason}</p>
                             )}
-                          </div>
 
                           {/* Registry match or Linked target */}
                           {displayTarget ? (
                             <LinkedTarget artist={displayTarget} />
                           ) : matchArtist ? (
-                            <div className="shrink-0 rounded-xl border border-[#dfe4d8] bg-[#f8f9f4] p-3 min-w-[180px] max-w-[220px]">
-                              <p className="text-[10px] font-black uppercase tracking-wide text-[#71796b] mb-1">Registry Match</p>
+                            <WkSurface className="w-fit max-w-full p-3">
+                              <p className="text-[10px] font-black uppercase tracking-wide text-wk-text-muted mb-1">Registry Match</p>
                               <div className="flex items-center gap-2">
                                 {matchArtist.public_image_url ? (
                                   <img src={matchArtist.public_image_url} alt="" className="h-8 w-8 rounded-full object-cover" />
                                 ) : (
-                                  <div className="h-8 w-8 rounded-full bg-[#e0e5d8] flex items-center justify-center">
-                                    <WkIcon name="Mic2" size={12} className="text-[#858c7e]" />
+                                  <div className="h-8 w-8 rounded-full bg-wk-surface-raised flex items-center justify-center">
+                                    <WkIcon name="Mic2" size={12} className="text-wk-text-muted" />
                                   </div>
                                 )}
                                 <div className="min-w-0">
-                                  <p className="text-[13px] font-bold text-[#171712] truncate">{matchArtist.display_name}</p>
-                                  <p className="text-[10px] text-[#858c7e]">{matchArtist.origin_iso2 || "No country"}</p>
+                                  <p className="text-[13px] font-bold text-wk-text truncate">{matchArtist.display_name}</p>
+                                  <p className="text-[10px] text-wk-text-muted">{matchArtist.origin_iso2 || "No country"}</p>
                                   {!matchArtist.public_image_url && imageUrl && (
-                                    <p className="text-[9px] text-[#85c441] font-semibold mt-0.5">Will add image</p>
+                                    <p className="text-[9px] text-wk-brand font-semibold mt-0.5">Will add image</p>
                                   )}
                                   {!matchArtist.bio && bio && (
-                                    <p className="text-[9px] text-[#85c441] font-semibold">Will add bio</p>
+                                    <p className="text-[9px] text-wk-brand font-semibold">Will add bio</p>
                                   )}
                                 </div>
                               </div>
-                            </div>
+                            </WkSurface>
                           ) : null}
 
                           {/* Actions */}
-                          <div className="shrink-0 flex flex-col gap-2">
+                          <div data-wk-artist-intake-actions className="flex flex-wrap items-start gap-2">
                             {(decisions[record.id]?.status || record.review_status) === "pending" ? (
                               <>
                                 {/* Link button — only show for no_match records that aren't already linking */}
                                 {record.match_status === "no_match" && !isLinking && (
-                                  <button
+                                  <WkButton variant="ghost"
                                     onClick={() => setLinkingId(record.id)}
-                                    className="rounded-lg border border-[#c88b1a]/30 bg-[#c88b1a]/5 px-3 py-2 text-[12px] font-bold text-[#c88b1a] hover:bg-[#c88b1a]/10 flex items-center gap-1.5 whitespace-nowrap"
+                                    className="wk-button-sm"
                                   >
                                     <WkIcon name="Link" size={12} /> Link
-                                  </button>
+                                  </WkButton>
                                 )}
                                 {/* Inline search when linking */}
                                 {isLinking && (
@@ -792,32 +802,33 @@ export default function ArtistIntakePage() {
                                 )}
                                 {!isLinking && (
                                   <>
-                                    <button
+                                    <WkButton variant="primary"
                                       onClick={() => handleDecision(record.id, "accepted")}
-                                      className="rounded-lg bg-[#5f8f2f] px-3 py-2 text-[12px] font-bold text-white hover:bg-[#4d7a26] flex items-center gap-1.5 whitespace-nowrap"
+                                      className="wk-button-sm"
                                     >
                                       <WkIcon name="Check" size={12} /> Accept
-                                    </button>
-                                    <button
+                                    </WkButton>
+                                    <WkButton variant="ghost"
                                       onClick={() => handleDecision(record.id, "rejected")}
-                                      className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec] flex items-center gap-1.5 whitespace-nowrap"
+                                      className="wk-button-sm"
                                     >
                                       <WkIcon name="X" size={12} /> Reject
-                                    </button>
+                                    </WkButton>
                                   </>
                                 )}
                               </>
                             ) : (
-                              <button
+                              <WkButton variant="ghost"
                                 onClick={() => handleDecision(record.id, "pending")}
-                                className="rounded-lg border border-[#dfe4d8] px-3 py-2 text-[12px] font-bold text-[#71796b] hover:bg-[#f0f3ec] whitespace-nowrap"
+                                className="wk-button-sm"
                               >
                                 Undo
-                              </button>
+                              </WkButton>
                             )}
                           </div>
+                          </div>
                         </div>
-                      </div>
+                      </WkSurface>
                     );
                   })
                 )}
