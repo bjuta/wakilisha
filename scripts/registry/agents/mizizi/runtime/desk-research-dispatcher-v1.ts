@@ -779,7 +779,7 @@ export function createDeskResearchDispatcherV1(options:Options){
    !Array.isArray(pass.sourceReceipts)||pass.sourceReceipts.length>30)return false;
   if(pass.factualNoteReferences!==undefined){
    if(!options.factualNoteSubject||!factualNoteReferencesCurrentV1(pass.factualNoteReferences,
-    await readDeskFactualNotesV1(options.rpc,scope,options.factualNoteSubject,now)))return false;
+    await readDeskFactualNotesV1(options.rpc,scope,options.factualNoteSubject,now,pass.factualNoteReferences.map(r=>r.noteId))))return false;
   }
   const seen=new Set<string>();
   for(const ref of pass.sourceReceipts){

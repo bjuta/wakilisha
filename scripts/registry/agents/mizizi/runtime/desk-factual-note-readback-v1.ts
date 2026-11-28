@@ -13,13 +13,15 @@ function text(v:unknown,max:number,min=1):v is string{
  * or treat readback as permission to transmit it to an external model. */
 export type DeskFactualNoteV1=Readonly<{
  noteId:string;noteSha256:string;reviewRevision:number;caseId:string;workspaceId:string;
- expectedRevision:number;membershipSha256:string;observationSha256:string;authorId:string;reviewerId:string;
+ expectedRevision:number;membershipSha256:string;observationSha256:string;authorId:string|null;reviewerId:string|null;
+ authorJobId?:string;authorWorkerId?:string;originPassFingerprint?:string;originClaimIndex?:number;
+ sourceReceiptIds?:readonly string[];sourceLocators?:readonly string[];modelUseRef?:string;
  fieldKey:string;noteKind:string;consultationMethod:string;sourceLocator:string;noteText:string;
- noteTextSha256:string;locatorSha256:string;observedAt:string;reviewRef:string;validUntil:string;
+ noteTextSha256:string;locatorSha256:string;observedAt:string;reviewRef:string|null;validUntil:string;
  representation:"original_factual_note";verified:false;modelUseEligible:true;
 }>;
 export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScopeV1,
- subject:Readonly<{membershipSha256:string;observationSha256:string}>,now=Date.now){
+ subject:Readonly<{membershipSha256:string;observationSha256:string}>,now=Date.now,noteIds?:readonly string[]){
  const failNote=()=>fail("FACTUAL_NOTE_READBACK_DENIED");
  const shape=(v:unknown,keys:readonly string[]):v is Record<string,unknown>=>!!v&&typeof v==="object"&&!Array.isArray(v)&&
   Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
@@ -28,7 +30,8 @@ export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScope
   !/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(scope.workerId)||
   !Number.isSafeInteger(scope.expectedRevision)||scope.expectedRevision<1||!live()||
   !subject||!SHA.test(subject.membershipSha256)||!SHA.test(subject.observationSha256))failNote();
- const r=await rpc("mizizi_read_desk_factual_notes_v1",{p_scope:scope});
+ if(noteIds!==undefined&&(!Array.isArray(noteIds)||noteIds.length<1||noteIds.length>12||new Set(noteIds).size!==noteIds.length||noteIds.some(id=>!UUID.test(id))))return failNote();
+ const r=await rpc("mizizi_read_desk_factual_notes_v1",{p_scope:scope,...(noteIds?{p_note_ids:noteIds}: {})});
  if(!live()||r.error||!shape(r.data,["bodyText","bodySha256"]))return failNote();
  const packet=r.data;
  if(typeof packet.bodyText!=="string"||Buffer.byteLength(packet.bodyText)>128000||
@@ -41,23 +44,44 @@ export async function readDeskFactualNotesV1(rpc:WorkerRpc,scope:DeskSearchScope
   !Array.isArray(b.notes)||b.notes.length>12)return failNote();
  const seen=new Set<string>(),notes:DeskFactualNoteV1[]=[];
  for(const n of b.notes){
+  const agent=n?.consultationMethod==="autonomous_authorized_consultation";
   if(!shape(n,["noteId","noteSha256","reviewRevision","caseId","workspaceId","expectedRevision","membershipSha256",
    "observationSha256","authorId","reviewerId","fieldKey","noteKind","consultationMethod","sourceLocator","noteText",
-   "noteTextSha256","locatorSha256","observedAt","reviewRef","validUntil","representation","verified","modelUseEligible"]))
+   "noteTextSha256","locatorSha256","observedAt","reviewRef","validUntil","representation","verified","modelUseEligible",
+   ...(agent?["authorJobId","authorWorkerId","originPassFingerprint","originClaimIndex","sourceReceiptIds","sourceLocators","modelUseRef"]:[])]))
    return failNote();
   const x=n as unknown as DeskFactualNoteV1;
-  if(![x.noteId,x.authorId,x.reviewerId].every(v=>typeof v==="string"&&UUID.test(v))||
-   x.authorId===x.reviewerId||seen.has(x.noteId)||typeof x.noteSha256!=="string"||!SHA.test(x.noteSha256)||
-   !Number.isSafeInteger(x.reviewRevision)||x.reviewRevision<1||x.caseId!==scope.caseId||x.workspaceId!==scope.workspaceId||
+  const validLocator=(v:unknown)=>{
+   if(!text(v,1000,12))return false;
+   try{const u=new URL(v);return u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!!u.hostname;}
+   catch{return false;}
+  };
+  const authorValid=agent?
+   x.authorId===null&&typeof x.authorJobId==="string"&&UUID.test(x.authorJobId)&&
+    typeof x.authorWorkerId==="string"&&/^mizizi-chart:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(x.authorWorkerId)&&
+    typeof x.originPassFingerprint==="string"&&SHA.test(x.originPassFingerprint)&&
+    Number.isSafeInteger(x.originClaimIndex)&&x.originClaimIndex!>=0&&x.originClaimIndex!<20&&
+    Array.isArray(x.sourceReceiptIds)&&x.sourceReceiptIds.length>=1&&x.sourceReceiptIds.length<=12&&
+    new Set(x.sourceReceiptIds).size===x.sourceReceiptIds.length&&x.sourceReceiptIds.every(id=>typeof id==="string"&&UUID.test(id))&&
+    Array.isArray(x.sourceLocators)&&x.sourceLocators.length===x.sourceReceiptIds.length&&x.sourceLocators[0]===x.sourceLocator&&
+    x.sourceLocators.every(validLocator)&&text(x.modelUseRef,500,8)&&
+    (x.reviewRevision===0?x.reviewerId===null&&x.reviewRef===null:
+     typeof x.reviewerId==="string"&&UUID.test(x.reviewerId)&&text(x.reviewRef,500,8)):
+   typeof x.authorId==="string"&&UUID.test(x.authorId)&&typeof x.reviewerId==="string"&&UUID.test(x.reviewerId)&&
+    x.authorId!==x.reviewerId&&x.reviewRevision>=1&&text(x.reviewRef,500,8);
+  if(!authorValid||typeof x.noteId!=="string"||!UUID.test(x.noteId)||seen.has(x.noteId)||
+   (noteIds!==undefined&&!noteIds.includes(x.noteId))||typeof x.noteSha256!=="string"||!SHA.test(x.noteSha256)||
+   !Number.isSafeInteger(x.reviewRevision)||x.reviewRevision<0||x.caseId!==scope.caseId||x.workspaceId!==scope.workspaceId||
    x.expectedRevision!==scope.expectedRevision||x.membershipSha256!==subject.membershipSha256||
    x.observationSha256!==subject.observationSha256||
    !["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"].includes(x.fieldKey)||
    !["direct_observation","attributed_claim","inference"].includes(x.noteKind)||
-   !["manual_public_consultation","manual_first_party_consultation"].includes(x.consultationMethod)||
-   !text(x.noteText,1200,8)||!text(x.sourceLocator,1000,12)||!/^https:\/\/[a-z0-9.-]+\/[A-Za-z0-9_./~%-]+$/.test(x.sourceLocator)||
-   /\/[.]{1,2}(\/|$)|%(2e|2f|5c|25|00)/i.test(x.sourceLocator)||
+   (!agent&&!["manual_public_consultation","manual_first_party_consultation"].includes(x.consultationMethod))||
+   !text(x.noteText,1200,8)||!validLocator(x.sourceLocator)||
+   (!agent&&(!/^https:\/\/[a-z0-9.-]+\/[A-Za-z0-9_./~%-]+$/.test(x.sourceLocator)||
+    /\/[.]{1,2}(\/|$)|%(2e|2f|5c|25|00)/i.test(x.sourceLocator)))||
    hash(x.noteText)!==x.noteTextSha256||hash(x.sourceLocator)!==x.locatorSha256||
-   !text(x.reviewRef,500,8)||typeof x.observedAt!=="string"||!Number.isFinite(Date.parse(x.observedAt))||
+   typeof x.observedAt!=="string"||!Number.isFinite(Date.parse(x.observedAt))||
    Date.parse(x.observedAt)>now()||typeof x.validUntil!=="string"||!Number.isFinite(Date.parse(x.validUntil))||
    Date.parse(x.validUntil)<=now()||Date.parse(x.validUntil)>Date.parse(scope.leaseExpiresAt)||
    x.representation!=="original_factual_note"||x.verified!==false||x.modelUseEligible!==true)return failNote();
@@ -74,7 +98,8 @@ export function factualNoteReferencesV1(packet:DeskFactualNoteReadbackV1):readon
 }
 export function factualNoteContextV1(packet:DeskFactualNoteReadbackV1){
  return packet.notes.map(n=>({noteId:n.noteId,fieldKey:n.fieldKey,noteKind:n.noteKind,sourceLocator:n.sourceLocator,
-  noteText:n.noteText,observedAt:n.observedAt,representation:n.representation,verified:false}));
+  noteText:n.noteText,observedAt:n.observedAt,representation:n.representation,verified:false,
+  ...(n.authorJobId?{authorship:"mizizi",sourceLocators:n.sourceLocators}: {})}));
 }
 export function validFactualNoteReferencesV1(refs:unknown):refs is readonly DeskFactualNoteReferenceV1[]{
  if(!Array.isArray(refs)||refs.length<1||refs.length>12)return false;
@@ -82,7 +107,7 @@ export function validFactualNoteReferencesV1(refs:unknown):refs is readonly Desk
  for(const r of refs){
   if(!r||typeof r!=="object"||Array.isArray(r)||Object.keys(r).sort().join(",")!=="noteId,noteSha256,reviewRevision"||
    typeof r.noteId!=="string"||!UUID.test(r.noteId)||seen.has(r.noteId)||typeof r.noteSha256!=="string"||!SHA.test(r.noteSha256)||
-   !Number.isSafeInteger(r.reviewRevision)||r.reviewRevision<1)return false;
+   !Number.isSafeInteger(r.reviewRevision)||r.reviewRevision<0)return false;
   seen.add(r.noteId);
  }
  return true;

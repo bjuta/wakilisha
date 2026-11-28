@@ -1754,3 +1754,251 @@ begin
   'verified',false,'jobsDispatched',0);
 end $function$
 
+-- Note recall shares the current custody and immutable journal authority.
+-- The original pass is independently re-read; agent identity is a job, not
+-- an authenticated human. No note becomes a canonical or source receipt.
+do $wk_note_recall_preimage$ begin
+ if pg_get_functiondef('public.mizizi_read_desk_factual_notes_v1(jsonb)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION public.mizizi_read_desk_factual_notes_v1(p_scope jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;n mizizi_private.desk_factual_notes_v1;d mizizi_private.desk_factual_note_reviews_v1;
+ items jsonb:='[]'::jsonb;body text;expiry timestamptz;
+begin
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ for n in select x.* from mizizi_private.desk_factual_notes_v1 x
+  where x.case_id=(c->>'caseId')::uuid and x.workspace_id=(c->>'workspaceId')::uuid
+   and x.expected_revision=(c->>'expectedRevision')::integer
+   and x.membership_sha256=c->>'membershipSha256' and x.observation_sha256=c->>'observationSha256'
+  order by x.note_id
+ loop
+  select * into d from mizizi_private.desk_factual_note_reviews_v1 r where r.note_id=n.note_id order by r.revision desc limit 1;
+  if not found or d.decision<>'admitted' or not d.model_processing_allowed or d.valid_until<=clock_timestamp()
+   or d.note_sha256<>n.note_sha256 or d.reviewer_id=n.author_id then continue;end if;
+  -- An expired or revoked actor invalidates this note rather than becoming
+  -- permission to transmit it. Fail closed on any unexpected exception.
+  begin
+   perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,n.author_id);
+   perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,d.reviewer_id);
+  exception when insufficient_privilege then continue;end;
+  if jsonb_array_length(items)>=12 then raise exception 'Factual note readback bound exceeded' using errcode='55000';end if;
+  expiry:=least(d.valid_until,(c->>'leaseExpiresAt')::timestamptz);
+  if expiry<=clock_timestamp() then return null;end if;
+  items:=items||jsonb_build_array(jsonb_build_object(
+   'noteId',n.note_id,'noteSha256',n.note_sha256,'reviewRevision',d.revision,
+   'caseId',n.case_id,'workspaceId',n.workspace_id,'expectedRevision',n.expected_revision,
+   'membershipSha256',n.membership_sha256,'observationSha256',n.observation_sha256,
+   'authorId',n.author_id,'reviewerId',d.reviewer_id,'fieldKey',n.field_key,'noteKind',n.note_kind,
+   'consultationMethod',n.consultation_method,'sourceLocator',n.source_locator,'noteText',n.note_text,
+   'noteTextSha256',encode(sha256(convert_to(n.note_text,'UTF8')),'hex'),
+   'locatorSha256',encode(sha256(convert_to(n.source_locator,'UTF8')),'hex'),
+   'observedAt',n.observed_at,'reviewRef',d.review_ref,'validUntil',expiry,
+   'representation','original_factual_note','verified',false,'modelUseEligible',true));
+ end loop;
+ if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then return null;end if;
+ body:=jsonb_build_object('contract','mizizi.desk_factual_note_readback.v1',
+  'scope',p_scope,'membershipSha256',c->>'membershipSha256','observationSha256',c->>'observationSha256',
+  'notes',items)::text;
+ return jsonb_build_object('bodyText',body,'bodySha256',encode(sha256(convert_to(body,'UTF8')),'hex'));
+end $function$
+$wk_exact$
+ then raise exception 'MIZIZI_AGENT_NOTE_READ_PREIMAGE_CHANGED';end if;
+ if pg_get_functiondef('mizizi_private.desk_factual_note_references_current_v1(jsonb,jsonb)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION mizizi_private.desk_factual_note_references_current_v1(c jsonb, b jsonb)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare packet jsonb;notes jsonb;ref jsonb;ids uuid[]:=array[]::uuid[];nid uuid;
+begin
+ if jsonb_typeof(b->'factualNoteReferences') is distinct from 'array' or
+ jsonb_array_length(b->'factualNoteReferences') not between 1 and 12 or b ? 'deskBatchReceipt' then return false;end if;
+ packet:=public.mizizi_read_desk_factual_notes_v1(jsonb_build_object('jobId',c->'jobId','caseId',c->'caseId',
+ 'workspaceId',c->'workspaceId','expectedRevision',c->'expectedRevision','workerId',c->'workerId','leaseExpiresAt',c->'leaseExpiresAt'));
+ if packet is null then return false;end if;
+ notes:=(packet->>'bodyText')::jsonb->'notes';
+ for ref in select value from jsonb_array_elements(b->'factualNoteReferences') loop
+  if jsonb_typeof(ref) is distinct from 'object' or (select count(*) from jsonb_object_keys(ref))<>3
+   or coalesce(ref->>'noteId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+   or coalesce(ref->>'noteSha256','') !~ '^[a-f0-9]{64}$' or jsonb_typeof(ref->'reviewRevision') is distinct from 'number'
+   or coalesce(ref->>'reviewRevision','') !~ '^[1-9][0-9]{0,8}$' then return false;end if;
+  nid:=(ref->>'noteId')::uuid;
+  if nid=any(ids) or not exists(select 1 from jsonb_array_elements(notes) n where n->>'noteId'=ref->>'noteId'
+   and n->>'noteSha256'=ref->>'noteSha256' and n->'reviewRevision'=ref->'reviewRevision') then return false;end if;
+  -- Notes are context, not evidence citations, and cannot be treated as such.
+  if exists(select 1 from jsonb_array_elements(b->'findings') f where f->'sourceIds' @> jsonb_build_array(nid::text))
+   or exists(select 1 from jsonb_array_elements(b->'sourceReceipts') s where s->>'sourceId'=nid::text)
+   then return false;end if;
+  ids:=array_append(ids,nid);
+ end loop;
+ return true;
+end $function$
+$wk_exact$
+ then raise exception 'MIZIZI_AGENT_NOTE_REFS_PREIMAGE_CHANGED';end if;
+end $wk_note_recall_preimage$;
+create function mizizi_private.desk_agent_note_current_v1(n mizizi_private.desk_factual_notes_v1,c jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $f$
+declare b jsonb;f jsonb;src jsonb;r mizizi_private.desk_tool_receipts_v1;sid uuid;
+ locators jsonb:='[]'::jsonb;expiry timestamptz;observed timestamptz;
+begin
+ if c is null or n.author_id is not null or n.author_job_id is null
+  or n.case_id::text is distinct from c->>'caseId' or n.workspace_id::text is distinct from c->>'workspaceId'
+  or n.expected_revision is distinct from (c->>'expectedRevision')::integer
+  or n.membership_sha256 is distinct from c->>'membershipSha256' or n.observation_sha256 is distinct from c->>'observationSha256'
+  then return null;end if;
+ select p.body_text::jsonb into b from mizizi_private.research_passes p where p.case_id=n.case_id
+  and p.workspace_id=n.workspace_id and p.job_id=n.author_job_id and p.fingerprint=n.origin_pass_fingerprint
+  and encode(sha256(convert_to(p.body_text,'UTF8')),'hex')=n.origin_pass_fingerprint;
+ if not found then return null;end if;
+ f:=b->'findings'->n.origin_claim_index;
+ if f->>'statement' is distinct from n.note_text or f->>'fieldKey' is distinct from n.field_key
+  or f->>'noteKind' is distinct from n.note_kind or f->'sourceIds' is distinct from to_jsonb(n.source_receipt_ids)
+ then return null;end if;
+ if n.note_sha256 is distinct from encode(sha256(convert_to(jsonb_build_array(n.case_id,n.workspace_id,n.expected_revision,n.membership_sha256,
+   n.observation_sha256,n.author_job_id,n.author_worker_id,n.origin_pass_fingerprint,n.origin_claim_index,n.source_receipt_ids,
+   n.field_key,n.note_kind,n.consultation_method,n.source_locator,n.note_text)::text,'UTF8')),'hex') then return null;end if;
+ foreach sid in array n.source_receipt_ids loop
+  select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+  if not found or r.job_id is distinct from n.author_job_id or r.worker_id is distinct from n.author_worker_id
+   or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false)
+   or not exists(select 1 from jsonb_array_elements(b->'deskToolReceipts') d where d->>'receiptId'=sid::text
+    and d->>'callSha256'=r.call_sha256 and d->>'resultSha256'=r.result_sha256) then return null;end if;
+  select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
+  if not found or src->'modelDisclosed' is distinct from 'true'::jsonb or src->>'citation' is null
+   or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
+   or src->>'excerpt' is distinct from r.result_text::jsonb->'sources'->0->>'excerpt'
+   or src->>'citation' is distinct from r.result_text::jsonb->'sources'->0->>'citation' then return null;end if;
+  locators:=locators||jsonb_build_array(src->>'citation');
+  observed:=greatest(observed,(src->>'observedAt')::timestamptz);
+  expiry:=least(expiry,(r.result_text::jsonb->'sources'->0->'source'->>'expiresAt')::timestamptz);
+ end loop;
+ if n.source_locator is distinct from locators->>0 or n.observed_at is distinct from observed
+  or expiry is null or expiry<=clock_timestamp() then return null;end if;
+ return jsonb_build_object('sourceLocators',locators,'validUntil',expiry);
+end $f$;
+revoke all on function mizizi_private.desk_agent_note_current_v1(mizizi_private.desk_factual_notes_v1,jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+CREATE FUNCTION mizizi_private.desk_factual_note_packet_v1(p_scope jsonb,p_note_ids uuid[])
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;n mizizi_private.desk_factual_notes_v1;d mizizi_private.desk_factual_note_reviews_v1;
+ items jsonb:='[]'::jsonb;body text;expiry timestamptz;agent jsonb;agent_fields jsonb;
+ o mizizi_private.desk_operational_policy_versions_v1;has_review boolean;
+begin
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ if p_note_ids is not null and (cardinality(p_note_ids) not between 1 and 12 or
+  cardinality(p_note_ids)<>(select count(distinct v) from unnest(p_note_ids) v)) then return null;end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ for n in select x.* from mizizi_private.desk_factual_notes_v1 x
+  where x.case_id=(c->>'caseId')::uuid and x.workspace_id=(c->>'workspaceId')::uuid
+   and x.expected_revision=(c->>'expectedRevision')::integer
+   and x.membership_sha256=c->>'membershipSha256' and x.observation_sha256=c->>'observationSha256'
+   and (p_note_ids is null or x.note_id=any(p_note_ids))
+  order by (x.author_id is null),case when x.author_id is not null then x.note_id end,x.recorded_at desc,x.note_id
+ loop
+  agent_fields:='{}'::jsonb;
+  select * into d from mizizi_private.desk_factual_note_reviews_v1 r where r.note_id=n.note_id order by r.revision desc limit 1;
+  has_review:=found;
+  if n.author_id is not null then
+   if not has_review or d.decision<>'admitted' or not d.model_processing_allowed or d.valid_until<=clock_timestamp()
+    or d.note_sha256<>n.note_sha256 or d.reviewer_id=n.author_id then continue;end if;
+   begin
+    perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,n.author_id);
+    perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,d.reviewer_id);
+   exception when insufficient_privilege then continue;end;
+   expiry:=least(d.valid_until,(c->>'leaseExpiresAt')::timestamptz);
+  else
+   -- A machine note is unverified original context. An independent standing
+   -- session and current source rights govern reuse, not a fabricated review.
+   if o.revision is null or not mizizi_private.desk_operational_policy_live_v1(o,c) then continue;end if;
+   if has_review then
+    if d.decision<>'admitted' or not d.model_processing_allowed or d.valid_until<=clock_timestamp() or d.note_sha256<>n.note_sha256 then continue;end if;
+    begin perform mizizi_private.assert_chart_candidate_research_actor_v1(n.workspace_id,d.reviewer_id);
+    exception when insufficient_privilege then continue;end;
+   end if;
+   agent:=mizizi_private.desk_agent_note_current_v1(n,c);
+   if agent is null then continue;end if;
+   expiry:=least(o.valid_until,(c->>'leaseExpiresAt')::timestamptz,(agent->>'validUntil')::timestamptz,
+    case when has_review then d.valid_until end);
+   agent_fields:=jsonb_build_object('authorJobId',n.author_job_id,'authorWorkerId',n.author_worker_id,
+    'originPassFingerprint',n.origin_pass_fingerprint,'originClaimIndex',n.origin_claim_index,
+    'sourceReceiptIds',to_jsonb(n.source_receipt_ids),'sourceLocators',agent->'sourceLocators',
+    'modelUseRef','desk-standing:'||o.revision::text);
+  end if;
+  -- Bound only the selected context, never the durable corpus.
+  if jsonb_array_length(items)>=12 then exit;end if;
+  if expiry<=clock_timestamp() then return null;end if;
+  items:=items||jsonb_build_array(jsonb_build_object(
+   'noteId',n.note_id,'noteSha256',n.note_sha256,'reviewRevision',case when has_review then d.revision else 0 end,
+   'caseId',n.case_id,'workspaceId',n.workspace_id,'expectedRevision',n.expected_revision,
+   'membershipSha256',n.membership_sha256,'observationSha256',n.observation_sha256,
+   'authorId',n.author_id,'reviewerId',d.reviewer_id,'fieldKey',n.field_key,'noteKind',n.note_kind,
+   'consultationMethod',n.consultation_method,'sourceLocator',n.source_locator,'noteText',n.note_text,
+   'noteTextSha256',encode(sha256(convert_to(n.note_text,'UTF8')),'hex'),
+   'locatorSha256',encode(sha256(convert_to(n.source_locator,'UTF8')),'hex'),
+   'observedAt',n.observed_at,'reviewRef',d.review_ref,'validUntil',expiry,
+   'representation','original_factual_note','verified',false,'modelUseEligible',true)||agent_fields);
+ end loop;
+ if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then return null;end if;
+ body:=jsonb_build_object('contract','mizizi.desk_factual_note_readback.v1',
+  'scope',p_scope,'membershipSha256',c->>'membershipSha256','observationSha256',c->>'observationSha256',
+  'notes',items)::text;
+ return jsonb_build_object('bodyText',body,'bodySha256',encode(sha256(convert_to(body,'UTF8')),'hex'));
+end $function$
+
+revoke all on function mizizi_private.desk_factual_note_packet_v1(jsonb,uuid[]) from public,anon,authenticated,service_role,mizizi_executor;
+create or replace function public.mizizi_read_desk_factual_notes_v1(p_scope jsonb)
+returns jsonb language sql security definer set search_path=pg_catalog as $f$
+ select mizizi_private.desk_factual_note_packet_v1(p_scope,null::uuid[])
+$f$;
+-- Exact historical references can be checked without putting the whole
+-- notebook into the current model context.
+create function public.mizizi_read_desk_factual_notes_v1(p_scope jsonb,p_note_ids uuid[])
+returns jsonb language sql security definer set search_path=pg_catalog as $f$
+ select mizizi_private.desk_factual_note_packet_v1(p_scope,p_note_ids)
+$f$;
+revoke all on function public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[]) from public,anon,authenticated,service_role,mizizi_executor;
+grant execute on function public.mizizi_read_desk_factual_notes_v1(jsonb,uuid[]) to service_role;
+CREATE OR REPLACE FUNCTION mizizi_private.desk_factual_note_references_current_v1(c jsonb, b jsonb)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare packet jsonb;notes jsonb;ref jsonb;ids uuid[]:=array[]::uuid[];nid uuid;requested uuid[];
+begin
+ if jsonb_typeof(b->'factualNoteReferences') is distinct from 'array' or
+ jsonb_array_length(b->'factualNoteReferences') not between 1 and 12 or b ? 'deskBatchReceipt' then return false;end if;
+ if exists(select 1 from jsonb_array_elements(b->'factualNoteReferences') v
+  where coalesce(v->>'noteId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$') then return false;end if;
+ select array_agg((v->>'noteId')::uuid) into requested from jsonb_array_elements(b->'factualNoteReferences') v;
+ if cardinality(requested)<>(select count(distinct v) from unnest(requested) v) then return false;end if;
+ packet:=mizizi_private.desk_factual_note_packet_v1(jsonb_build_object('jobId',c->'jobId','caseId',c->'caseId',
+ 'workspaceId',c->'workspaceId','expectedRevision',c->'expectedRevision','workerId',c->'workerId','leaseExpiresAt',c->'leaseExpiresAt'),requested);
+ if packet is null then return false;end if;
+ notes:=(packet->>'bodyText')::jsonb->'notes';
+ for ref in select value from jsonb_array_elements(b->'factualNoteReferences') loop
+  if jsonb_typeof(ref) is distinct from 'object' or (select count(*) from jsonb_object_keys(ref))<>3
+   or coalesce(ref->>'noteId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+   or coalesce(ref->>'noteSha256','') !~ '^[a-f0-9]{64}$' or jsonb_typeof(ref->'reviewRevision') is distinct from 'number'
+   or coalesce(ref->>'reviewRevision','') !~ '^(0|[1-9][0-9]{0,8})$' then return false;end if;
+  nid:=(ref->>'noteId')::uuid;
+  if nid=any(ids) or not exists(select 1 from jsonb_array_elements(notes) n where n->>'noteId'=ref->>'noteId'
+   and n->>'noteSha256'=ref->>'noteSha256' and n->'reviewRevision'=ref->'reviewRevision') then return false;end if;
+  -- Notes are context, not evidence citations, and cannot be treated as such.
+  if exists(select 1 from jsonb_array_elements(b->'findings') f where f->'sourceIds' @> jsonb_build_array(nid::text))
+   or exists(select 1 from jsonb_array_elements(b->'sourceReceipts') s where s->>'sourceId'=nid::text)
+   then return false;end if;
+  ids:=array_append(ids,nid);
+ end loop;
+ return true;
+end $function$
+

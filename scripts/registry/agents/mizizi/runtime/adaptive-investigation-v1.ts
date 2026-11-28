@@ -29,8 +29,8 @@ export function notebookClaimCurrentV1(claim:ResearchClaimV1,sources:readonly {s
  if(claim.fieldKey===undefined&&claim.noteKind===undefined)return true;
  if(!NOTEBOOK_FIELDS_V1.includes(claim.fieldKey!)||!NOTEBOOK_KINDS_V1.includes(claim.noteKind!)||
   typeof claim.statement!=="string"||claim.statement.length<8||claim.statement.length>1200||
-  !claim.sourceIds.length||new Set(claim.sourceIds).size!==claim.sourceIds.length)return false;
- const normalized=(v:string)=>v.trim().replace(/\\s+/g," ").toLowerCase();
+  !Array.isArray(claim.sourceIds)||!claim.sourceIds.length||claim.sourceIds.length>12||new Set(claim.sourceIds).size!==claim.sourceIds.length)return false;
+ const normalized=(v:string)=>v.trim().replace(/\s+/g," ").toLowerCase();
  const statement=normalized(claim.statement);
  return claim.sourceIds.every(id=>{
   const s=sources.find(x=>x.sourceId===id);

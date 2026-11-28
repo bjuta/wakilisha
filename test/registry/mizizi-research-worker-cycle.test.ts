@@ -91,6 +91,21 @@ describe("MIZIZI original factual-note readback",()=>{
   expect(result.notes[0]).not.toHaveProperty("sourceId");
   expect(Object.isFrozen(result.notes[0])).toBe(true);
  });
+ it("recalls original agent notes with job provenance, not a fabricated human review",async()=>{
+  const agent={...note,authorId:null,reviewerId:null,reviewRef:null,reviewRevision:0,
+   consultationMethod:"autonomous_authorized_consultation",authorJobId:JOB,authorWorkerId:"mizizi-chart:"+EVENT,
+   originPassFingerprint:"d".repeat(64),originClaimIndex:0,sourceReceiptIds:[EVENT],sourceLocators:[sourceLocator],
+   modelUseRef:"desk-standing:1"};
+  const rpc:WorkerRpc=vi.fn(async()=>({data:packet({...body,notes:[agent]}),error:null}));
+  expect((await readDeskFactualNotesV1(rpc,scope,subject,()=>NOW,[RECEIPT])).notes).toEqual([agent]);
+  expect(rpc).toHaveBeenCalledWith("mizizi_read_desk_factual_notes_v1",{p_scope:scope,p_note_ids:[RECEIPT]});
+  for(const bad of [{authorId:JOB},{reviewerId:EVENT},{originPassFingerprint:"forged"},{sourceReceiptIds:[]},
+   {sourceLocators:["https://other.example/"]},{modelUseRef:""},{verified:true},{reviewRevision:1}]){
+   await expect(readDeskFactualNotesV1(async()=>({data:packet({...body,notes:[{...agent,...bad}]}),error:null}),scope,subject,()=>NOW))
+    .rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+  }
+  await expect(readDeskFactualNotesV1(rpc,scope,subject,()=>NOW,[EVENT])).rejects.toThrow("FACTUAL_NOTE_READBACK_DENIED");
+ });
  it("rejects tampering, stale/foreign bindings, self-review, false verification and private or expired notes",async()=>{
   const variants=[{...body,scope:{...scope,caseId:EVENT}},{...body,observationSha256:"d".repeat(64)},
    ...[{noteText:"Tampered note"},{sourceLocator:"https://example.org/fixture?token=secret"},{authorId:EVENT},

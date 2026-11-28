@@ -36,7 +36,7 @@ const PROMPT=[
  "When evidence is insufficient, propose meaningful follow-up questions or pause. Do not perform writes.",
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
 ].join(" ");
-const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified human research context, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
+const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified original research context, authored by MIZIZI or a human researcher, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
 const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use only actually examined source IDs, never quote publisher text as your note. A note is not independent factual verification.";
 const NOTEBOOK_CLAIM_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items,
  properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.properties,

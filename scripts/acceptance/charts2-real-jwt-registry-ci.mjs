@@ -1105,10 +1105,10 @@ export async function verifyCharts2RealJwtRegistryV1({
  from mizizi_private.chart_candidate_subjects_v1 where case_id=${q(sharedTarget)}::uuid;
  insert into mizizi_private.desk_operational_policy_versions_v1(workspace_id,case_id,revision,expected_revision,
  membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,
- max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms,shared_native_auto_allowed,public_retained_batch_allowed)
+ max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms,shared_native_auto_allowed,public_retained_batch_allowed,public_web_transient_allowed)
  values (${q(ws)},${q(pairedId)},1,2,${q(context.membershipSha256)},${q(context.observationSha256)},true,
  'fixture:standing-owner-review',${q(credential)},array['fixture-haiku'],array[${q(questionHash)}],
- array['search_web','read_page','browse_page','inspect_visual','recall_evidence'],5,10000,${j(rules)},now()+interval '2 days',true,array['recording credits'],true,true);
+ array['search_web','read_page','browse_page','inspect_visual','recall_evidence'],5,10000,${j(rules)},now()+interval '2 days',true,array['recording credits'],true,true,false);
  insert into mizizi_private.desk_resource_policy_versions_v1(
  resource,revision,enabled,workspace_id,account_fingerprint,entitlement_ref,billing_safeguard_ref,
  exclusive_allocation_verified,capacity_ceiling_verified,paid_inference_authorized,zero_incremental_cost_verified,
@@ -1190,6 +1190,38 @@ export async function verifyCharts2RealJwtRegistryV1({
  if (${append(standingPage)}->>'outcome') is distinct from 'created' then raise exception 'STOP_STANDING_NATIVE_ADMISSION';end if;
  if (${authority("model_disclose",envelope(3,[standingPageId],deps))}->>'allowed') is distinct from 'true'
  then raise exception 'STOP_STANDING_DYNAMIC_MODEL_TRANSCRIPT';end if;
+ -- Agent note authoring and recall share the same exact source/journal.
+ -- Roll back the fixture so the original continuation tests stay unchanged.
+ declare pass jsonb;bad jsonb;t text;fp text;outcome text;packet jsonb;agent jsonb;note_count integer;
+ begin
+  pass:=${q(journalBodyFor(deps))}::jsonb||jsonb_build_object('findings',jsonb_build_array(jsonb_build_object(
+   'statement','The archival programme is a provisional recording reference.','sourceIds',jsonb_build_array(${q(standingPageId)}),
+   'interpretation','hypothesis','uncertainty',0.8,'reasoningSummary','This original note does not establish the recording identity.',
+   'fieldKey','subject_version','noteKind','attributed_claim','independentlyVerified',false,'verificationRef',null)));
+  bad:=jsonb_set(pass,'{findings,0,sourceIds}',jsonb_build_array(${q(staleId)}));
+  begin
+   t:=bad::text;
+   perform * from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,encode(sha256(convert_to(t,'UTF8')),'hex'),null);
+   raise exception 'STOP_AGENT_NOTE_FOREIGN_SOURCE';
+  exception when insufficient_privilege then null;end;
+  t:=pass::text;fp:=encode(sha256(convert_to(t,'UTF8')),'hex');
+  select r.outcome into strict outcome from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,fp,null) r;
+  if outcome is distinct from 'created' then raise exception 'STOP_AGENT_NOTE_APPEND';end if;
+  select r.outcome into strict outcome from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,${q(activeWorker)},t,fp,null) r;
+  if outcome is distinct from 'replayed' then raise exception 'STOP_AGENT_NOTE_REPLAY';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)});
+  select count(*),max(v::text)::jsonb into note_count,agent from jsonb_array_elements((packet->>'bodyText')::jsonb->'notes') v
+   where v->>'consultationMethod'='autonomous_authorized_consultation';
+  if note_count<>1 or agent->>'authorJobId' is distinct from ${q(job.job_id)}
+   or agent->>'originPassFingerprint' is distinct from fp or agent->'authorId' is distinct from 'null'::jsonb
+   or agent->'reviewerId' is distinct from 'null'::jsonb or agent->>'reviewRevision' is distinct from '0'
+   or agent->'verified' is distinct from 'false'::jsonb or agent->'sourceReceiptIds' is distinct from jsonb_build_array(${q(standingPageId)})
+   then raise exception 'STOP_AGENT_NOTE_READBACK';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
+  if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>1 then raise exception 'STOP_AGENT_NOTE_TARGETED_READ';end if;
+  raise exception 'Fixture rollback' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;end;
+ raise notice 'WK_AUTH_MIZIZI_AGENT_NOTE_ATOMIC_APPEND_REPLAY_RECALL=PASS';
  -- Test local browser receipt admission, resource proof and cleanup within
  -- the same standing scope, then roll back the local fixture before the
  -- independent existing continuation test. No actual browser/provider call.
