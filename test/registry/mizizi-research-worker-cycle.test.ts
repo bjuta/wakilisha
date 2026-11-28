@@ -6,7 +6,7 @@ import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/r
 import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-source-interpreter-v1.mjs";
-import {createDeskNativeReaderV1,isPublicDeskIpv4V1,createDeskBrowserResourceReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
+import {createDeskNativeReaderV1,isPublicDeskIpv4V1,createDeskBrowserResourceReaderV1,deskRobotsAllowsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-native-reader-v1";
 import {createDeskSearchGatewayV1,createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGatewayV1,deskPublicDiscoveryFingerprintV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-gateway-v1";
 import { describe, expect, it, vi } from "vitest";
 import {createHash} from "node:crypto";
@@ -2291,14 +2291,23 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation">={},useTavily=false){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation"|"requirePublicMethodEligibility">={},useTavily=false){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
   const provider=vi.fn(async()=>new Response(JSON.stringify({web:{results:[{url,title:"Archival programme"}]}}),
    {headers:{"content-type":"application/json"}}));
   const tavily=vi.fn(async()=>({status:200,contentType:"application/json",body:new TextEncoder().encode(JSON.stringify({results:[{url,title:"Archival programme"}]})),headers:{}}));
-  const native=vi.fn(async()=>({status:200,contentType:mime,body}));
+  const native=vi.fn(async(target?:{url:string})=>{
+   if(target?.url.endsWith("/robots.txt")){
+    if(disabled.has("robots_missing"))return {status:404,body:new Uint8Array()};
+    if(disabled.has("robots_forbidden"))return {status:403,body:new Uint8Array()};
+    if(disabled.has("robots_redirect"))return {status:302,location:"https://www.loc.gov/robots.txt",body:new Uint8Array()};
+    return {status:200,contentType:"text/plain",body:new TextEncoder().encode(disabled.has("robots_disallowed")?
+     "User-agent: WAKILISHA-MIZIZI\nDisallow: /details/":"User-agent: *\nDisallow: /private/")};
+   }
+   return {status:200,contentType:mime,body};
+  });
   const access=vi.fn(async()=>({policyRef:"policy:reviewed-public-read",validUntil:expiry,
    acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
   const examination=vi.fn(async()=>true);
@@ -2395,6 +2404,35 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   const execute=(c:ReturnType<typeof call>)=>dispatch.executeTool(scope,c,hash(JSON.stringify({scope,call:c})));
   return {dispatch,dispatchOptions,execute,calls,receipts,leadRows,disabled,provider,tavily,native,access,examination,rpc};
  }
+ it("honors exact robots group, longest rule, wildcards and encoded path without a model permission inference",()=>{
+  const encode=(s:string)=>new TextEncoder().encode(s),base="https://archive.org";
+  const policy=encode("User-agent: *\nDisallow: /\nUser-agent: WAKILISHA-MIZIZI\nDisallow: /details/*\nAllow: /details/public$\nDisallow: /encoded/%7Eprivate\n");
+  expect(deskRobotsAllowsV1(policy,base+"/details/public")).toBe(true);
+  expect(deskRobotsAllowsV1(policy,base+"/details/public?x=1")).toBe(false);
+  expect(deskRobotsAllowsV1(policy,base+"/details/private")).toBe(false);
+  expect(deskRobotsAllowsV1(policy,base+"/encoded/~private")).toBe(false);
+  expect(deskRobotsAllowsV1(policy,base+"/other")).toBe(true);
+  expect(deskRobotsAllowsV1(encode("User-agent: *\nCrawl-delay: 10"),base+"/other")).toBe(false);
+  expect(deskRobotsAllowsV1(encode("<html>Soft error</html>"),base+"/other")).toBe(false);
+ });
+ it.each(["allow","robots_missing","robots_disallowed","robots_forbidden","robots_redirect"] as const)
+ ("requires a durably precharged robots check before public page acquisition (%s)",async mode=>{
+  const h=fixture(textBytes,"text/plain",{requirePublicMethodEligibility:true});
+  if(mode!=="allow")h.disabled.add(mode);
+  const first=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const read=call("read_page",{lead_id:first.leads[0].id});
+  if(mode==="allow"||mode==="robots_missing"){
+   const result=await h.execute(read);
+   expect(result.sources).toHaveLength(1);
+   expect(h.native.mock.calls.map(a=>a[0]?.url)).toEqual(["https://archive.org/robots.txt",url]);
+   expect(h.calls.filter(c=>c.fn==="mizizi_reserve_desk_resource_v1")).toHaveLength(2);
+  }else{
+   await expect(h.execute(read)).rejects.toThrow("ACQUISITION_DENIED");
+   expect(h.native.mock.calls.map(a=>a[0]?.url)).toEqual(["https://archive.org/robots.txt"]);
+   expect(h.calls.filter(c=>c.fn==="mizizi_reserve_desk_resource_v1")).toHaveLength(1);
+   expect(h.receipts.size).toBe(1);
+  }
+ },20000);
  it("connects actual search, budget, native reader and parser to private opaque custody and source readback",async()=>{
   const h=fixture(),search=call("search_web",{query:"Nairobi recording archive"});
   const first=await h.execute(search);

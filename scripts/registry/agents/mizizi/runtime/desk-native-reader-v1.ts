@@ -249,6 +249,128 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
 }
 
 
+// Bounded robots exclusion method check for the honest WAKILISHA-MIZIZI
+// product token. A robots permit is not a source licence, consent, model
+// disclosure grant, or proof that other applicable terms permit use.
+const ROBOTS_PRODUCT="wakilisha-mizizi";
+const ROBOTS_LIMIT=512*1024;
+type RobotsRule=Readonly<{allow:boolean;pattern:string;weight:number}>;
+type RobotsPolicy=Readonly<{rules:readonly RobotsRule[];delayDenied:boolean}>;
+function robotsPath(raw:string):string|null{
+ if(/[\p{Cc}\p{Cf}]/u.test(raw)||/%(?![a-f0-9]{2})/i.test(raw))return null;
+ // Match percent-encoded reserved octets without decoding them into
+ // separators/wildcards. Decode unreserved octets, as in RFC 9309.
+ return raw.replace(/%[a-f0-9]{2}|[^\x20-\x7e]/giu,v=>{
+  if(v.startsWith("%")){
+   const c=String.fromCharCode(parseInt(v.slice(1),16));
+   return /^[A-Za-z0-9._~-]$/.test(c)?c:v.toUpperCase();
+  }
+  return encodeURIComponent(v).toUpperCase();
+ });
+}
+function parseDeskRobotsV1(bytes:Uint8Array):RobotsPolicy|null{
+ if(!(bytes instanceof Uint8Array)||bytes.length>ROBOTS_LIMIT)return null;
+ let value:string;try{value=new TextDecoder("utf-8",{fatal:true}).decode(bytes);}catch{return null;}
+ const groups:{agents:string[];rules:RobotsRule[];delayDenied:boolean;hasRule:boolean}[]=[];
+ let group:typeof groups[number]|undefined;
+ for(const raw of value.split(/\r\n|\n|\r/)){
+  const line=raw.split("#",1)[0].trim();
+  if(!line)continue;
+  const m=/^([a-zA-Z][a-zA-Z_-]*)\s*:\s*(.*)$/.exec(line);
+  if(!m)return null; // Not a confirmed robots document (e.g. HTML error).
+  const key=m[1].toLowerCase(),v=m[2].trim();
+  if(key==="user-agent"){
+   if(!/^(?:[a-zA-Z_-]+|\*)$/.test(v))return null;
+   if(!group||group.hasRule){
+    group={agents:[],rules:[],delayDenied:false,hasRule:false};groups.push(group);
+   }
+   group.agents.push(v.toLowerCase());
+  }else if(key==="allow"||key==="disallow"||key==="crawl-delay"){
+   if(!group)continue;
+   group.hasRule=true;
+   if(key==="crawl-delay"){
+    // No sleeping, guessed rate budget or bypass of a site's expressed
+    // delay. Nonzero/ambiguous delay is unavailable in this bounded lease.
+    if(!/^0(?:\.0+)?$/.test(v))group.delayDenied=true;
+    continue;
+   }
+   if(!v)continue;
+   if(v.length>2048||!v.startsWith("/")||v.includes(" "))return null;
+   const pattern=robotsPath(v);if(pattern===null)return null;
+   group.rules.push({allow:key==="allow",pattern,weight:pattern.replace(/\*|\$$/g,"").length});
+  }
+ }
+ const named=groups.filter(g=>g.agents.includes(ROBOTS_PRODUCT));
+ const chosen=named.length?named:groups.filter(g=>g.agents.includes("*"));
+ return Object.freeze({rules:Object.freeze(chosen.flatMap(g=>g.rules)),delayDenied:chosen.some(g=>g.delayDenied)});
+}
+function robotsRuleMatches(path:string,pattern:string):boolean{
+ const anchored=pattern.endsWith("$"),rule=anchored?pattern.slice(0,-1):pattern;
+ if(!rule.includes("*"))return anchored?path===rule:path.startsWith(rule);
+ // Literal fragment scan instead of attacker-controlled regular expressions.
+ // All paths, rules and document bytes are bounded; no regex backtracking.
+ const parts=rule.split("*"),first=parts.shift()!,last=parts.pop()!;
+ if(!path.startsWith(first))return false;
+ let at=first.length;
+ for(const part of parts){const next=path.indexOf(part,at);if(next<0)return false;at=next+part.length;}
+ if(anchored)return path.endsWith(last)&&path.length-last.length>=at;
+ return path.indexOf(last,at)>=0;
+}
+export function deskRobotsAllowsV1(bytes:Uint8Array,url:string):boolean{
+ let target:URL;try{target=publicUrl(url);}catch{return false;}
+ const p=parseDeskRobotsV1(bytes),path=robotsPath(target.pathname+target.search);
+ if(!p||p.delayDenied||path===null)return false;
+ let weight=-1,allowed=true;
+ for(const rule of p.rules)if(robotsRuleMatches(path,rule.pattern)){
+  if(rule.weight>weight){weight=rule.weight;allowed=rule.allow;}
+  else if(rule.weight===weight&&rule.allow)allowed=true;
+ }
+ return allowed;
+}
+/** One origin check per exact lease, no automatic retry or retained source
+ * expression. The reader is the existing pinned, independently authorized,
+ * durably precharged native transport. 404/410 alone mean no robots document;
+ * explicit access denial, rate limits, transport ambiguity, invalid type,
+ * cross-origin redirects and malformed policies are unavailable, not permits. */
+export function createDeskPublicMethodGateV1(options:Readonly<{
+ scope:DeskSearchScopeV1;
+ readRobots:(url:string)=>Promise<{finalUrl:string;contentType:string;body:Uint8Array}>;
+ now?:()=>number;
+}>){
+ const now=options.now??Date.now,cache=new Map<string,Promise<RobotsPolicy|null>>();
+ const lease=Date.parse(options.scope.leaseExpiresAt);
+ return async(url:string)=>{
+  if(!Number.isFinite(lease)||lease<=now())return false;
+  let target:URL;try{target=publicUrl(url);}catch{return false;}
+  if(target.href!==url)return false;
+  let pending=cache.get(target.origin);
+  if(!pending){
+   if(cache.size>=16)return false;
+   pending=(async()=>{
+    const robots=target.origin+"/robots.txt";
+    try{
+     const result=await options.readRobots(robots);
+     if(result.finalUrl!==robots||result.contentType!=="text/plain")return null;
+     return parseDeskRobotsV1(result.body);
+    }catch(e){
+     if(e instanceof DeskNativeHttpUnavailableV1&&[404,410].includes(e.status))
+      return {rules:[],delayDenied:false};
+     return null;
+    }
+   })();
+   cache.set(target.origin,pending);
+  }
+  const p=await pending,path=robotsPath(target.pathname+target.search);
+  if(lease<=now()||!p||p.delayDenied||path===null)return false;
+  let weight=-1,allowed=true;
+  for(const rule of p.rules)if(robotsRuleMatches(path,rule.pattern)){
+   if(rule.weight>weight){weight=rule.weight;allowed=rule.allow;}
+   else if(rule.weight===weight&&rule.allow)allowed=true;
+  }
+  return allowed;
+ };
+}
+
 export type DeskBrowserResourceBindingV1=Readonly<{
  scope:DeskSearchScopeV1;url:string;resourceType:string;topLevelUrl:string;
 }>;

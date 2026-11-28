@@ -9,7 +9,7 @@ import {isIP} from "node:net";
 import {createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGatewayV1,
  qualifyDeskPublicDiscoveryProviderV1,type DeskSearchScopeV1,type DeskDiscoveryConfigurationV1,
  type DeskSearchRequestV1} from "./desk-research-gateway-v1.ts";
-import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,type DeskBrowserResourceBindingV1} from "./desk-native-reader-v1.ts";
+import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,createDeskPublicMethodGateV1,type DeskBrowserResourceBindingV1} from "./desk-native-reader-v1.ts";
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
@@ -77,6 +77,7 @@ type Options=Readonly<{
  allowSameCaseRecall?:boolean;
  factualNoteSubject?:DeskFactualNoteSubjectV1;
  allowTransientModelConsultation?:()=>boolean;
+ requirePublicMethodEligibility?:boolean;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -227,26 +228,36 @@ export function createDeskResearchDispatcherV1(options:Options){
     await options.browser!.authorizeRequest(binding,u,resourceType,policy)===true;
   }
  }):null;
- const native=createDeskNativeReaderV1({
-  ...options.nativeTestSeams,now,
-  precharge:async(candidate,target,authority)=>{
-   assertScope(candidate);
-   if(!await accessGrant("native_acquire",target.url,{},hash(JSON.stringify({scope:candidate,target}))))return false;
-   return budget.nativePrecharge(options.nativeAccountFingerprint)(candidate,target,authority);
-  },
+ const nativePrecharge:NativeOptions["precharge"]=async(candidate,target,authority)=>{
+  assertScope(candidate);
+  if(!await accessGrant("native_acquire",target.url,{},hash(JSON.stringify({scope:candidate,target}))))return false;
+  return budget.nativePrecharge(options.nativeAccountFingerprint)(candidate,target,authority);
+ };
+ const nativeAuthority:NativeOptions["authorize"]=async(candidate,url)=>{
+  assertScope(candidate);
+  // Acquisition is independently authorized per hop by the access RPC.
+  // A source-content custody read is not an acquisition permission.
+  const grant=await accessGrant("native_acquire",url,{});
+  if(!grant)return null;
+  const external=await options.authorizeAcquisition(candidate,url);
+  if(!external||external.acquisitionAllowed!==true||external.zeroIncrementalSpendAllowed!==true)return null;
+  const expiry=Math.min(Date.parse(grant.validUntil),Date.parse(external.validUntil));
+  if(!Number.isFinite(expiry)||expiry<=now())return null;
+  return {...external,validUntil:new Date(expiry).toISOString()};
+ };
+ const publicMethod=createDeskPublicMethodGateV1({scope,now,readRobots:async robots=>{
+  // Exact /robots.txt only; do not follow redirect to another location.
+  // Separate durable access and precharge for this additional network hop.
+  const read=createDeskNativeReaderV1({...options.nativeTestSeams,now,precharge:nativePrecharge,
+   authorize:(candidate,url)=>url===robots?nativeAuthority(candidate,url):Promise.resolve(null)});
+  return read({scope,url:robots});
+ }});
+ const methodEligible=(url:string)=>options.requirePublicMethodEligibility===true?publicMethod(url):Promise.resolve(true);
+ const native=createDeskNativeReaderV1({...options.nativeTestSeams,now,precharge:nativePrecharge,
   authorize:async(candidate,url)=>{
-   assertScope(candidate);
-   // Acquisition is independently authorized per hop by the access RPC.
-   // A source-content custody read is not an acquisition permission.
-   const grant=await accessGrant("native_acquire",url,{});
-   if(!grant)return null;
-   const external=await options.authorizeAcquisition(candidate,url);
-   if(!external||external.acquisitionAllowed!==true||external.zeroIncrementalSpendAllowed!==true)return null;
-   const expiry=Math.min(Date.parse(grant.validUntil),Date.parse(external.validUntil));
-   if(!Number.isFinite(expiry)||expiry<=now())return null;
-   return {...external,validUntil:new Date(expiry).toISOString()};
-  }
- });
+   const grant=await nativeAuthority(candidate,url);
+   return grant&&await methodEligible(url)?grant:null;
+  }});
  const examination=async(candidate:DeskSearchScopeV1,binding:Readonly<Record<string,unknown>>)=>{
   assertScope(candidate);
   if(["pdf_visual","browser_visual"].includes(String(binding.mode))){
@@ -364,7 +375,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   authorizeRequest:async(b:DeskBrowserResourceBindingV1,digest:string)=>{
    assertScope(b.scope);
    return hash(JSON.stringify(b))===digest&&!!await localGrant("browser_request",b.url,
-    {url:b.url,resourceType:b.resourceType,parentUrl:b.topLevelUrl});
+    {url:b.url,resourceType:b.resourceType,parentUrl:b.topLevelUrl})&&await methodEligible(b.url);
   },
   readResource:async(b:DeskBrowserResourceBindingV1,digest:string,signal:AbortSignal,session:LocalSessionProof)=>{
    assertScope(b.scope);
@@ -377,7 +388,7 @@ export function createDeskResearchDispatcherV1(options:Options){
     authorize:async(candidate,sha)=>{
      if(!matches(candidate,sha))return null;
      const g=await localGrant("browser_request",b.url,descriptor);
-     if(!g)return null;
+     if(!g||!await methodEligible(b.url))return null;
      const expiry=Math.min(Date.parse(g.validUntil),Date.parse(session.validUntil));
      return expiry>now()?{policyRef:g.policyRef,validUntil:new Date(expiry).toISOString(),
       acquisitionAllowed:true,zeroIncrementalSpendAllowed:true}:null;
