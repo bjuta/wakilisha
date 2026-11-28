@@ -330,10 +330,11 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
    const reopen=job.reopenEventId?await readCurrentDeskReopeningEventV1(input.rpc,scope,job.reopenEventId):undefined;
    const verifyReopen:AdaptiveWorkerDependenciesV1["verifyReopen"]=job.reopenEventId?
     async(event,id,previous)=>{
-     if(id.caseId!==job.caseId||id.workspaceId!==job.workspaceId||previous.fingerprint!==event.predecessorFingerprint)return false;
+     if(id.caseId!==job.caseId||id.workspaceId!==job.workspaceId||(previous?.fingerprint??(event.reopeningMode==='terminal_retry'?'0'.repeat(64):null))!==event.predecessorFingerprint)return false;
      const fresh=await readCurrentDeskReopeningEventV1(input.rpc,scope,job.reopenEventId!);
      return !!fresh&&fresh.sourceEventRef===event.sourceEventRef&&fresh.eventSha256===event.eventSha256&&
-      fresh.predecessorFingerprint===event.predecessorFingerprint&&fresh.question===event.question;
+      fresh.predecessorFingerprint===event.predecessorFingerprint&&fresh.question===event.question&&
+      fresh.reopeningMode===event.reopeningMode;
     }:undefined;
    active={job,dispatcher};
    return createAdaptiveResearchWorkerHandlerV1({
@@ -355,7 +356,9 @@ export async function readCurrentDeskReopeningEventV1(rpc:WorkerRpc,scope:DeskSe
  if(reply.data===null)return undefined;
  const event=reply.data as InvestigationReopenAuthorityV1;
  const sha=/^[a-f0-9]{64}$/,uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
- if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,question,sourceEventRef"||
+ if(!event||(Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,question,sourceEventRef"&&
+  Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,question,reopeningMode,sourceEventRef")||
+  (event.reopeningMode!==undefined&&event.reopeningMode!=="terminal_retry")||
   !uuid.test(eventId)||event.sourceEventRef!==eventId||!sha.test(event.eventSha256)||!sha.test(event.predecessorFingerprint)||
   typeof event.question!=="string"||event.question.length<8||event.question.length>500||event.question.trim()!==event.question||
   /[\p{Cc}\p{Cf}]/u.test(event.question))throw Error("MIZIZI_DESK_REOPEN_SCOPE_DENIED");

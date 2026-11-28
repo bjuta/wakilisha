@@ -85,6 +85,8 @@ export type InvestigationIdentityV1=Readonly<{
  * and digest alone confer no permission or ability to dispatch a new job. */
 export type InvestigationReopenAuthorityV1=Readonly<{
  sourceEventRef:string;eventSha256:string;predecessorFingerprint:string;question:string;
+ /** Exact authenticated terminal-history event, never inferred from job state. */
+ reopeningMode?:"terminal_retry";
 }>;
 export type DeskBatchReceiptV1=Readonly<{reservationId:string;bodySha256:string;resultSha256:string}>;
 // Only bounded availability failures from the trusted native transport.
@@ -113,7 +115,7 @@ export type InvestigationPassV1=Readonly<{
  factualNoteReferences?:readonly DeskFactualNoteReferenceV1[];
  deskBatchReceipt?:DeskBatchReceiptV1;
  /** First pass after a separately verified new event; no event payload. */
- reopenEvent?:Readonly<Pick<InvestigationReopenAuthorityV1,"sourceEventRef"|"eventSha256"|"predecessorFingerprint">>;
+ reopenEvent?:Readonly<Pick<InvestigationReopenAuthorityV1,"sourceEventRef"|"eventSha256"|"predecessorFingerprint"|"reopeningMode">>;
  /** Trustworthy runtime diagnostic, not model analysis or source evidence. */
  interruptionCode?:DeskAvailabilityFailureV1;
  findings:readonly VerifiedClaimV1[];
@@ -189,10 +191,17 @@ export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:
    throw Error("MIZIZI_RESEARCH_NOTEBOOK_HISTORY_INVALID");
   const event=pass.reopenEvent;
   if(event!==undefined){
-   if(!event||Object.keys(event).sort().join(",")!=="eventSha256,predecessorFingerprint,sourceEventRef"||
+   const terminal=event?.reopeningMode==="terminal_retry";
+   const keys=Object.keys(event??{}).sort().join(",");
+   if(!event||keys!==(terminal?
+     "eventSha256,predecessorFingerprint,reopeningMode,sourceEventRef":
+     "eventSha256,predecessorFingerprint,sourceEventRef")||
     !UUID.test(event.sourceEventRef)||event.sourceEventRef!==event.sourceEventRef.toLowerCase()||
-    !SHA.test(event.eventSha256)||event.predecessorFingerprint!==prior||
-    history[i-1]?.decision.action!=="pause"||reopenEvents.has(event.sourceEventRef))
+    !SHA.test(event.eventSha256)||
+    event.predecessorFingerprint!==(prior??(terminal?"0".repeat(64):null))||
+    (terminal? (i>0&&history[i-1]?.decision.action!=="continue"):
+     history[i-1]?.decision.action!=="pause")||
+    reopenEvents.has(event.sourceEventRef))
     throw Error("MIZIZI_RESEARCH_REOPEN_HISTORY_INVALID");
    reopenEvents.add(event.sourceEventRef);
   }
@@ -244,7 +253,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  maxNewPasses:number;maxTotalPasses:number;costBudgetUnits:number;
  reopen?:InvestigationReopenAuthorityV1;
  verifyReopen?:(event:InvestigationReopenAuthorityV1,identity:InvestigationIdentityV1,
-   previous:InvestigationPassV1)=>Promise<boolean>;
+   previous:InvestigationPassV1|undefined)=>Promise<boolean>;
  /** Trusted runtime metering, never model-generated estimated usage. */
  measureCostUnits?:()=>number;now?:()=>number;
  /** Independently trusted, current external-model permission for non-open sources.
@@ -276,7 +285,18 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
  verifyInvestigationHistoryV1(identity,history);
  let latest=history.at(-1);
  const reopen=input.reopen===undefined?undefined:Object.freeze({...input.reopen});
- if(reopen&&latest?.decision.action!=="pause")throw Error("MIZIZI_RESEARCH_REOPEN_NOT_PAUSED");
+ const terminalReopen=reopen?.reopeningMode==="terminal_retry";
+ if(reopen&&!terminalReopen&&latest?.decision.action!=="pause")throw Error("MIZIZI_RESEARCH_REOPEN_NOT_PAUSED");
+ if(terminalReopen&&latest&&latest.decision.action!=="continue")throw Error("MIZIZI_RESEARCH_TERMINAL_RETRY_UNQUALIFIED");
+ if(terminalReopen){
+  if(Object.keys(reopen!).sort().join(",")!=="eventSha256,predecessorFingerprint,question,reopeningMode,sourceEventRef"||
+   !UUID.test(reopen!.sourceEventRef)||reopen!.sourceEventRef!==reopen!.sourceEventRef.toLowerCase()||
+   !SHA.test(reopen!.eventSha256)||reopen!.predecessorFingerprint!==(latest?.fingerprint??"0".repeat(64))||
+   history.some(p=>p.reopenEvent?.sourceEventRef===reopen!.sourceEventRef)||
+   typeof input.verifyReopen!=="function")
+    throw Error("MIZIZI_RESEARCH_TERMINAL_RETRY_AUTHORITY_UNVERIFIED");
+  requireText(reopen!.question,"REOPEN_QUESTION",500);
+ }
  if(latest?.decision.action==="conclude")return {
   caseId:identity.caseId,workspaceId:identity.workspaceId,passesAdded:0,
   totalPasses:history.length,disposition:"concluded",nextQuestion:null,
@@ -295,7 +315,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   requireText(reopen.question,"REOPEN_QUESTION",500);
  }
  const reopenPrevious=latest?.decision.action==="pause"?latest:undefined;
- let question=(reopenPrevious?reopen?.question:null)||
+ let question=(reopen?reopen.question:null)||
      latest?.decision.nextQuestion||identity.openingQuestion;
  // Desk token units are a cumulative investigation budget across leases.
  // The monetary ledger independently precharges actual and uncertain calls.
@@ -310,8 +330,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // Do not enter an externally metered desk pass with an exhausted budget.
   if(input.prepareDeskPass&&remainingCost<=0)break;
   const snapshot=Object.freeze([...history]);
-  const activeReopen=added===0&&reopenPrevious?reopen:undefined;
-  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,reopenPrevious!)!==true)
+  const activeReopen=added===0?reopen:undefined;
+  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,latest)!==true)
    throw Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_UNVERIFIED");
   if(input.canPrepareDeskPass&&await input.canPrepareDeskPass(identity,question,snapshot)!==true)break;
   const prepared=input.prepareDeskPass?
@@ -525,7 +545,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    ...(prepared?.factualNoteReferences!==undefined?{factualNoteReferences:prepared.factualNoteReferences}:{}),
    ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
    ...(activeReopen?{reopenEvent:{sourceEventRef:activeReopen.sourceEventRef,eventSha256:activeReopen.eventSha256,
-    predecessorFingerprint:activeReopen.predecessorFingerprint}}:{}),
+    predecessorFingerprint:activeReopen.predecessorFingerprint,
+    ...(activeReopen.reopeningMode?{reopeningMode:activeReopen.reopeningMode}:{})}}:{}),
    ...(interrupted?{interruptionCode:prepared!.interruptionCode}:{}),
    findings,passFinding:analysis.passFinding,proposedLeads:analysis.leads.map(l=>({...l})),
    decision,modelVersion:analysis.modelVersion,
@@ -536,7 +557,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    throw new Error('MIZIZI_RESEARCH_EVIDENCE_SNAPSHOT_BUDGET');
   const pass:InvestigationPassV1=Object.freeze({...body,
    fingerprint:digest({...body,fingerprint:undefined})});
-  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,reopenPrevious!)!==true)
+  if(activeReopen&&await input.verifyReopen!(activeReopen,identity,latest)!==true)
    throw Error("MIZIZI_RESEARCH_REOPEN_AUTHORITY_CHANGED");
   await store.append(identity,pass.ordinal,previous,pass);
   history.push(pass);added++;

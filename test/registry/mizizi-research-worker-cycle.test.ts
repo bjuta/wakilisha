@@ -695,8 +695,8 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   await runAdaptiveInvestigationV1(deps);
   const prior=store.rows[0],question="What does the independently available new archive establish?";
   const event={sourceEventRef:EVENT,eventSha256:"c".repeat(64),predecessorFingerprint:prior.fingerprint,question};
-  const verify=vi.fn(async (candidate:typeof event,id:typeof identity,previous:InvestigationPassV1)=>
-   JSON.stringify(candidate)===JSON.stringify(event)&&id.caseId===CASE&&previous.fingerprint===prior.fingerprint);
+  const verify=vi.fn(async (candidate:typeof event,id:typeof identity,previous:InvestigationPassV1|undefined)=>
+   JSON.stringify(candidate)===JSON.stringify(event)&&id.caseId===CASE&&previous?.fingerprint===prior.fingerprint);
   await expect(runAdaptiveInvestigationV1({...deps,reopen:{...event,question:"What about an unrelated recording instead?"},verifyReopen:verify}))
    .rejects.toThrow("REOPEN_AUTHORITY_UNVERIFIED");
   expect(reader).toHaveBeenCalledTimes(1);
@@ -712,6 +712,48 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
   await expect(runAdaptiveInvestigationV1({...deps,reopen:{...event,predecessorFingerprint:store.rows[1].fingerprint},verifyReopen:async()=>true}))
    .rejects.toThrow("REOPEN_AUTHORITY_UNVERIFIED");
   expect(store.rows).toHaveLength(2);expect(analyst).not.toHaveBeenCalled();
+ });
+ it("recovers a terminal zero-pass case only with a trusted reviewed event and immutable first-pass provenance",async()=>{
+  const store=memory(),event={sourceEventRef:EVENT,eventSha256:"e".repeat(64),
+   predecessorFingerprint:"0".repeat(64),reopeningMode:"terminal_retry" as const,
+   question:"What original sources can establish the recording version?"};
+  const verify=vi.fn(async(candidate:typeof event,id:typeof identity,previous:InvestigationPassV1|undefined)=>
+   candidate===event&&id.caseId===CASE&&previous===undefined);
+  const deps={identity,store,maxNewPasses:1,maxTotalPasses:3,costBudgetUnits:20,now:()=>NOW,
+   readSources:async()=>[],analyze:async()=>{throw Error("NO_EVIDENCE_MODEL");},
+   verifyFinding:async()=>({verified:false,verificationRef:null})};
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:{...event,predecessorFingerprint:"f".repeat(64)},
+   verifyReopen:verify})).rejects.toThrow("TERMINAL_RETRY_AUTHORITY_UNVERIFIED");
+  await expect(runAdaptiveInvestigationV1({...deps,reopen:event})).rejects.toThrow("TERMINAL_RETRY_AUTHORITY_UNVERIFIED");
+  expect(store.rows).toHaveLength(0);
+  expect(await runAdaptiveInvestigationV1({...deps,reopen:event,verifyReopen:verify}))
+   .toMatchObject({passesAdded:1,totalPasses:1,disposition:"paused"});
+  expect(store.rows[0]).toMatchObject({ordinal:1,predecessorFingerprint:null,
+   question:event.question,reopenEvent:{sourceEventRef:EVENT,eventSha256:event.eventSha256,
+    predecessorFingerprint:event.predecessorFingerprint,reopeningMode:"terminal_retry"}});
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({totalPasses:1,disposition:"paused"});
+ });
+ it("preserves an immutable terminal continue pass and binds the exact next requalification",async()=>{
+  const store=memory(),second="Who supplied the independent original-release documentation?";
+  const deps={identity,store,maxNewPasses:1,maxTotalPasses:3,costBudgetUnits:20,now:()=>NOW,
+   readSources:async()=>[source],authorizeModelProcessing:async()=>true,
+   analyze:async()=>answer([lead(second)],"continue"),
+   verifyFinding:async()=>({verified:false,verificationRef:null})};
+  expect(await runAdaptiveInvestigationV1(deps)).toMatchObject({passesAdded:1,disposition:"continue"});
+  const predecessor=store.rows[0].fingerprint;
+  const event={sourceEventRef:EVENT,eventSha256:"d".repeat(64),predecessorFingerprint:predecessor,
+   reopeningMode:"terminal_retry" as const,question:second};
+  const verify=vi.fn(async(_event:typeof event,_id:typeof identity,previous:InvestigationPassV1|undefined)=>
+   previous?.fingerprint===predecessor);
+  const recovered={...deps,readSources:async()=>[],reopen:event,verifyReopen:verify};
+  expect(await runAdaptiveInvestigationV1(recovered)).toMatchObject({passesAdded:1,totalPasses:2,disposition:"paused"});
+  expect(store.rows[0].fingerprint).toBe(predecessor);
+  expect(store.rows[1]).toMatchObject({ordinal:2,question:second,predecessorFingerprint:predecessor,
+   reopenEvent:{sourceEventRef:EVENT,eventSha256:event.eventSha256,
+    predecessorFingerprint:predecessor,reopeningMode:"terminal_retry"}});
+  expect(await runAdaptiveInvestigationV1({...deps,readSources:async()=>[]}))
+   .toMatchObject({totalPasses:2,disposition:"paused"});
  });
  it("requires independent model-use consent for a claimed first-party source",async()=>{
   const store=memory(),model=vi.fn(async()=>answer([],"conclude"));
