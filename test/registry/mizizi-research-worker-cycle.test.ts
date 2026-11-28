@@ -2344,7 +2344,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return {status:200,contentType:"text/plain",body:new TextEncoder().encode(disabled.has("robots_disallowed")?
      "User-agent: WAKILISHA-MIZIZI\nDisallow: /details/":"User-agent: *\nDisallow: /private/")};
    }
-   return {status:200,contentType:mime,body};
+   return {status:200,contentType:mime,body,...(disabled.has("restricted_header")?{processingRestricted:true}:{})};
   });
   const access=vi.fn(async()=>({policyRef:"policy:reviewed-public-read",validUntil:expiry,
    acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}));
@@ -2363,7 +2363,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
      policyRef:"fixture:access:"+operation,validUntil:expiry,allowed:true});
    }
    if(fn==="mizizi_read_desk_operational_policy_v1")return ok({scope,revision:1,credentialSha256:hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"])),publicWebTransientAllowed:true,validUntil:expiry,
-    operationInterpretationRule:disabled.has("operation_rule")?{kind:"native_html_declared_cc0_v1",sourceUseRef:"fixture:independent-content-review",providerProcessingRef:"fixture:independent-provider-review",credentialSha256:disabled.has("wrong_operation_credential")?"f".repeat(64):hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))}:null});
+    operationInterpretationRule:disabled.has("operation_rule")?{kind:"bounded_public_research_v1",operations:disabled.has("no_native_text")?["pdf_visual"]:["native_text","browser_text","pdf_visual","browser_visual"],sourceUseRef:"fixture:independent-content-review",providerProcessingRef:"fixture:independent-provider-review",credentialSha256:disabled.has("wrong_operation_credential")?"f".repeat(64):hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))}:null});
    if(fn==="mizizi_read_desk_custody_policy_v1"){
     const host=String(args.p_host);
     return ok(disabled.has(host)||disabled.has("fixture_unknown_host")&&host==="archive.org"?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
@@ -2932,35 +2932,54 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(await open.dispatch.verifyToolReceipt(scope,{receiptId:consulted.receiptId,
    callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},consulted)).toBe(true);
  });
- it.each(["allowed","no_rule","wrong_credential","no_declaration","body_link","conflict"] as const)("requires a reviewed operation rule as well as exact native document eligibility (%s)",async mode=>{
-  const cc="https://creativecommons.org/publicdomain/zero/1.0/",licence='<link rel="license" href="'+cc+'">';
-  const header=mode==="no_declaration"||mode==="body_link"?"":licence+(mode==="conflict"?'<link rel="license" href="https://creativecommons.org/licenses/by-nc/4.0/">':"");
+ it("applies one reviewed operation rule to ordinary unregistered pages, PDF text and visual receipts, with negative signals and no publisher content retained",async()=>{
   const passage="The programme attributes this recording to an ensemble, but the named producer is uncertain. ".repeat(8);
-  const html='<html><head><title>Archive fixture</title>'+header+'</head><body><article><p>'+passage+'</p>'+(mode==="body_link"?'<a rel="license" href="'+cc+'">Rights signal</a>':"")+'</article></body></html>';
   const credential=hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]));
-  const h=fixture(new TextEncoder().encode(html),"text/html",{allowTransientModelConsultation:()=>true,
-   transientProviderCredentialSha256:credential,requirePublicMethodEligibility:true},true);
-  h.disabled.add("fixture_unknown_host");
-  if(mode!=="no_rule")h.disabled.add("operation_rule");
-  if(mode==="wrong_credential")h.disabled.add("wrong_operation_credential");
-  const found=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
-  const got=await h.execute(call("read_page",{lead_id:found.leads[0].id}));
-  expect(got.sources).toEqual([]);
-  const appended=h.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1").at(-1)!;
-  expect(appended.args.p_policy_revision).toBeNull();
-  expect(JSON.stringify(appended.args)).not.toContain(passage.trim());
-  if(mode==="allowed"){
-   expect(got.consultation?.text).toContain("The programme attributes");
-   expect(appended.args.p_provenance).toMatchObject({locator:"article_text",operationInterpretation:{
-    kind:"native_html_declared_cc0_v1",standingRevision:1,documentLicense:cc}});
-   expect(JSON.parse(String(appended.args.p_result_text)).consultation).not.toHaveProperty("text");
-   expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:got.receiptId,
-    callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},got)).toBe(true);
-  }else{
-   expect(got.consultation).toBeUndefined();
-   expect(appended.args.p_provenance).not.toHaveProperty("operationInterpretation");
+  const opts={allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:credential,requirePublicMethodEligibility:true};
+  for(const mode of ["allowed","no_rule","wrong_credential","no_native_text","restricted_meta","restricted_header"]){
+   const html='<html><head><title>Archive fixture</title>'+(mode==="restricted_meta"?'<meta name="robots" content="noai, nosnippet">':'')+'</head><body><article><p>'+passage+'</p></article></body></html>';
+   const h=fixture(new TextEncoder().encode(html),"text/html",opts,true);
+   h.disabled.add("fixture_unknown_host");
+   if(mode!=="no_rule")h.disabled.add("operation_rule");
+   if(mode!=="allowed")h.disabled.add(mode==="wrong_credential"?"wrong_operation_credential":mode);
+   const found=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+   const got=await h.execute(call("read_page",{lead_id:found.leads[0].id}));
+   expect(got.sources).toEqual([]);
+   const appended=h.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1").at(-1)!;
+   expect(appended.args.p_policy_revision).toBeNull();
+   expect(JSON.stringify(appended.args)).not.toContain("The programme attributes");
+   if(mode==="allowed"){
+    expect(got.consultation?.text).toContain("The programme attributes");
+    expect(appended.args.p_provenance).toMatchObject({locator:"article_text",operationInterpretation:{
+     kind:"bounded_public_research_v1",standingRevision:1,method:"native_text",restrictionCheck:"no_known_directive"}});
+    expect(JSON.parse(String(appended.args.p_result_text)).consultation).not.toHaveProperty("text");
+    expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:got.receiptId,
+     callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},got)).toBe(true);
+   }else{
+    expect(got.consultation).toBeUndefined();
+    expect(appended.args.p_provenance).not.toHaveProperty("operationInterpretation");
+   }
   }
- },20000);
+  const h=fixture(pdfFixture(),"application/pdf",opts,true);
+  h.disabled.add("fixture_unknown_host");h.disabled.add("operation_rule");
+  const discovery=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const initial=await h.execute(call("read_page",{lead_id:discovery.leads[0].id}));
+  const doc=initial.leads.find(l=>l.kind==="document")!;
+  expect(doc).toBeDefined();
+  const text=await h.execute(call("read_document",{lead_id:doc.id,page_start:1,page_end:2}));
+  expect(text.consultation?.text).toContain("Nairobi recording archive");
+  const image=await h.execute(call("inspect_visual",{lead_id:doc.id,page:2}));
+  expect(image.sources).toEqual([]);
+  expect(image.visual?.sha256).toBe(hash(image.visual!.body));
+  expect(image.consultation?.text).toBe("Visual examination only; image SHA-256 "+image.visual!.sha256+".");
+  const stored=h.receipts.get(image.receiptId)!;
+  expect(JSON.parse(String(stored.resultText)).consultation).not.toHaveProperty("text");
+  expect(JSON.parse(String(stored.resultText)).visual).not.toHaveProperty("body");
+  const binding={receiptId:image.receiptId,callSha256:String(stored.callSha256),resultSha256:hash(String(stored.resultText))};
+  expect(await h.dispatch.verifyToolReceipt(scope,binding,image)).toBe(true);
+  expect(await h.dispatch.verifyToolReceipt(scope,binding,{...image,visual:{...image.visual!,body:new Uint8Array(40)}})).toBe(false);
+  expect(h.native.mock.calls.filter(a=>!a[0]?.url.endsWith("/robots.txt"))).toHaveLength(1);
+ },45000);
 });
 
 

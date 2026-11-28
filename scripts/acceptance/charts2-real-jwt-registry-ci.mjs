@@ -1047,8 +1047,8 @@ export async function verifyCharts2RealJwtRegistryV1({
  // rule. Reuse the exact consumed resources inside the rollback subtest.
  const operationHost="www.loc.gov",operationUrl="https://www.loc.gov/item/fixture",
   operationSearchId=randomUUID(),operationLeadId=randomUUID(),operationPageId=randomUUID();
- const operationKind="native_html_declared_cc0_v1",operationLicense="https://creativecommons.org/publicdomain/zero/1.0/";
- const operationRule={kind:operationKind,sourceUseRef:"fixture:independent-source-use-review",
+ const operationKind="bounded_public_research_v1";
+ const operationRule={kind:operationKind,operations:["native_text","browser_text","pdf_visual","browser_visual"],sourceUseRef:"fixture:independent-source-use-review",
   providerProcessingRef:"fixture:independent-provider-handling-review",credentialSha256:credential};
  const operationSearch=binding("search_web",{query:context.positions[0].title},
   {receiptId:operationSearchId,leads:[{id:operationLeadId,kind:"reference",label:"Fixture public archive"}],sources:[],visual:null},
@@ -1059,7 +1059,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  const operationMeta={requestedUrl:operationUrl,finalUrl:operationUrl,sourceSha256:sourceHash,
   projectionSha256:hash("synthetic operation projection"),contentType:"text/html",retrievedAt:observedAt,
   byteLength:128,hopSha256:[hopHash],locator:"article_text",documentPages:null,renderRequired:false,
-  operationInterpretation:{kind:operationKind,standingRevision:2,documentLicense:operationLicense}};
+  operationInterpretation:{kind:operationKind,standingRevision:2,method:"native_text",restrictionCheck:"no_known_directive"}};
  const operationPage=binding("read_page",{lead_id:operationLeadId},
   {receiptId:operationPageId,leads:[],sources:[],visual:null,consultation:operationRef},operationHost,operationMeta,[],null);
  const operationCall=JSON.parse(operationPage.p_call_text);
@@ -1237,8 +1237,8 @@ export async function verifyCharts2RealJwtRegistryV1({
    or (${operationExamine}->>'allowed') is distinct from 'true'
    then raise exception 'STOP_OPERATION_ACCESS_PROOFS';end if;
   if ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,standingRevision:1}}})} is not null
-   or ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,documentLicense:"https://creativecommons.org/licenses/by-nc/4.0/"}}})} is not null
-   then raise exception 'STOP_OPERATION_FORGED_RULE_OR_LICENSE';end if;
+   or ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,restrictionCheck:"restricted"}}})} is not null
+   then raise exception 'STOP_OPERATION_FORGED_RULE_OR_RESTRICTION';end if;
   if (${append(operationPage)}->>'outcome') is distinct from 'created'
    or (${read(operationPageId)}->>'resultSha256') is distinct from ${q(operationPage.p_result_sha256)}
    or (${authority("model_disclose",envelope(3,[],operationDeps))}->>'allowed') is distinct from 'true'

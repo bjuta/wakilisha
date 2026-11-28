@@ -673,7 +673,7 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
     // Capture and observation have different fingerprints: asynchronous DOM
     // changes are possible. A trusted admitter must derive actual evidence
     // from captured bytes, not claim the observation is the captured DOM.
-    const allowVisual=visualAllowed&&(!authorizeVisualLead||await authorizeVisualLead(scope,observation.url)===true);
+    const allowVisual=visualAllowed&&(!authorizeVisualLead||await authorizeVisualLead(scope,observation.url,capture)===true);
     // An access-only observation exposes control types, not publisher-supplied labels.
     const allowContentLabels=!authorizeContentLabels||await authorizeContentLabels(scope,observation.url)===true;
     const entries=action==="visual"?[]:actionLeads(observation,allowVisual,allowContentLabels);
@@ -690,7 +690,7 @@ export function createDeskBrowserActionRouterV1({scope:rawScope,session,resolveR
       s.source.caseId!==scope.caseId||s.source.workspaceId!==scope.workspaceId)||
      (action==="visual"?(!result.visual||result.visual.sourceId!==receiptId||
        result.visual.sha256!==capture.visual.sha256||hash(result.visual.body)!==capture.visual.sha256||
-       result.sources.length!==1):result.visual!==undefined))
+       !(result.sources.length===1||result.sources.length===0&&result.consultation?.receiptId===receiptId)):result.visual!==undefined))
      fail("ACTION_ROUTER_CUSTODY_DENIED");
     if(await authorizeCall(scope,call,callSha256)!==true)fail("ACTION_ROUTER_AUTHORITY_DENIED");
     live();

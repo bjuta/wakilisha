@@ -16,7 +16,7 @@ const MAX_REDIRECTS=3;
 const MAX_DURATION_MS=20_000;
 type Target=Readonly<{url:string;hostname:string;address:string}>;
 type HopResponse=Readonly<{status:number;location?:string;contentType?:string;
- body:Uint8Array;headers?:Readonly<Record<string,string>>}>;
+ body:Uint8Array;headers?:Readonly<Record<string,string>>;processingRestricted?:boolean}>;
 type NativeReadRequest=Readonly<{scope:DeskSearchScopeV1;url:string}>;
 type NativeReadAuthority=Readonly<{policyRef:string;validUntil:string;
  acquisitionAllowed:true;zeroIncrementalSpendAllowed:true}>;
@@ -101,6 +101,14 @@ const BROWSER_MIMES:Readonly<Record<string,readonly string[]>>=Object.freeze({
  xhr:["application/json","text/plain","text/html","application/xml","text/xml"],
  fetch:["application/json","text/plain","text/html","application/xml","text/xml"],
 });
+// Restrictive source directives are negative signals only, never a use grant.
+export function deskProcessingRestrictedV1(value:unknown):boolean{
+ if(value===undefined||value===null)return false;
+ const raw=Array.isArray(value)?value.join(","):value;
+ return typeof raw!=="string"||raw.length>16000||
+  /(?:^|[\s,:;])(?:noai|noimageai|notrain|noarchive|nosnippet|none)(?:$|[\s,:;])/i.test(raw)||
+  /(?:^|[\s,;])max-snippet\s*:\s*0(?:$|[\s,;])/i.test(raw);
+}
 const BROWSER_RESPONSE_HEADERS=["content-security-policy","content-security-policy-report-only","x-content-type-options",
  "x-frame-options","referrer-policy","cross-origin-resource-policy","cross-origin-opener-policy",
  "cross-origin-embedder-policy","access-control-allow-origin","access-control-allow-methods",
@@ -171,7 +179,7 @@ async function readNative(target:Target,signal:AbortSignal,browserType?:string,t
    res.once("error",()=>stop("BODY_UNCONFIRMED"));
    res.once("end",()=>{
     if(!res.complete||(declared!==undefined&&size!==Number(declared))){stop("BODY_UNCONFIRMED");return;}
-    finish(null,{status,contentType:type,body:Buffer.concat(chunks,size),...(browserType?{headers}:{} )});
+    finish(null,{status,contentType:type,body:Buffer.concat(chunks,size),processingRestricted:deskProcessingRestrictedV1(res.headers["x-robots-tag"]),...(browserType?{headers}:{} )});
    });
   });
   req.once("error",()=>finish(Error("MIZIZI_DESK_NATIVE_TRANSPORT_UNCONFIRMED")));
@@ -241,7 +249,7 @@ export function createDeskNativeReaderV1(options:NativeReadOptions){
     finalUrl:url.href,redirects:Object.freeze(redirects),hopSha256:Object.freeze(hopSha256),
     retrievedAt:new Date(now()).toISOString(),
     contentType:type,byteLength:body.length,sha256:createHash("sha256").update(body).digest("hex"),
-    body,sourceRetentionAuthorized:false as const,externalModelProcessingAuthorized:false as const,
+    body,processingRestricted:response.processingRestricted===true||deskProcessingRestrictedV1(response.headers?.["x-robots-tag"]),sourceRetentionAuthorized:false as const,externalModelProcessingAuthorized:false as const,
     identityVerified:false as const});
   }
   fail("REDIRECT_DENIED");
@@ -460,6 +468,8 @@ export function createDeskBrowserResourceReaderV1(options:BrowserResourceReadOpt
    if(Number.isInteger(response.status)&&response.status>=100&&response.status<=599)throw new DeskNativeHttpUnavailableV1(response.status);
    fail("SOURCE_UNAVAILABLE");
   }
+  // Do not introduce expressly restricted resources into a rendered observation.
+  if(response.processingRestricted===true||deskProcessingRestrictedV1(response.headers?.["x-robots-tag"]))fail("SOURCE_PROCESSING_RESTRICTED");
   const type=browserContentType(response.contentType,exact.resourceType),body=Uint8Array.from(response.body);
   if(body.length<1)fail("BODY_UNCONFIRMED");
   const headers:Record<string,string>={};

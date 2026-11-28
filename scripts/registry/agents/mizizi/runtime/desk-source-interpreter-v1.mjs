@@ -31,6 +31,24 @@ function safeLead(raw,base){
   u.hash="";return u.href.length<=2048?u.href:null;
  }catch{return null;}
 }
+// Read only explicit negative machine-readable restrictions. Their absence
+// is not a licence, permission, or evidence about all applicable terms.
+function documentProcessingRestricted(doc){
+ const restricted=value=>/(?:^|[\s,:;])(?:noai|noimageai|notrain|noarchive|nosnippet|none)(?:$|[\s,:;])/i.test(value)||
+  /(?:^|[\s,;])max-snippet\s*:\s*0(?:$|[\s,;])/i.test(value);
+ return [...doc.querySelectorAll("meta[name]")].some(n=>{
+  const name=(n.getAttribute("name")??"").toLowerCase();
+  return ["robots","wakilisha-mizizi","googlebot","bingbot","gptbot","claudebot"].includes(name)&&restricted(n.getAttribute("content")??"");
+ });
+}
+// Browser observation bytes remain local; use the same negative-signal check.
+export async function deskRenderedProcessingRestrictedV1(body,url){
+ if(!(body instanceof Uint8Array)||body.length<1||body.length>MAX_BYTES)return true;
+ const {JSDOM}=await import("jsdom");
+ const dom=new JSDOM(new TextDecoder("utf-8",{fatal:true}).decode(body),{url,contentType:"text/html"});
+ try{return dom.window.document.querySelectorAll("*").length>MAX_DOM_NODES||documentProcessingRestricted(dom.window.document);}
+ finally{dom.window.close();}
+}
 async function parseHtml(body,url){
  const [{JSDOM},{Readability}]=await Promise.all([import("jsdom"),import("@mozilla/readability")]);
  // Never enable runScripts or resources. No browsing context with network
@@ -40,13 +58,7 @@ async function parseHtml(body,url){
  try{
   const doc=dom.window.document;
   if(doc.querySelectorAll("*").length>MAX_DOM_NODES)fail("DOM_BUDGET");
-  // Source-level declaration, not proof of rights. Only a reviewed standing
-  // rule may authorize reliance on this signal. No relative or body links.
-  const licenceNodes=[...doc.querySelectorAll("[rel]")].filter(n=>
-   (n.getAttribute("rel")??"").toLowerCase().split(/\s+/).includes("license"));
-  const licence=licenceNodes.length===1&&licenceNodes[0].tagName==="LINK"&&
-   licenceNodes[0].parentElement===doc.head&&licenceNodes[0].getAttribute("href")==="https://creativecommons.org/publicdomain/zero/1.0/"?
-   "https://creativecommons.org/publicdomain/zero/1.0/":null;
+  const processingRestricted=documentProcessingRestricted(doc);
   doc.querySelectorAll("script,style,template,noscript,iframe,object,embed,form,base,link,[hidden],[aria-hidden='true']").forEach(n=>n.remove());
   const links=[],seen=new Set();let linksTruncated=false;
   for(const a of doc.querySelectorAll("a[href]")){
@@ -59,12 +71,12 @@ async function parseHtml(body,url){
   const fallbackTitle=label(doc.title);
   const article=new Readability(doc,{maxElemsToParse:MAX_DOM_NODES,charThreshold:120,keepClasses:false}).parse();
   if(!article||!clean(article.textContent)){
-   return {kind:"html",title:fallbackTitle,author:null,publishedLabel:null,publisher:null,
+   return {kind:"html",...(processingRestricted?{processingRestricted:true}:{}),title:fallbackTitle,author:null,publishedLabel:null,publisher:null,
     segments:[],links,linksTruncated,documentPages:null,needsVisualReview:true,partial:true,
     extractionMethod:"readability_no_article",sourceTextAbsent:false};
   }
   const passage=bounded(article.textContent,MAX_TEXT);
-  return {kind:"html",...(licence?{documentLicense:licence}:{}),title:label(article.title)||fallbackTitle,author:label(article.byline),
+  return {kind:"html",...(processingRestricted?{processingRestricted:true}:{}),title:label(article.title)||fallbackTitle,author:label(article.byline),
    publishedLabel:label(article.publishedTime,120),publisher:label(article.siteName),
    segments:[{locator:"article_text",page:null,...passage}],links,linksTruncated,
    documentPages:null,needsVisualReview:false,partial:passage.truncated||linksTruncated,

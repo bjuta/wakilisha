@@ -1,7 +1,7 @@
 -- #1441 / #1442. CLI 2.107.0 minted exact filename.
--- First operation class only; no authority seeded. A source declaration is
--- not proof of rights. Independently reviewed source-use and actual provider
--- handling permission must cover reliance on it before issuing a rule.
+-- One bounded public-research interpretation rule across native text, documents,
+-- isolated browser text and visual consultation. No permission seeded.
+-- Independent source-use and actual provider-handling authority is mandatory.
 begin;
 set local lock_timeout='5s';
 set local statement_timeout='90s';
@@ -12,15 +12,21 @@ do $guard$ begin
  if (select encode(sha256(convert_to(prosrc,'UTF8')),'hex') from pg_proc where oid='mizizi_private.desk_custody_receipt_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb)'::regprocedure) is distinct from '74c10b39a83ecc32d69ad575564f9117010bfe697aca35abe8657291f0601cc8' then raise exception 'STOP_OPERATION_INTERPRETATION_PREIMAGE: mizizi_private.desk_custody_receipt_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb)';end if;
  if (select encode(sha256(convert_to(prosrc,'UTF8')),'hex') from pg_proc where oid='public.mizizi_record_desk_tool_receipt_v1(text,text,text,text,text,integer,jsonb,jsonb)'::regprocedure) is distinct from '149069c1a46e3088e4b74b8327ef36e3295667032c97abb31c775c2bd15e9ca0' then raise exception 'STOP_OPERATION_INTERPRETATION_PREIMAGE: public.mizizi_record_desk_tool_receipt_v1(text,text,text,text,text,integer,jsonb,jsonb)';end if;
  if (select encode(sha256(convert_to(prosrc,'UTF8')),'hex') from pg_proc where oid='mizizi_private.desk_agent_note_current_v1(mizizi_private.desk_factual_notes_v1,jsonb)'::regprocedure) is distinct from 'f4bdd18d9d9c7067b11ac0a5f5bd852fa78e1e79e066f82693c210a9b998088e' then raise exception 'STOP_OPERATION_INTERPRETATION_PREIMAGE: mizizi_private.desk_agent_note_current_v1(mizizi_private.desk_factual_notes_v1,jsonb)';end if;
+ if (select encode(sha256(convert_to(prosrc,'UTF8')),'hex') from pg_proc where oid='public.mizizi_authorize_desk_access_v1(jsonb,text,text,text)'::regprocedure) is distinct from 'd809be70577156c3dba14343f9c09a85c9e4a07ea1075e8ed41fabd72cdafd43' then raise exception 'STOP_OPERATION_ACCESS_PREIMAGE';end if;
+ if (select encode(sha256(convert_to(prosrc,'UTF8')),'hex') from pg_proc where oid='mizizi_private.desk_operational_receipt_current_v1(mizizi_private.desk_tool_receipts_v1,jsonb)'::regprocedure) is distinct from 'edf381ad82c3a3401b5e3436fc89fc06d65df1a40512e28e09c16162836db723' then raise exception 'STOP_OPERATION_RECEIPT_PREIMAGE';end if;
 end $guard$;
 alter table mizizi_private.desk_operational_policy_versions_v1
  add column operation_interpretation_rule jsonb,
  add constraint desk_operation_interpretation_rule_v1 check(operation_interpretation_rule is null or coalesce(
   enabled and public_web_transient_allowed and jsonb_typeof(operation_interpretation_rule)='object'
-  and operation_interpretation_rule=jsonb_build_object('kind','native_html_declared_cc0_v1',
+  and operation_interpretation_rule=jsonb_build_object('kind','bounded_public_research_v1',
+   'operations',operation_interpretation_rule->'operations',
    'sourceUseRef',operation_interpretation_rule->'sourceUseRef',
    'providerProcessingRef',operation_interpretation_rule->'providerProcessingRef',
    'credentialSha256',credential_sha256)
+  and jsonb_typeof(operation_interpretation_rule->'operations')='array'
+  and operation_interpretation_rule->'operations' <@ '["native_text","browser_text","pdf_visual","browser_visual"]'::jsonb
+  and jsonb_array_length(operation_interpretation_rule->'operations') between 1 and 4
   and jsonb_typeof(operation_interpretation_rule->'sourceUseRef')='string'
   and jsonb_typeof(operation_interpretation_rule->'providerProcessingRef')='string'
   and length(operation_interpretation_rule->>'sourceUseRef') between 8 and 500
@@ -30,26 +36,53 @@ alter table mizizi_private.desk_operational_policy_versions_v1
   and operation_interpretation_rule->>'sourceUseRef' !~ '[[:cntrl:]]'
   and operation_interpretation_rule->>'providerProcessingRef' !~ '[[:cntrl:]]'
   and operation_interpretation_rule->>'sourceUseRef'<>operation_interpretation_rule->>'providerProcessingRef',false));
--- Current independently issued rule and exact trusted native metadata;
--- receipt never contains publisher expression. The host's source-rights
--- assertion is not independent proof; source-use review must precede issuance.
-create function mizizi_private.desk_operation_interpretation_current_v1(
- o mizizi_private.desk_operational_policy_versions_v1,m jsonb)
+-- Access, content processing and factual knowledge remain separate. The
+-- standing rule covers only the independently reviewed use and provider
+-- handling, never a permission inferred from absence of a restriction.
+create function mizizi_private.desk_operation_interpretation_allowed_v1(
+ o mizizi_private.desk_operational_policy_versions_v1, method text)
 returns boolean language sql volatile set search_path=pg_catalog as $f$
  select coalesce(o.enabled and o.public_web_transient_allowed and o.valid_until>clock_timestamp()
-  and o.operation_interpretation_rule->>'kind'='native_html_declared_cc0_v1'
+  and o.operation_interpretation_rule->>'kind'='bounded_public_research_v1'
   and o.operation_interpretation_rule->>'credentialSha256'=o.credential_sha256
   and length(o.operation_interpretation_rule->>'sourceUseRef') between 8 and 500
   and length(o.operation_interpretation_rule->>'providerProcessingRef') between 8 and 500
   and o.operation_interpretation_rule->>'sourceUseRef'<>o.operation_interpretation_rule->>'providerProcessingRef'
-  and m->'operationInterpretation'=jsonb_build_object('kind','native_html_declared_cc0_v1',
-   'standingRevision',o.revision,'documentLicense','https://creativecommons.org/publicdomain/zero/1.0/')
-  and m->>'contentType'='text/html' and m->>'locator'='article_text'
-  and m->>'finalUrl' ~ '^https://[^?#]+$'
+  and method in ('native_text','browser_text','pdf_visual','browser_visual')
+  and o.operation_interpretation_rule->'operations' ? method,false)
+$f$;
+revoke all on function mizizi_private.desk_operation_interpretation_allowed_v1(mizizi_private.desk_operational_policy_versions_v1,text) from public,anon,authenticated,service_role,mizizi_executor;
+
+create function mizizi_private.desk_operation_interpretation_current_v1(
+ o mizizi_private.desk_operational_policy_versions_v1,m jsonb)
+returns boolean language sql volatile set search_path=pg_catalog as $f$
+ select coalesce(mizizi_private.desk_operation_interpretation_allowed_v1(o,m->'operationInterpretation'->>'method')
+  and m->'operationInterpretation'=jsonb_build_object('kind','bounded_public_research_v1',
+   'standingRevision',o.revision,'method',m->'operationInterpretation'->>'method','restrictionCheck','no_known_directive')
+  and mizizi_private.desk_custody_url_host_v1(m->>'finalUrl') is not null
   and m->>'sourceSha256' ~ '^[0-9a-f]{64}$' and m->>'projectionSha256' ~ '^[0-9a-f]{64}$'
-  and m->'documentPages'='null'::jsonb and m->'renderRequired'='false'::jsonb,false)
+  and case m->'operationInterpretation'->>'method'
+   when 'native_text' then
+    (m->>'contentType' in ('text/html','application/xhtml+xml') and m->>'locator'='article_text')
+    or (m->>'contentType'='text/plain' and m->>'locator'='plain_text')
+    or (m->>'contentType'='application/pdf' and m->>'locator' ~ '^pdf_pages?:[1-9][0-9]{0,4}(-[1-9][0-9]{0,4})?$')
+   when 'browser_text' then m->>'contentType'='text/html' and m->>'locator'='browser_visible_text' and m->'detail' ? 'localBrowser'
+   when 'pdf_visual' then m->>'contentType'='application/pdf' and m->>'locator' ~ '^pdf_visual:[1-9][0-9]{0,4}$'
+   when 'browser_visual' then m->>'contentType'='text/html' and m->>'locator'='browser_viewport:1' and m->'detail' ? 'localBrowser'
+   else false end,false)
 $f$;
 revoke all on function mizizi_private.desk_operation_interpretation_current_v1(mizizi_private.desk_operational_policy_versions_v1,jsonb) from public,anon,authenticated,service_role,mizizi_executor;
+
+-- Image bytes are transient. Their existing visual descriptor and the
+-- consultation's canonical digest descriptor bind the exact image without
+-- inventing a retained source, an OCR claim or independent verification.
+alter table mizizi_private.desk_tool_receipts_v1 drop constraint desk_tool_receipts_transient_only_v1;
+alter table mizizi_private.desk_tool_receipts_v1 add constraint desk_tool_receipts_transient_only_v1 check (
+ policy_revision is not null or (operation in ('read_page','read_document','browse_page','inspect_visual')
+ and source_id is null and operational_revision is not null and parent_receipt_id is not null
+ and result_text::jsonb->'sources' is not distinct from '[]'::jsonb
+ and (result_text::jsonb->'visual' is not distinct from 'null'::jsonb
+  or (operation='inspect_visual' and result_text::jsonb ? 'consultation'))));
 
 CREATE OR REPLACE FUNCTION public.mizizi_read_desk_operational_policy_v1(p_scope jsonb)
  RETURNS jsonb
@@ -76,6 +109,163 @@ begin
   'validUntil',least(o.valid_until,(c->>'leaseExpiresAt')::timestamptz));
 end $function$;
 
+CREATE OR REPLACE FUNCTION public.mizizi_authorize_desk_access_v1(p_scope jsonb, p_operation text, p_binding_text text, p_binding_sha256 text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;b jsonb;d jsonb;u text;h text;urlhash text;
+ p mizizi_private.desk_access_policy_versions_v1;
+ custody mizizi_private.desk_custody_policy_versions_v1;
+ expiry timestamptz;o mizizi_private.desk_operational_policy_versions_v1;callhash text;hophash text;
+ transient_access boolean:=false; bound_custody_revision integer;
+begin
+ if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
+ if p_binding_text is null or octet_length(p_binding_text) not between 1 and 8192
+ or p_binding_sha256 is null or p_binding_sha256<>encode(sha256(convert_to(p_binding_text,'UTF8')),'hex')
+ or coalesce(p_operation,'') not in ('native_acquire','native_text','browser_text','pdf_visual','browser_visual','browser_render','browser_request')
+ then raise exception 'Invalid desk access binding' using errcode='22023';end if;
+ b:=p_binding_text::jsonb;d:=b->'descriptor';u:=b->>'url';
+ if jsonb_typeof(b) is distinct from 'object' or jsonb_typeof(d) is distinct from 'object'
+ then raise exception 'Invalid desk access object' using errcode='22023';end if;
+ if (select count(*) from jsonb_object_keys(b)) not between 2 and 4
+ or exists(select 1 from jsonb_object_keys(b) k where k not in ('url','descriptor','callSha256','hopSha256'))
+ or not(b ?& array['url','descriptor']) or jsonb_typeof(b->'url') is distinct from 'string'
+ or (b ? 'callSha256' and coalesce(b->>'callSha256','') !~ '^[0-9a-f]{64}$')
+ or (b ? 'hopSha256' and (p_operation not in ('native_acquire','browser_request') or not(b ? 'callSha256') or coalesce(b->>'hopSha256','') !~ '^[0-9a-f]{64}$'))
+ then raise exception 'Invalid desk access shape' using errcode='22023';end if;
+ callhash:=b->>'callSha256';hophash:=b->>'hopSha256';
+ h:=mizizi_private.desk_custody_url_host_v1(u);
+ if h is null or h='api.search.brave.com' then return null;end if;
+ if p_operation='native_acquire' and d<>'{}'::jsonb then return null;end if;
+ if p_operation in ('native_text','browser_text','pdf_visual','browser_visual') and
+  (d->>'finalUrl' is distinct from u or coalesce(d->>'sha256','') !~ '^[0-9a-f]{64}$') then return null;end if;
+ if p_operation='native_text' and d->>'representation' is distinct from 'native_response_bytes' then return null;end if;
+ if p_operation='browser_text' and d->>'representation' is distinct from 'rendered_dom_not_original_response' then return null;end if;
+ if p_operation in ('pdf_visual','browser_visual') and d->>'mode' is distinct from p_operation then return null;end if;
+ if p_operation='pdf_visual' and coalesce(d->>'pageNumber','') !~ '^[1-9][0-9]{0,4}$' then return null;end if;
+ if p_operation='browser_render' and (d->>'url' is distinct from u or jsonb_typeof(d->'visual') is distinct from 'boolean') then return null;end if;
+ if p_operation='browser_request' and (d->>'url' is distinct from u or coalesce(d->>'resourceType','') not in ('document','stylesheet','image','font','script','xhr','fetch','other','media','manifest','texttrack','eventsource')) then return null;end if;
+ urlhash:=encode(sha256(convert_to(u,'UTF8')),'hex');
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.desk_custody_context_v1(p_scope);
+ if c is null then return null;end if;
+ custody:=mizizi_private.current_desk_custody_policy_v1((c->>'workspaceId')::uuid,h);
+ select * into p from mizizi_private.desk_access_policy_versions_v1
+ where workspace_id=(c->>'workspaceId')::uuid and host=h and url_sha256=urlhash and operation=p_operation
+ order by revision desc limit 1;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ -- Transient session authority never grants external disclosure or retention.
+ -- Explicit access decisions take precedence; no legacy grant is rewritten.
+ transient_access:=coalesce(mizizi_private.desk_operational_policy_live_v1(o,c)
+  and o.public_web_transient_allowed and p.revision is null
+  -- Preserve an existing positive scoped grant and its receipt meaning.
+  and not coalesce(mizizi_private.desk_custody_policy_live_v1(custody)
+   and mizizi_private.desk_operational_url_allowed_v1(o,h,u,p_operation,custody.revision),false)
+  and split_part(u,'?',1) ~ '^https://[a-z0-9.-]+(/[A-Za-z0-9_./~%:-]*)?$'
+  and split_part(u,'?',1) !~* '%(2e|2f|5c|25)'
+  and split_part(u,'?',1) !~ '/[.]{1,2}(/|$)'
+  and h not in ('api.gdeltproject.org','api.tavily.com')
+  and (p_operation in ('native_acquire','native_text','browser_request','browser_render','browser_text')
+   or (custody.revision is null and p_operation in ('pdf_visual','browser_visual')
+    and mizizi_private.desk_operation_interpretation_allowed_v1(o,p_operation)))
+  and (not (p_operation='browser_render' and d->'visual'='true'::jsonb)
+   or (custody.revision is null and mizizi_private.desk_operation_interpretation_allowed_v1(o,'browser_visual')))
+  and (custody.revision is null or (custody.enabled and custody.private_research_allowed
+   and custody.valid_until>clock_timestamp()
+   and (p_operation not in ('browser_request','browser_render','browser_text') or custody.browser_render_allowed))),false);
+ if not transient_access then
+  if not mizizi_private.desk_custody_policy_live_v1(custody) or custody.source_family<>'public_web' then return null;end if;
+  if p_operation in ('browser_text','browser_visual','browser_render','browser_request') and not custody.browser_render_allowed then return null;end if;
+  if (p_operation in ('pdf_visual','browser_visual') or (p_operation='browser_render' and d->'visual'='true'::jsonb))
+   and (not custody.visual_processing_allowed or not custody.excerpt_retention_allowed) then return null;end if;
+  if (p.revision is null and o.revision is null)
+   or (p.revision is not null and (not p.enabled or p.custody_revision is distinct from custody.revision)) then return null;end if;
+ end if;
+ bound_custody_revision:=case when transient_access then null else custody.revision end;
+ if o.revision is not null then
+  if not mizizi_private.desk_operational_policy_live_v1(o,c)
+   or (not transient_access and not mizizi_private.desk_operational_url_allowed_v1(o,h,u,p_operation,custody.revision))
+   or callhash is null or not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q
+    where q.job_id=(p_scope->>'jobId')::uuid and q.lease_expires_at=(p_scope->>'leaseExpiresAt')::timestamptz
+    and q.call_sha256=callhash and q.operation='tool_execute' and q.standing_revision=o.revision
+    and q.valid_until>clock_timestamp()) then return null;end if;
+  if p_operation='native_text' and (coalesce(d->>'pageStart','') !~ '^[1-9][0-9]{0,4}$'
+   or coalesce(d->>'pageEnd','') !~ '^[1-9][0-9]{0,4}$') then return null;end if;
+ end if;
+ expiry:=least(p.valid_until,o.valid_until,custody.valid_until,(c->>'leaseExpiresAt')::timestamptz);
+ if expiry<=clock_timestamp() then return null;end if;
+ if o.revision is not null then
+  insert into mizizi_private.desk_operational_call_proofs_v1(job_id,case_id,workspace_id,worker_id,lease_expires_at,
+   call_sha256,operation,binding_sha256,standing_revision,host,url_sha256,custody_revision,exact_revision,
+   hop_sha256,source_sha256,page_start,page_end,valid_until)
+  values((p_scope->>'jobId')::uuid,(c->>'caseId')::uuid,(c->>'workspaceId')::uuid,p_scope->>'workerId',
+   (p_scope->>'leaseExpiresAt')::timestamptz,callhash,p_operation,p_binding_sha256,o.revision,h,urlhash,bound_custody_revision,p.revision,
+   hophash,d->>'sha256',case when p_operation='native_text' then (d->>'pageStart')::integer when p_operation='pdf_visual' then (d->>'pageNumber')::integer end,
+   case when p_operation='native_text' then (d->>'pageEnd')::integer when p_operation='pdf_visual' then (d->>'pageNumber')::integer end,expiry)
+  on conflict do nothing;
+  if not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q where q.job_id=(p_scope->>'jobId')::uuid
+   and q.lease_expires_at=(p_scope->>'leaseExpiresAt')::timestamptz and q.operation=p_operation
+   and q.binding_sha256=p_binding_sha256 and q.standing_revision=o.revision and q.exact_revision is not distinct from p.revision
+   and q.custody_revision is not distinct from bound_custody_revision
+   and q.valid_until>clock_timestamp()) then return null;end if;
+ end if;
+ return jsonb_build_object('operation',p_operation,'bindingSha256',p_binding_sha256,'urlSha256',urlhash,
+  'policyRef','desk-access:'||urlhash||':'||p_operation||':'||coalesce(p.revision,0)::text||':'||coalesce(bound_custody_revision::text,'transient')||
+   case when o.revision is null then '' else ':standing:'||o.revision::text end,
+  'validUntil',expiry,'allowed',true);
+end $function$;
+
+CREATE OR REPLACE FUNCTION mizizi_private.desk_operational_receipt_current_v1(r mizizi_private.desk_tool_receipts_v1, c jsonb)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare o mizizi_private.desk_operational_policy_versions_v1;g mizizi_private.desk_operational_call_proofs_v1;
+ p mizizi_private.desk_access_policy_versions_v1;cp mizizi_private.desk_custody_policy_versions_v1;
+ mp mizizi_private.desk_model_authority_versions_v1;
+begin
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if o.revision is null then return r.operational_revision is null;end if;
+ if not mizizi_private.desk_operational_policy_live_v1(o,c)
+ or r.operational_revision is distinct from o.revision or not(r.operation=any(o.tool_names)) then return false;end if;
+ select * into g from mizizi_private.desk_operational_call_proofs_v1 q
+  where q.job_id=r.job_id and q.lease_expires_at=r.lease_expires_at and q.call_sha256=r.call_sha256
+  and q.operation='tool_execute' and q.binding_sha256=r.call_sha256 and q.standing_revision=o.revision;
+ if not found then return false;end if;
+ select * into mp from mizizi_private.desk_model_authority_versions_v1
+  where workspace_id=r.workspace_id and case_id=r.case_id and operation='tool_execute' and binding_sha256=r.call_sha256
+  order by revision desc limit 1;
+ if mp.revision is distinct from g.exact_revision or (mp.revision is not null and
+  (not mp.enabled or mp.valid_until<=clock_timestamp())) then return false;end if;
+ for g in select * from mizizi_private.desk_operational_call_proofs_v1 q
+  where q.job_id=r.job_id and q.lease_expires_at=r.lease_expires_at and q.call_sha256=r.call_sha256
+   and q.operation in ('native_acquire','native_text','browser_render','browser_request','browser_text','browser_visual','pdf_visual') loop
+  cp:=mizizi_private.current_desk_custody_policy_v1(r.workspace_id,g.host);
+  if g.standing_revision is distinct from o.revision then return false;end if;
+  if g.custody_revision is null then
+   -- This proves access only. The enclosing custody receipt check still
+   -- requires current positive retained-source/disclosure authority.
+   if not o.public_web_transient_allowed or g.exact_revision is not null
+    or (g.operation not in ('native_acquire','native_text','browser_request','browser_render','browser_text')
+     and not (cp.revision is null and g.operation in ('pdf_visual','browser_visual') and mizizi_private.desk_operation_interpretation_allowed_v1(o,g.operation)))
+    or (cp.revision is not null and (not cp.enabled or not cp.private_research_allowed
+      or cp.valid_until<=clock_timestamp()
+      or (g.operation in ('browser_request','browser_render','browser_text') and not cp.browser_render_allowed))) then return false;end if;
+  elsif not mizizi_private.desk_custody_policy_live_v1(cp)
+   or cp.revision is distinct from g.custody_revision then return false;end if;
+  select * into p from mizizi_private.desk_access_policy_versions_v1
+   where workspace_id=r.workspace_id and host=g.host and url_sha256=g.url_sha256 and operation=g.operation
+   order by revision desc limit 1;
+  if p.revision is distinct from g.exact_revision
+   or (p.revision is not null and (not p.enabled or p.custody_revision is distinct from cp.revision or p.valid_until<=clock_timestamp()))
+   then return false;end if;
+ end loop;
+ return true;
+end $function$;
+
 CREATE OR REPLACE FUNCTION mizizi_private.desk_custody_receipt_current_v1(r mizizi_private.desk_tool_receipts_v1, c jsonb)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -84,9 +274,9 @@ CREATE OR REPLACE FUNCTION mizizi_private.desk_custody_receipt_current_v1(r mizi
 AS $function$
 declare p mizizi_private.desk_custody_policy_versions_v1;
  ancestor mizizi_private.desk_tool_receipts_v1:=r;depth integer:=0;
- o mizizi_private.desk_operational_policy_versions_v1;operation_consultation boolean;
+ standing mizizi_private.desk_operational_policy_versions_v1;operation_consultation boolean;
 begin
- o:=mizizi_private.current_desk_operational_policy_v1(c);
+ standing:=mizizi_private.current_desk_operational_policy_v1(c);
  loop
   depth:=depth+1;
   if depth>200 or ancestor.id is null or c is null or ancestor.case_id::text is distinct from c->>'caseId'
@@ -99,30 +289,34 @@ begin
   if ancestor.provenance ? 'sharedNative' and not mizizi_private.desk_shared_receipt_current_v1(ancestor,c) then return false;end if;
   if ancestor.provenance ? 'sharedNativeSearch' and not mizizi_private.desk_shared_search_current_v1(ancestor,c) then return false;end if;
   p:=mizizi_private.current_desk_custody_policy_v1(ancestor.workspace_id,ancestor.host);
-  operation_consultation:=coalesce(ancestor.policy_revision is null and ancestor.operation='read_page'
+  operation_consultation:=coalesce(ancestor.policy_revision is null and ancestor.operation in ('read_page','read_document','browse_page','inspect_visual')
    and (ancestor.result_text::jsonb ? 'consultation')
-   and mizizi_private.desk_operation_interpretation_current_v1(o,ancestor.provenance),false);
+   and mizizi_private.desk_operation_interpretation_current_v1(standing,ancestor.provenance),false);
   if ancestor.provenance ? 'operationInterpretation' and not operation_consultation then return false;end if;
   if ancestor.policy_revision is null then
    -- Consultation receipts cannot become evidence or survive a newly
    -- issued host-specific custody decision without fresh authorization.
-   if p.revision is not null or ancestor.operation not in ('read_page','browse_page') or ancestor.source_id is not null
+   if p.revision is not null or ancestor.operation not in ('read_page','read_document','browse_page','inspect_visual') or ancestor.source_id is not null
     or ancestor.operational_revision is null or ancestor.parent_receipt_id is null
     or ancestor.result_text::jsonb->'sources' is distinct from '[]'::jsonb
-    or ancestor.result_text::jsonb->'visual' is distinct from 'null'::jsonb
+    or (ancestor.result_text::jsonb->'visual' is distinct from 'null'::jsonb and not (operation_consultation and ancestor.operation='inspect_visual'))
     or (not operation_consultation and (ancestor.result_text::jsonb ? 'consultation'
       or ancestor.provenance->>'locator' is distinct from 'no_text'))
     or (ancestor.operation='read_page' and exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
-      where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)'))
+      where not coalesce((v->>'kind'='reference' and v->>'label'='Public reference (unverified)') or
+       (v->>'kind'='document' and ancestor.provenance->>'contentType'='application/pdf' and v->>'label'='PDF document — '||(ancestor.provenance->>'documentPages')||' pages'
+        and (mizizi_private.desk_operation_interpretation_allowed_v1(standing,'native_text') or mizizi_private.desk_operation_interpretation_allowed_v1(standing,'pdf_visual'))),false)))
+    or (ancestor.provenance->'detail' ? 'localBrowser' and not coalesce(mizizi_private.desk_local_browser_receipt_available_v1(ancestor,c),false))
     or (ancestor.operation='browse_page' and (
       ancestor.provenance->'detail'->'visual' is distinct from 'null'::jsonb
-      or not coalesce(mizizi_private.desk_local_browser_receipt_available_v1(ancestor,c),false)
       or exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
-       where v->>'kind' is distinct from 'browser_action' or not exists(
+       where not exists(
         select 1 from jsonb_array_elements(ancestor.provenance->'detail'->'actionBindings') a
-        where a->>'id'=v->>'id' and v->>'label'=case a->>'action'
+        where a->>'id'=v->>'id' and ((v->>'kind'='browser_action' and v->>'label'=case a->>'action'
          when 'expand' then 'Expand public section' when 'search' then 'Search public page'
-         when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
+         when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end)
+         or (v->>'kind'='visual' and a->>'action'='visual' and v->>'label'='Examine the current browser viewport'
+          and mizizi_private.desk_operation_interpretation_allowed_v1(standing,'browser_visual')))))))
     then return false;end if;
   elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from ancestor.policy_revision
    or (ancestor.source_id is not null and not p.excerpt_retention_allowed)
@@ -204,28 +398,38 @@ begin
  -- Consultation is not source-content custody. This branch requires a
  -- standing session and no existing source-specific custody decision.
  transient_receipt:=coalesce(p_policy_revision is null and p.revision is null
-  and op in ('read_page','browse_page') and mizizi_private.desk_operational_policy_live_v1(o,c)
+  and op in ('read_page','read_document','browse_page','inspect_visual') and mizizi_private.desk_operational_policy_live_v1(o,c)
   and o.public_web_transient_allowed and p_host not in ('api.gdeltproject.org','api.tavily.com','api.search.brave.com'),false);
- operation_consultation:=coalesce(transient_receipt and op='read_page' and (result ? 'consultation')
+ operation_consultation:=coalesce(transient_receipt and (result ? 'consultation')
+  and p_provenance->'operationInterpretation'->>'method'=case op when 'read_page' then 'native_text' when 'read_document' then 'native_text'
+   when 'browse_page' then 'browser_text' when 'inspect_visual' then case when p_provenance->'detail' ? 'localBrowser' then 'browser_visual' else 'pdf_visual' end end
   and mizizi_private.desk_operation_interpretation_current_v1(o,p_provenance),false);
  if p_provenance ? 'operationInterpretation' and not operation_consultation then return null;end if;
  if transient_receipt then
   if (not operation_consultation and (result ? 'consultation' or p_provenance->>'locator' is distinct from 'no_text'))
-   or result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
+   or result->'sources' is distinct from '[]'::jsonb
+   or (result->'visual' is distinct from 'null'::jsonb and not (operation_consultation and op='inspect_visual'))
+   or (op='inspect_visual' and not operation_consultation)
    or (op='read_page' and (
-    p_provenance->'documentPages' is distinct from 'null'::jsonb
+    (p_provenance->'documentPages' is distinct from 'null'::jsonb and
+     (p_provenance->>'contentType' is distinct from 'application/pdf' or not (mizizi_private.desk_operation_interpretation_allowed_v1(o,'native_text') or mizizi_private.desk_operation_interpretation_allowed_v1(o,'pdf_visual'))))
     or p_provenance->'renderRequired' is distinct from 'false'::jsonb
     or exists(select 1 from jsonb_array_elements(result->'leads') v
-     where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)')
-    or exists(select 1 from jsonb_array_elements(p_lead_bindings) v where position('?' in coalesce(v->>'url',''))>0)))
+     where not coalesce((v->>'kind'='reference' and v->>'label'='Public reference (unverified)') or
+      (v->>'kind'='document' and p_provenance->>'contentType'='application/pdf' and v->>'label'='PDF document — '||(p_provenance->>'documentPages')||' pages'
+       and (mizizi_private.desk_operation_interpretation_allowed_v1(o,'native_text') or mizizi_private.desk_operation_interpretation_allowed_v1(o,'pdf_visual'))),false))
+    or exists(select 1 from jsonb_array_elements(p_lead_bindings) v where position('?' in coalesce(v->>'url',''))>0
+     and exists(select 1 from jsonb_array_elements(result->'leads') l where l->>'id'=v->>'id' and l->>'kind'='reference'))))
    or (op='browse_page' and (
     p_provenance->'detail'->'visual' is distinct from 'null'::jsonb
     or exists(select 1 from jsonb_array_elements(result->'leads') v
-     where v->>'kind' is distinct from 'browser_action' or not exists(
+     where not exists(
       select 1 from jsonb_array_elements(p_provenance->'detail'->'actionBindings') a
-      where a->>'id'=v->>'id' and v->>'label'=case a->>'action'
+      where a->>'id'=v->>'id' and ((v->>'kind'='browser_action' and v->>'label'=case a->>'action'
        when 'expand' then 'Expand public section' when 'search' then 'Search public page'
-       when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
+       when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end)
+       or (v->>'kind'='visual' and a->>'action'='visual' and v->>'label'='Examine the current browser viewport'
+        and mizizi_private.desk_operation_interpretation_allowed_v1(o,'browser_visual')))))))
    then return null;end if;
  elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from p_policy_revision then return null;end if;
  -- Non-retainable page navigation never persists publisher anchor/action labels.
@@ -246,8 +450,12 @@ begin
   if o.revision is null or not o.public_web_transient_allowed or (not operation_consultation and (
     p.excerpt_retention_allowed or not p.external_model_processing_allowed
     or p.transient_provider_processing_ref is null or p.transient_provider_credential_sha256 is distinct from o.credential_sha256))
-   or op not in ('read_page','read_document','render_page','browse_page') or result ? 'unavailable'
-   or result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
+   or op not in ('read_page','read_document','render_page','browse_page','inspect_visual') or result ? 'unavailable'
+   or result->'sources' is distinct from '[]'::jsonb
+   or (result->'visual' is distinct from 'null'::jsonb and not (operation_consultation and op='inspect_visual'))
+   or (op='inspect_visual' and (not operation_consultation
+    or result->'consultation'->>'textSha256' is distinct from encode(sha256(convert_to('Visual examination only; image SHA-256 '||(result->'visual'->>'sha256')||'.','UTF8')),'hex')
+    or result->'consultation'->>'textBytes' is distinct from octet_length('Visual examination only; image SHA-256 '||(result->'visual'->>'sha256')||'.')::text))
    or jsonb_typeof(result->'consultation') is distinct from 'object'
    or (select count(*) from jsonb_object_keys(result->'consultation'))<>5
    or not(result->'consultation' ?& array['receiptId','textSha256','textBytes','citation','observedAt'])
@@ -355,7 +563,7 @@ begin
   detail:=p_provenance->'detail';local_meta:=detail->'localBrowser';local_action:=local_meta->>'action';
   if o.revision is null or (not transient_receipt and (not p.browser_render_allowed or p.source_family<>'public_web'))
    or not(p_provenance ?& array['parentReceiptId','finalUrl','sourceSha256','projectionSha256','contentType','retrievedAt','byteLength','locator','detail'])
-   or (select count(*) from jsonb_object_keys(p_provenance))<>9
+   or (select count(*) from jsonb_object_keys(p_provenance-'operationInterpretation'))<>9
    or jsonb_typeof(detail) is distinct from 'object' or (select count(*) from jsonb_object_keys(detail))<>3
    or not(detail ?& array['localBrowser','visual','actionBindings'])
    or jsonb_typeof(local_meta) is distinct from 'object' or (select count(*) from jsonb_object_keys(local_meta))<>6
@@ -436,14 +644,14 @@ begin
     and q.call_sha256=p_call_sha256 and q.operation='browser_request' and q.url_sha256=final_hash and q.hop_sha256 is not null)
   then return null;end if;
   if op='inspect_visual' then
-   if not p.visual_processing_allowed or not p.excerpt_retention_allowed or local_action<>'visual'
+   if (not transient_receipt and (not p.visual_processing_allowed or not p.excerpt_retention_allowed)) or local_action<>'visual'
     or not mizizi_private.desk_visual_descriptor_valid_v1(detail->'visual')
     or detail->'visual'->>'width'<>'1280' or detail->'visual'->>'height'<>'900'
     or p_provenance->>'projectionSha256' is distinct from detail->'visual'->>'sha256'
     or p_provenance->>'locator' is distinct from 'browser_viewport:1'
-    or jsonb_array_length(result->'leads')<>0 or jsonb_array_length(result->'sources')<>1
+    or jsonb_array_length(result->'leads')<>0 or jsonb_array_length(result->'sources')<>(case when transient_receipt then 0 else 1 end)
     or result->'visual' is distinct from jsonb_build_object('sourceId',rid,'sha256',detail->'visual'->>'sha256','contentType','image/png')
-    or result->'sources'->0->>'excerpt' is distinct from 'Visual derivative for examination; no textual claim is verified.'
+    or (not transient_receipt and result->'sources'->0->>'excerpt' is distinct from 'Visual derivative for examination; no textual claim is verified.')
    then return null;end if;
   elsif local_action='visual' or detail->'visual' is distinct from 'null'::jsonb
    or coalesce(p_provenance->>'locator','') not in ('browser_visible_text','no_text') then return null;end if;
@@ -452,12 +660,12 @@ begin
   -- The DB binds metadata and parent custody; it never claims to verify
   -- original/raster bytes that are not retained.
   detail:=p_provenance->'detail';
-  if p.source_family<>'public_web' or not(call_body->'input' ? 'lead_id')
+  if (not transient_receipt and p.source_family<>'public_web') or not(call_body->'input' ? 'lead_id')
    or coalesce(call_body->'input'->>'lead_id','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
    or not(p_provenance ?& array['parentReceiptId','finalUrl','sourceSha256','projectionSha256','contentType','retrievedAt','byteLength','locator','detail'])
-   or (select count(*) from jsonb_object_keys(p_provenance))<>9
+   or (select count(*) from jsonb_object_keys(p_provenance-'operationInterpretation'))<>9
    or jsonb_typeof(detail) is distinct from 'object'
-   or mizizi_private.desk_custody_url_host_v1(p_provenance->>'finalUrl') is distinct from p.host
+   or mizizi_private.desk_custody_url_host_v1(p_provenance->>'finalUrl') is distinct from p_host
    or coalesce(p_provenance->>'sourceSha256','') !~ '^[0-9a-f]{64}$'
    or coalesce(p_provenance->>'projectionSha256','') !~ '^[0-9a-f]{64}$'
    or coalesce(p_provenance->>'byteLength','') !~ '^[1-9][0-9]{0,6}$'
@@ -473,7 +681,7 @@ begin
    or parent_receipt.job_id::text is distinct from s->>'jobId'
    or parent_receipt.worker_id is distinct from s->>'workerId'
    or parent_receipt.lease_expires_at is distinct from (s->>'leaseExpiresAt')::timestamptz
-   or parent_receipt.host is distinct from p.host
+   or parent_receipt.host is distinct from p_host
    or parent_receipt.policy_revision is distinct from p.revision
   then return null;end if;
   parent_id:=parent_receipt.id;
@@ -534,15 +742,15 @@ begin
      or coalesce(p_provenance->>'locator','') not in ('no_text','pdf_pages:'||page_start||'-'||page_end)
     then return null;end if;
    else
-    if not p.visual_processing_allowed or not p.excerpt_retention_allowed
+    if (not transient_receipt and (not p.visual_processing_allowed or not p.excerpt_retention_allowed))
      or not(detail ?& array['page','visual']) or (select count(*) from jsonb_object_keys(detail))<>2
      or coalesce(detail->>'page','') !~ '^[1-9][0-9]{0,4}$'
      or detail->'page' is distinct from call_body->'input'->'page'
      or not mizizi_private.desk_visual_descriptor_valid_v1(detail->'visual')
      or p_provenance->>'projectionSha256' is distinct from detail->'visual'->>'sha256'
-     or jsonb_array_length(result->'sources')<>1
+     or jsonb_array_length(result->'sources')<>(case when transient_receipt then 0 else 1 end)
      or result->'visual' is distinct from jsonb_build_object('sourceId',rid,'sha256',detail->'visual'->>'sha256','contentType','image/png')
-     or result->'sources'->0->>'excerpt' is distinct from 'Visual derivative for examination; no textual claim is verified.'
+     or (not transient_receipt and result->'sources'->0->>'excerpt' is distinct from 'Visual derivative for examination; no textual claim is verified.')
     then return null;end if;
     if parent_lead.kind='document' and parent_receipt.operation='read_page' and p_provenance->>'contentType'='application/pdf' then
      if parent_receipt.provenance->>'documentPages' is null or (detail->>'page')::integer>(parent_receipt.provenance->>'documentPages')::integer
@@ -574,6 +782,13 @@ begin
       and (not transient_receipt or q.custody_revision is null)))) then return null;end if;
    end loop;
   end if;
+ end if;
+ if transient_receipt and op='inspect_visual' and local_meta is null then
+  if not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q where q.job_id=(s->>'jobId')::uuid
+   and q.lease_expires_at=(s->>'leaseExpiresAt')::timestamptz and q.call_sha256=p_call_sha256 and q.operation='pdf_visual'
+   and q.standing_revision=o.revision and q.custody_revision is null and q.valid_until>clock_timestamp()
+   and q.url_sha256=encode(sha256(convert_to(p_provenance->>'finalUrl','UTF8')),'hex') and q.source_sha256=p_provenance->>'sourceSha256'
+   and q.page_start=(detail->>'page')::integer and q.page_end=q.page_start) then return null;end if;
  end if;
  if op not in ('search_web','search_news') then
   if jsonb_array_length(result->'sources')=1 then
@@ -618,7 +833,7 @@ begin
     if op<>'read_page' or not p.browser_render_allowed or p_provenance->'renderRequired' is distinct from 'true'::jsonb then return null;end if;
    elsif lead->>'kind'='browser_action' or (lead->>'kind'='visual' and op='browse_page') then
     if op<>'browse_page' or local_meta is null or (not transient_receipt and not p.browser_render_allowed)
-     or (lead->>'kind'='visual' and (not p.visual_processing_allowed or not p.excerpt_retention_allowed))
+     or (lead->>'kind'='visual' and case when transient_receipt then not mizizi_private.desk_operation_interpretation_allowed_v1(o,'browser_visual') else (not p.visual_processing_allowed or not p.excerpt_retention_allowed) end)
      or not exists(select 1 from jsonb_array_elements(detail->'actionBindings') v
       where v->>'id'=lead->>'id' and (select count(*) from jsonb_object_keys(v))=2
        and ((lead->>'kind'='visual' and v->>'action'='visual') or

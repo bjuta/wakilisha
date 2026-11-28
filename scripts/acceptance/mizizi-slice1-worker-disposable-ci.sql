@@ -30,18 +30,22 @@ DECLARE o mizizi_private.desk_operational_policy_versions_v1; m jsonb;
 BEGIN
  o.enabled:=true;o.public_web_transient_allowed:=true;o.revision:=1;
  o.credential_sha256:=repeat('a',64);o.valid_until:=clock_timestamp()+interval '1 minute';
- m:=jsonb_build_object('operationInterpretation',jsonb_build_object('kind','native_html_declared_cc0_v1',
-  'standingRevision',1,'documentLicense','https://creativecommons.org/publicdomain/zero/1.0/'),
+ m:=jsonb_build_object('operationInterpretation',jsonb_build_object('kind','bounded_public_research_v1',
+  'standingRevision',1,'method','native_text','restrictionCheck','no_known_directive'),
   'contentType','text/html','locator','article_text','finalUrl','https://archive.org/details/fixture',
   'sourceSha256',repeat('b',64),'projectionSha256',repeat('c',64),'documentPages',null,'renderRequired',false);
  IF mizizi_private.desk_operation_interpretation_current_v1(o,m) THEN RAISE EXCEPTION 'operation interpretation default allowed';END IF;
- o.operation_interpretation_rule:=jsonb_build_object('kind','native_html_declared_cc0_v1',
+ o.operation_interpretation_rule:=jsonb_build_object('kind','bounded_public_research_v1',
   'sourceUseRef','fixture:independent-content-review','providerProcessingRef','fixture:independent-provider-review',
-  'credentialSha256',o.credential_sha256);
+  'credentialSha256',o.credential_sha256,'operations',jsonb_build_array('native_text','browser_text','pdf_visual','browser_visual'));
  IF NOT mizizi_private.desk_operation_interpretation_current_v1(o,m)
  OR mizizi_private.desk_operation_interpretation_current_v1(o,m-'operationInterpretation')
  OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{operationInterpretation,standingRevision}','2'))
- OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{finalUrl}','"https://archive.org/details/fixture?q=private"'))
+ OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{operationInterpretation,restrictionCheck}','"restricted"'))
+ OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{operationInterpretation,method}','"pdf_visual"'))
+ OR NOT mizizi_private.desk_operation_interpretation_allowed_v1(o,'browser_text')
+ OR NOT mizizi_private.desk_operation_interpretation_allowed_v1(o,'pdf_visual')
+ OR NOT mizizi_private.desk_operation_interpretation_allowed_v1(o,'browser_visual')
  THEN RAISE EXCEPTION 'operation interpretation binding failed';END IF;
  o.credential_sha256:=repeat('d',64);
  IF mizizi_private.desk_operation_interpretation_current_v1(o,m) THEN RAISE EXCEPTION 'operation interpretation credential mismatch';END IF;

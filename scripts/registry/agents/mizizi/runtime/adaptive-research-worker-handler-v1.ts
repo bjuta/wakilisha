@@ -369,6 +369,7 @@ type OperationalNativeDeskPolicyV1=Readonly<{
  questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
  adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];sharedNativeAutoAllowed?:boolean;
  publicWebTransientAllowed?:boolean;
+ operationInterpretationRule?:{operations:readonly string[]}|null;
  accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
  validUntil:string;
 }>;
@@ -432,7 +433,8 @@ export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
      const browserOperation=operation.startsWith("browser_");
      // No source permission is synthesized here. The independent access RPC,
      // pinned resolver, transport, resource budget and custody checks remain.
-     if(p.publicWebTransientAllowed===true&&["native_acquire","native_text","browser_request","browser_render","browser_text"].includes(operation)){
+     if(p.publicWebTransientAllowed===true&&(["native_acquire","native_text","browser_request","browser_render","browser_text"].includes(operation)||
+      ["pdf_visual","browser_visual"].includes(operation)&&Array.isArray(p.operationInterpretationRule?.operations)&&p.operationInterpretationRule!.operations.includes(operation))){
       return u.href===url&&u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&
        url.length<=2048&&!/[\\\p{Cc}\p{Cf}]/u.test(url)&&
        !/%(?:2e|2f|5c|25)/i.test(u.pathname)&&

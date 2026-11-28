@@ -10,7 +10,7 @@ import {createDurableDeskSearchGatewayV1,createDurableDeskPublicDiscoveryGateway
  qualifyDeskPublicDiscoveryProviderV1,type DeskSearchScopeV1,type DeskDiscoveryConfigurationV1,
  type DeskSearchRequestV1} from "./desk-research-gateway-v1.ts";
 import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,createDeskPublicMethodGateV1,type DeskBrowserResourceBindingV1} from "./desk-native-reader-v1.ts";
-import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
+import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1,deskRenderedProcessingRestrictedV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {verifyInvestigationHistoryV1,verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1,type DeskConsultationRefV1} from "./adaptive-investigation-v1.ts";
@@ -266,7 +266,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   assertScope(candidate);
   if(["pdf_visual","browser_visual"].includes(String(binding.mode))){
    const p=await policy(urlOf(binding.finalUrl).hostname);
-   if(!p||p.sourceFamily!=="public_web"||p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)return false;
+   if(p?(p.sourceFamily!=="public_web"||p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed):!await operationRule(String(binding.mode),String(binding.finalUrl)))return false;
   }
   // Local text examination and protected evidence disclosure are distinct.
   return !!await accessGrant(binding.mode==="pdf_visual"?"pdf_visual":binding.mode==="browser_visual"?"browser_visual":
@@ -287,7 +287,8 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(parsed?.receiptId!==id||!Array.isArray(parsed.leads)||!Array.isArray(parsed.sources)||
    (parsed.visual!==null&&(!parsed.visual||!UUID.test(parsed.visual.sourceId)||!SHA.test(parsed.visual.sha256)||parsed.visual.contentType!=="image/png"))||
    (parsed.unavailable!==undefined&&(!isDeskUnavailableOutcomeV1(parsed.unavailable)||parsed.leads.length||parsed.sources.length||parsed.visual!==null))||
-   (parsed.consultation!==undefined&&(!validDeskTransientConsultationV1(parsed.consultation)||parsed.consultation.text!==undefined||parsed.consultation.receiptId!==id||parsed.sources.length||parsed.visual!==null||parsed.unavailable!==undefined))||
+   (parsed.consultation!==undefined&&(!validDeskTransientConsultationV1(parsed.consultation)||parsed.consultation.text!==undefined||parsed.consultation.receiptId!==id||parsed.sources.length||parsed.unavailable!==undefined||
+     (parsed.visual!==null&&(parsed.visual.sourceId!==id||parsed.consultation.textSha256!==hash(visualText(parsed.visual.sha256))))))||
    bodyOf(parsed)!==row.resultText)fail("CUSTODY_READBACK_UNCONFIRMED");
   return {row,result:parsed};
  }
@@ -332,33 +333,39 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(!validDeskTransientConsultationV1(ref,true))fail("TRANSIENT_CONSULTATION_SHAPE");
   return Object.freeze(ref);
  }
- // First operation class: native HTML, explicit document-level declaration,
- // independently reviewed class eligibility AND actual provider handling.
- // The agent cannot supply either the rule or the declaration. Not general
- // permission for unlicensed publisher text or third-party content.
- async function operationConsultation(receipt:NativeReceipt,projection:{documentLicense?:unknown;segments:readonly {locator:string;text:string}[]}){
+ // One standing interpretation rule applies to permitted operations, not
+ // a publisher or file format. The reviewed source-use reference and actual
+ // provider-handling reference are independently issued; ordinary access,
+ // missing negative directives and licence labels do not themselves grant use.
+ async function operationRule(method:string,url:string){
   if(options.allowTransientModelConsultation?.()!==true||options.requirePublicMethodEligibility!==true||
-   !SHA.test(options.transientProviderCredentialSha256??"")||
-   receipt.contentType!=="text/html"||urlOf(receipt.finalUrl).search||
-   projection.documentLicense!=="https://creativecommons.org/publicdomain/zero/1.0/")return null;
-  const segment=projection.segments.find(s=>s.locator==="article_text"&&typeof s.text==="string"&&s.text.trim());
-  if(!segment)return null;
+   !SHA.test(options.transientProviderCredentialSha256??""))return null;
+  urlOf(url);
   const current=await rpc("mizizi_read_desk_operational_policy_v1",{p_scope:scope}) as {
    revision:number;scope:DeskSearchScopeV1;credentialSha256:string;publicWebTransientAllowed:boolean;validUntil:string;
-   operationInterpretationRule?:{kind:string;sourceUseRef:string;providerProcessingRef:string;credentialSha256:string}|null
+   operationInterpretationRule?:{kind:string;sourceUseRef:string;providerProcessingRef:string;credentialSha256:string;operations:string[]}|null
   }|null;
   const rule=current?.operationInterpretationRule,expiry=Date.parse(current?.validUntil??"");
   if(!current||!current.scope||scopeKeys.some(k=>current.scope[k]!==scope[k])||
    !Number.isSafeInteger(current.revision)||current.revision<1||current.publicWebTransientAllowed!==true||
    current.credentialSha256!==options.transientProviderCredentialSha256||
    !Number.isFinite(expiry)||expiry<=now()||expiry>Date.parse(scope.leaseExpiresAt)||
-   !rule||Object.keys(rule).length!==4||rule.kind!=="native_html_declared_cc0_v1"||
+   !rule||Object.keys(rule).length!==5||rule.kind!=="bounded_public_research_v1"||
    rule.credentialSha256!==current.credentialSha256||
-   !text(rule.sourceUseRef,500,8)||!text(rule.providerProcessingRef,500,8)||rule.sourceUseRef===rule.providerProcessingRef)return null;
-  const consultation=consultationContent(randomUUID(),receipt,"article_text",segment.text);
-  return consultation?{consultation,operationInterpretation:{kind:rule.kind,standingRevision:current.revision,
-   documentLicense:projection.documentLicense}}:null;
+   !text(rule.sourceUseRef,500,8)||!text(rule.providerProcessingRef,500,8)||rule.sourceUseRef===rule.providerProcessingRef||
+   !Array.isArray(rule.operations)||rule.operations.length<1||rule.operations.length>4||
+   new Set(rule.operations).size!==rule.operations.length||
+   rule.operations.some(op=>!["native_text","browser_text","pdf_visual","browser_visual"].includes(op))||
+   !rule.operations.includes(method))return null;
+  return {kind:rule.kind,standingRevision:current.revision,method,restrictionCheck:"no_known_directive"};
  }
+ async function operationConsultation(id:string,method:string,receipt:{finalUrl:string;retrievedAt:string},locator:string,raw:string,restricted:boolean){
+  if(restricted||!raw.trim())return null;
+  const operationInterpretation=await operationRule(method,receipt.finalUrl);
+  const consultation=operationInterpretation?consultationContent(id,receipt,locator,raw):undefined;
+  return consultation?{consultation,operationInterpretation}:null;
+ }
+ const visualText=(sha:string)=>"Visual examination only; image SHA-256 "+sha+".";
  async function append(callText:string,callSha256:string,result:DeskToolResultV1,
   p:{host:string;revision:number|null},provenance:Record<string,unknown>,bindings:readonly {id:string;url:string}[]){
   const resultText=bodyOf(result),resultSha256=hash(resultText);
@@ -381,8 +388,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(!localConfig||!activeCallSha256||await localConfig.authorizeAccess(scope,url,operation)!==true)return null;
   if(operation==="browser_visual"||operation==="browser_render"&&descriptor.visual===true){
    const p=await policy(urlOf(url).hostname);
-   if(!p||p.sourceFamily!=="public_web"||p.browserRenderAllowed!==true||
-    p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed)return null;
+   if(p?(p.sourceFamily!=="public_web"||p.browserRenderAllowed!==true||p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed):!await operationRule("browser_visual",url))return null;
   }
   return accessGrant(operation,url,descriptor,hopSha256);
  };
@@ -446,10 +452,11 @@ export function createDeskResearchDispatcherV1(options:Options){
     const p=await policy(urlOf(url).hostname);
     return !!p&&p.browserRenderAllowed===true&&p.excerptRetentionAllowed;
    },
-   authorizeVisualLead:async(candidate:DeskSearchScopeV1,url:string)=>{
+   authorizeVisualLead:async(candidate:DeskSearchScopeV1,url:string,capture:{body:Uint8Array})=>{
     assertScope(candidate);
     const p=await policy(urlOf(url).hostname);
-    return !!p&&p.visualProcessingAllowed===true&&p.excerptRetentionAllowed&&
+    return (p?p.visualProcessingAllowed===true&&p.excerptRetentionAllowed:
+     !!await operationRule("browser_visual",url)&&!await deskRenderedProcessingRestrictedV1(capture.body,url))&&
      await localConfig.authorizeAccess(scope,url,"browser_visual")===true;
    },
    admitObservation:async(b:{
@@ -468,11 +475,14 @@ export function createDeskResearchDispatcherV1(options:Options){
     if(!parent)fail("LOCAL_PARENT_DENIED");
     const url=urlOf(b.capture.finalUrl).href,p=await policy(urlOf(url).hostname);
     const visual=b.action==="visual";
-    if((p&&p.browserRenderAllowed!==true)||(visual&&!p))fail("SOURCE_CUSTODY_DENIED");
+    if(p&&p.browserRenderAllowed!==true)fail("SOURCE_CUSTODY_DENIED");
+    const restricted=!p&&await deskRenderedProcessingRestrictedV1(b.capture.body,url);
+    const visualRule=!p&&!restricted?await operationRule("browser_visual",url):null;
+    if(visual&&!p&&!visualRule)fail("SOURCE_CUSTODY_DENIED");
     if(!p?.excerptRetentionAllowed){
      // Non-retainable observations must carry no publisher action labels or visual content.
      const labels:Readonly<Record<string,string>>={expand:"Expand public section",search:"Search public page",follow:"Follow public reference",scroll_down:"Scroll down"};
-     if(b.leads.some(l=>l.kind!=="browser_action"||!b.actionBindings.some(a=>a.id===l.id&&labels[a.action]===l.label)))
+     if(b.leads.some(l=>l.kind==="visual"?(!visualRule||l.label!=="Examine the current browser viewport"||!b.actionBindings.some(a=>a.id===l.id&&a.action==="visual")):l.kind!=="browser_action"||!b.actionBindings.some(a=>a.id===l.id&&labels[a.action]===l.label)))
       fail("TRANSIENT_BROWSER_LABEL_DENIED");
     }
     const descriptor=visual&&b.capture.visual?imageDescriptor({body:b.capture.visual.body,sha256:b.capture.visual.sha256,
@@ -487,14 +497,18 @@ export function createDeskResearchDispatcherV1(options:Options){
      b.capture.visibleText.replace(/[\p{Cf}]/gu," ").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g," ").trim().slice(0,4000).trim();
     const capturedAt=new Date(now()).toISOString();
     const source={sha256:b.capture.sha256,retrievedAt:capturedAt,finalUrl:url};
-    const consultation=!visual?makeConsultation(b.receiptId,p,source,"browser_visible_text",excerpt):undefined;
-    const locator=visual?"browser_viewport:1":p&&excerpt&&(p.excerptRetentionAllowed||consultation)?"browser_visible_text":"no_text";
+    const permitted=!p?await operationConsultation(b.receiptId,visual?"browser_visual":"browser_text",source,
+     visual?"browser_viewport:1":"browser_visible_text",visual?visualText(descriptor!.sha256):excerpt,restricted):null;
+    if(visual&&!p&&!permitted)fail("VISUAL_AUTHORITY_DENIED");
+    const consultation=permitted?.consultation??(!visual?makeConsultation(b.receiptId,p,source,"browser_visible_text",excerpt):undefined);
+    const locator=visual?"browser_viewport:1":excerpt&&(p?.excerptRetentionAllowed||consultation)?"browser_visible_text":"no_text";
     const metadata={parentReceiptId:parent.receiptId,finalUrl:url,sourceSha256:b.capture.sha256,
      projectionSha256:descriptor?.sha256??b.capture.visibleTextSha256,contentType:"text/html",retrievedAt:capturedAt,
      byteLength:b.capture.body.length,locator,detail:{localBrowser:{reservationId:session.reservationId,
       requestSha256:session.requestSha256,sessionId:session.sessionId,observationSha256:b.observation.observationSha256,
       action:b.action,generation:b.observation.generation},visual:descriptor,
-      actionBindings:b.actionBindings.map(x=>({id:x.id,action:x.action}))}};
+      actionBindings:b.actionBindings.map(x=>({id:x.id,action:x.action}))},
+     ...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})};
     const result:DeskToolResultV1={receiptId:b.receiptId,leads:b.leads,
      sources:excerpt&&p?.excerptRetentionAllowed?[makeExcerpt(b.receiptId,p,source,locator,excerpt)]:[],
      ...(consultation?{consultation}:{}),
@@ -614,8 +628,9 @@ export function createDeskResearchDispatcherV1(options:Options){
      (parent.row.provenance as Record<string,unknown>)?.projectionSha256!==cached.provenance.projectionSha256)
     fail("TRANSIENT_ORIGINAL_UNAVAILABLE");
    const p=await policy(urlOf(url).hostname);
-   if(!p||p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");
-   const baseReceipt=cached.receipt;
+   if(p&&p.sourceFamily!=="public_web")fail("SOURCE_CUSTODY_DENIED");
+   const baseReceipt=cached.receipt,policyBinding=p??{host:urlOf(url).hostname,revision:null};
+   const restricted=!p&&(baseReceipt.contract!=="mizizi.desk_native_read.v1"||baseReceipt.processingRestricted===true||cached.provenance.processingRestricted===true);
    const provenance={parentReceiptId:raw.receiptId,finalUrl:url,sourceSha256:baseReceipt.sha256,
     contentType:baseReceipt.contentType,retrievedAt:baseReceipt.retrievedAt,byteLength:baseReceipt.byteLength};
    const receiptId=randomUUID();
@@ -631,14 +646,16 @@ export function createDeskResearchDispatcherV1(options:Options){
     const excerpt=interpreted.projection.segments.filter((seg:{text:string})=>seg.text.trim())
      .map((seg:{page:number;text:string})=>"Page "+seg.page+": "+seg.text).join("\n");
     const locator=excerpt?"pdf_pages:"+first+"-"+last:"no_text";
-    const consultation=makeConsultation(receiptId,p,baseReceipt,locator,excerpt);
-    return append(callText,callSha256,{receiptId,leads:[],sources:excerpt&&p.excerptRetentionAllowed?
-     [makeExcerpt(receiptId,p,baseReceipt,locator,excerpt)]:[],...(consultation?{consultation}:{})},p,
-     {...provenance,projectionSha256:interpreted.projectionSha256,locator,detail:{pageStart:first,pageEnd:last}},[]);
+    const permitted=!p?await operationConsultation(receiptId,"native_text",baseReceipt,locator,excerpt,restricted):null;
+    const consultation=permitted?.consultation??makeConsultation(receiptId,p,baseReceipt,locator,excerpt);
+    return append(callText,callSha256,{receiptId,leads:[],sources:excerpt&&p?.excerptRetentionAllowed?
+     [makeExcerpt(receiptId,p,baseReceipt,locator,excerpt)]:[],...(consultation?{consultation}:{})},policyBinding,
+     {...provenance,projectionSha256:interpreted.projectionSha256,locator:p||permitted?locator:"no_text",detail:{pageStart:first,pageEnd:last},
+      ...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})},[]);
    }
    if(call.name==="inspect_visual"){
     const page=call.input.page;
-    if(p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed||typeof page!=="number"||!Number.isSafeInteger(page)||page<1)
+    if((p?p.visualProcessingAllowed!==true||!p.excerptRetentionAllowed:restricted||!await operationRule("pdf_visual",url))||typeof page!=="number"||!Number.isSafeInteger(page)||page<1)
      fail("VISUAL_AUTHORITY_DENIED");
     let visual:{body:Uint8Array;sha256:string;width:number;height:number;byteLength:number},locator:string;
     if(raw.kind==="document"&&baseReceipt.contract==="mizizi.desk_native_read.v1"&&baseReceipt.contentType==="application/pdf"){
@@ -652,13 +669,17 @@ export function createDeskResearchDispatcherV1(options:Options){
      visual=baseReceipt.visual;locator="browser_viewport:1";
     }else fail("VISUAL_LEAD_DENIED");
     const descriptor=imageDescriptor(visual);
+    const permitted=!p?await operationConsultation(receiptId,"pdf_visual",baseReceipt,locator,visualText(descriptor.sha256),restricted):null;
+    if(!p&&!permitted)fail("VISUAL_AUTHORITY_DENIED");
     return append(callText,callSha256,{receiptId,leads:[],
-     sources:[makeExcerpt(receiptId,p,baseReceipt,locator,"Visual derivative for examination; no textual claim is verified.")],
-     visual:{sourceId:receiptId,sha256:descriptor.sha256,contentType:"image/png",body:Uint8Array.from(visual.body)}},p,
-     {...provenance,projectionSha256:descriptor.sha256,locator,detail:{page,visual:descriptor}},[]);
+     sources:p?[makeExcerpt(receiptId,p,baseReceipt,locator,"Visual derivative for examination; no textual claim is verified.")]:[],
+     ...(permitted?{consultation:permitted.consultation}:{}),
+     visual:{sourceId:receiptId,sha256:descriptor.sha256,contentType:"image/png",body:Uint8Array.from(visual.body)}},policyBinding,
+     {...provenance,projectionSha256:descriptor.sha256,locator,detail:{page,visual:descriptor},
+      ...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})},[]);
    }
    if(call.name==="render_page"){
-    if(raw.kind!=="render"||!browser||!browserProvider||p.browserRenderAllowed!==true||
+    if(raw.kind!=="render"||!browser||!browserProvider||!p||p.browserRenderAllowed!==true||
      baseReceipt.contract!=="mizizi.desk_native_read.v1"||cached.provenance.renderRequired!==true)
      fail("BROWSER_FALLBACK_DENIED");
     const visual=options.browser?.captureVisual===true&&p.visualProcessingAllowed===true&&p.excerptRetentionAllowed;
@@ -743,17 +764,27 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("SOURCE_PROJECTION_UNCONFIRMED");
   const projection=interpreted.projection;
   if(!p){
-   // Generic navigation is the fallback. Independently approved operation
-   // eligibility permits bounded memory-only text, never a retained source.
    const refs=leadsFrom(projection.links.filter((l:{url:string})=>!l.url.includes("?"))
     .map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));
-   const permitted=await operationConsultation(receipt,projection);
-   return append(callText,callSha256,{receiptId:permitted?.consultation.receiptId??randomUUID(),leads:refs.leads,sources:[],
-     ...(permitted?{consultation:permitted.consultation}:{})},
-    {host,revision:null},{requestedUrl:receipt.requestedUrl,finalUrl:receipt.finalUrl,sourceSha256:receipt.sha256,
-     projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,
-     byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:permitted?"article_text":"no_text",documentPages:null,renderRequired:false,
-     ...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})},refs.bindings);
+   const leads=[...refs.leads],bindings=[...refs.bindings],receiptId=randomUUID();
+   const restricted=receipt.processingRestricted===true||projection.processingRestricted===true;
+   const segment=projection.segments.find((seg:{text:string})=>typeof seg.text==="string"&&seg.text.trim());
+   const permitted=segment?await operationConsultation(receiptId,"native_text",receipt,segment.locator,segment.text,restricted):null;
+   const pages=receipt.contentType==="application/pdf"&&Number.isSafeInteger(projection.documentPages)&&
+    projection.documentPages>0&&projection.documentPages<=10000?projection.documentPages:null;
+   const documentPages=!restricted&&pages&&(await operationRule("native_text",receipt.finalUrl)||await operationRule("pdf_visual",receipt.finalUrl))?pages:null;
+   if(documentPages!==null){
+    const id=randomUUID();leads.push({id,kind:"document",label:"PDF document — "+documentPages+" pages"});
+    bindings.push({id,url:receipt.finalUrl});
+   }
+   const meta={requestedUrl:receipt.requestedUrl,finalUrl:receipt.finalUrl,sourceSha256:receipt.sha256,
+    projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,
+    byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:permitted?segment.locator:"no_text",
+    documentPages,renderRequired:false,...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})};
+   const result=await append(callText,callSha256,{receiptId,leads,sources:[],
+    ...(permitted?{consultation:permitted.consultation}:{})},{host,revision:null},meta,bindings);
+   if(documentPages!==null)remember(receiptId,receipt,{...meta,processingRestricted:restricted});
+   return result;
   }
   const refs=leadsFrom(p.excerptRetentionAllowed?projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})):
    projection.links.filter((l:{url:string})=>!l.url.includes("?")).map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));

@@ -37,7 +37,7 @@ const PROMPT=[
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
 ].join(" ");
 const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified original research context, authored by MIZIZI or a human researcher, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
-const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use sourceIds for retained evidence and consultationIds for transiently examined text. Either may be empty but at least one examined reference is required. A consultation ID is not a source ID. Never quote publisher text as your note. A note is not independent factual verification.";
+const NOTEBOOK_INSTRUCTION=" Visual consultations carry a digest descriptor and actual image, not a textual claim; cite their consultation ID for provisional observations. Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use sourceIds for retained evidence and consultationIds for transiently examined text. Either may be empty but at least one examined reference is required. A consultation ID is not a source ID. Never quote publisher text as your note. A note is not independent factual verification.";
 // This is a bounded verbatim-overlap fence, not a copyright detector.
 // Apply it before any free-text tool call reaches a provider or durable
 // authorization ledger, as well as before original note/journal output.
@@ -383,10 +383,11 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    let consultation:DeskTransientConsultationV1|undefined;
    if(result.consultation!==undefined){
     if(!notebook||!validDeskTransientConsultationV1(result.consultation)||result.consultation.text!==undefined||
-     result.consultation.receiptId!==binding.receiptId||sources.length||visual||unavailable||!["read_page","read_document","render_page","browse_page"].includes(call.name)||
-     !Array.isArray(resultBlock.content)||resultBlock.content.length!==1)return false;
+     result.consultation.receiptId!==binding.receiptId||sources.length||unavailable||!["read_page","read_document","render_page","browse_page","inspect_visual"].includes(call.name)||
+     (call.name==="inspect_visual")!==!!visual||!Array.isArray(resultBlock.content)||resultBlock.content.length!==(visual?2:1))return false;
     const supplied=record(JSON.parse(String(record(resultBlock.content[0]).text))).consultation;
     if(!validDeskTransientConsultationV1(supplied,true)||JSON.stringify(deskConsultationRefV1(supplied))!==JSON.stringify(result.consultation))return false;
+    if(visual&&(visual.sourceId!==binding.receiptId||supplied.text!=="Visual examination only; image SHA-256 "+visual.sha256+"."))return false;
     consultation=supplied;consultationIds.push(consultation.receiptId);consultedText.push(consultation);
    }
    const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
@@ -501,9 +502,10 @@ function readUsage(p:Record<string,unknown>,quote:Quote):Usage{
    inputTokens+outputTokens+cacheCreationTokens+cacheReadTokens<1)fail("USAGE_OUTSIDE_RESERVATION");
  return Object.freeze({inputTokens,outputTokens,cacheCreationTokens,cacheReadTokens});
 }
-function safeVisual(visual:DeskToolResultV1["visual"],sources:readonly SourceExcerptV1[]){
+function safeVisual(visual:DeskToolResultV1["visual"],sources:readonly SourceExcerptV1[],consultation?:DeskTransientConsultationV1){
  if(!visual)return null;
- if(!sources.some(s=>s.source.sourceId===visual.sourceId)||visual.contentType!=="image/png"||
+ if(!(sources.some(s=>s.source.sourceId===visual.sourceId)||consultation?.receiptId===visual.sourceId&&
+  consultation.text==="Visual examination only; image SHA-256 "+visual.sha256+".")||visual.contentType!=="image/png"||
   !(visual.body instanceof Uint8Array)||visual.body.length<33||visual.body.length>2_000_000||
   !SHA.test(visual.sha256)||hash(visual.body)!==visual.sha256)fail("VISUAL_RECEIPT_DENIED");
  const b=Buffer.from(visual.body);
@@ -766,8 +768,9 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     newLeads.length||newSources.length||raw.visual||options.discoveryHosts?.[call.name as "search_web"|"search_news"]!==unavailable.host))fail("UNAVAILABLE_OUTCOME_INVALID");
    const consultation=raw.consultation;
    if(consultation!==undefined&&(!notebook||!validDeskTransientConsultationV1(consultation,true)||consultation.receiptId!==raw.receiptId||
-    newSources.length||raw.visual||unavailable||!["read_page","read_document","render_page","browse_page"].includes(call.name)))fail("TRANSIENT_CONSULTATION_DENIED");
-   const visual=safeVisual(raw.visual,newSources);
+    newSources.length||unavailable||!["read_page","read_document","render_page","browse_page","inspect_visual"].includes(call.name)||
+    (call.name==="inspect_visual")!==!!raw.visual))fail("TRANSIENT_CONSULTATION_DENIED");
+   const visual=safeVisual(raw.visual,newSources,consultation);
    if(visual&&(call.name!=="inspect_visual"||++visualCount>1))fail("VISUAL_BOUND");
    const result:DeskToolResultV1=Object.freeze({receiptId:raw.receiptId,leads:Object.freeze(newLeads),
     sources:Object.freeze(newSources),...(visual?{visual}:{}),...(unavailable?{unavailable}:{}),...(consultation?{consultation}: {})});
