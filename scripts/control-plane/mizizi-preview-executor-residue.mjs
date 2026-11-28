@@ -7,7 +7,7 @@ export function captureExecutorIdentity(row){
  return Object.freeze({pid:row.pid,backendStart:row.backend_start});
 }
 const revoked="exists(select 1 from pg_catalog.pg_authid where rolname='mizizi_executor' and rolpassword is null and rolvaliduntil<=clock_timestamp())";
-const preview="(select count(*) from supabase_migrations.schema_migrations)=306 and (select max(version) from supabase_migrations.schema_migrations)='20261127171129'";
+const preview="(select count(*) from supabase_migrations.schema_migrations)=308 and (select max(version) from supabase_migrations.schema_migrations)='20261128081335'";
 const snapshot="select "+revoked+" as revoked,"+preview+" as preview,(select count(*)::int from pg_stat_activity where usename='mizizi_executor') as sessions";
 export async function cleanupExecutorResidue({query,identity,delay=ms=>new Promise(r=>setTimeout(r,ms))}){
  const one=async q=>{const rows=await query(q);if(!Array.isArray(rows)||rows.length!==1)return fail();return rows[0];};

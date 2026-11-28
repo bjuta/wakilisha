@@ -16,7 +16,7 @@ test("exact idle residual backend is terminated once then independently verified
  const h=fake([snap(1),[{terminated:true}],snap(1),snap(0)]);
  assert.deepEqual(await run(h),{terminated:true,sessions:0});
  const sql=h.calls[1];
- for(const guard of ["a.pid=445668","a.backend_start='2026-11-27 18:04:41.363144+00'::timestamptz","a.usename='mizizi_executor'","a.application_name='Supavisor'","a.backend_type='client backend'","a.state='idle'","a.xact_start is null","rolpassword is null","rolvaliduntil<=clock_timestamp()","20261127171129",")=1"])assert.ok(sql.includes(guard),guard);
+ for(const guard of ["a.pid=445668","a.backend_start='2026-11-27 18:04:41.363144+00'::timestamptz","a.usename='mizizi_executor'","a.application_name='Supavisor'","a.backend_type='client backend'","a.state='idle'","a.xact_start is null","rolpassword is null","rolvaliduntil<=clock_timestamp()","schema_migrations)=308","20261128081335",")=1"])assert.ok(sql.includes(guard),guard);
  assert.equal(h.calls.filter(x=>x.includes("pg_terminate_backend")).length,1);
 });
 test("unknown, additional, live credentials or wrong migration: no termination",async()=>{
