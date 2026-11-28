@@ -379,17 +379,24 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // Repeated identical source receipts, even under paraphrased questions,
   // are not independent new evidence. Two previous same-family passes are
   // sufficient to stop another paid interpretation of identical material.
-  const alreadySeen=new Set(history.flatMap(p=>
-   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
-  const sameEvidence=sources.length>0&&sources.every(s=>
-   alreadySeen.has(s.source.lineageKey+"|"+s.source.originKey+"|"+s.source.fingerprint));
-  const prior=history.at(-1);
-  const earlier=new Set(history.slice(0,-1).flatMap(p=>
-   p.sourceReceipts.map(r=>r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint)));
-  const priorRepeated=history.length>1&&!!prior&&prior.sourceReceipts.length>0&&
-   prior.sourceReceipts.every(r=>
-    earlier.has(r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint));
-  const evidenceExhausted=sameEvidence&&priorRepeated&&!prepared?.deskConsultationReceipts?.length;
+  // Consultation receipt IDs and timestamps change on reacquisition.
+  // Identical text at the same locator is not a new information gap or
+  // independent evidence. Keep consultation keys separate from retained
+  // evidence keys: a digest is not evidence or a source-use grant.
+  const retainedKey=(lineage:string,origin:string,fingerprint:string)=>JSON.stringify(["retained",lineage,origin,fingerprint]);
+  const consultationKey=(r:DeskConsultationRefV1)=>JSON.stringify(["consultation",r.citation,r.textSha256,r.textBytes]);
+  const passKeys=(p:InvestigationPassV1)=>[
+   ...p.sourceReceipts.map(r=>retainedKey(r.lineageKey,r.originKey,r.payloadFingerprint)),
+   ...(p.deskConsultationReceipts??[]).map(consultationKey)];
+  const currentKeys=[
+   ...sources.map(s=>retainedKey(s.source.lineageKey,s.source.originKey,s.source.fingerprint)),
+   ...(prepared?.deskConsultationReceipts??[]).map(consultationKey)];
+  const alreadySeen=new Set(history.flatMap(passKeys));
+  const sameEvidence=currentKeys.length>0&&currentKeys.every(key=>alreadySeen.has(key));
+  const prior=history.at(-1),priorKeys=prior?passKeys(prior):[];
+  const earlier=new Set(history.slice(0,-1).flatMap(passKeys));
+  const priorRepeated=history.length>1&&priorKeys.length>0&&priorKeys.every(key=>earlier.has(key));
+  const evidenceExhausted=sameEvidence&&priorRepeated;
   // Mixed public and restricted packets are also human-only. The case
   // question may itself disclose a protected witness or investigation lead;
   // filtering excerpts alone cannot safely authorize sending that question.

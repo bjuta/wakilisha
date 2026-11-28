@@ -893,6 +893,28 @@ describe("MIZIZI adaptive unfamiliar investigation (same accepted worker boundar
    decision:{action:"pause"}});
   expect(store.rows[2].findings).toEqual([]);
   expect(store.rows[2].sourceReceipts[0]).toMatchObject({modelDisclosed:false});
+  // The same bounded continuation rule covers digest-only consultations.
+  // Unlike a legacy analyst, a desk pass has already used metered inference.
+  // Preserve that cost and the exact receipts, but do not schedule a fourth
+  // interpretation of the same text with a freshly generated receipt ID.
+  const notebook=memory(),h=(v:string)=>createHash("sha256").update(v).digest("hex");
+  const consulted=vi.fn(async(_id:unknown,_q:string,history:readonly InvestigationPassV1[])=>{
+   const i=history.length,receiptId=[JOB,CASE,EVENT][i]??RECEIPT;
+   const ref={receiptId,textSha256:h("same permitted consultation text"),textBytes:32,
+    citation:"https://archive.org/details/fixture#article_text",observedAt:new Date(NOW-i).toISOString()};
+   return {sources:[],costUnits:2,deskConsultationReceipts:[ref],
+    deskToolReceipts:[{receiptId,callSha256:h("call"+i),resultSha256:h("result"+i)}],
+    analysis:{...answer([lead("New angle "+i+" regarding the same original consultation?")],"continue"),hypotheses:[]}};
+  });
+  const noLegacy=vi.fn(async()=>{throw Error("LEGACY_READER");});
+  const r=await runAdaptiveInvestigationV1({identity,store:notebook,prepareDeskPass:consulted,
+   readSources:noLegacy,analyze:noLegacy,authorizeModelProcessing:async()=>true,
+   verifyFinding:async()=>({verified:false,verificationRef:null}),maxNewPasses:8,maxTotalPasses:20,costBudgetUnits:100,now:()=>NOW});
+  expect(r).toMatchObject({passesAdded:3,disposition:"paused"});
+  expect(consulted).toHaveBeenCalledTimes(3);
+  expect(noLegacy).not.toHaveBeenCalled();
+  expect(notebook.rows[2]).toMatchObject({costUnits:2,findings:[],decision:{action:"pause"},deskConsultationReceipts:[{receiptId:EVENT}]});
+  expect(notebook.rows.reduce((sum,p)=>sum+p.costUnits,0)).toBe(6);
  });
  it("executes two adaptive research passes through the existing actual worker RPC lifecycle",async()=>{
   const store=memory(),rpc=harness();
