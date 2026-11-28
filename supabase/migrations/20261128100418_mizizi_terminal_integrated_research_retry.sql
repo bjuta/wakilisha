@@ -93,7 +93,7 @@ begin
     join mizizi_private.desk_tool_receipts_v1 r on r.id::text=d->>'receiptId'
     where r.operation in ('browse_page','render_page','inspect_visual')))) then return false;end if;
  return true;
-end $function$
+end $function$;
 
 -- Existing public.admin_mizizi_authorize_desk_reopening_v1 guarded replacement.
 CREATE OR REPLACE FUNCTION public.admin_mizizi_authorize_desk_reopening_v1(p_case_id uuid, p_expected_revision integer, p_previous_job_id uuid, p_predecessor_fingerprint text, p_event_id uuid, p_event_sha256 text, p_event_kind text, p_observed_at timestamp with time zone, p_question text, p_valid_until timestamp with time zone, p_acknowledgement text)
@@ -153,7 +153,7 @@ begin
  return jsonb_build_object('eventId',e.event_id,'caseId',e.case_id,'workspaceId',e.workspace_id,
   'previousJobId',e.previous_job_id,'expectedRevision',e.expected_revision,'eventSha256',e.event_sha256,
   'predecessorFingerprint',e.predecessor_fingerprint,'validUntil',e.valid_until,'jobsDispatched',0);
-end $function$
+end $function$;
 
 -- Existing mizizi_private.admit_desk_reopening_job_v1 guarded replacement.
 CREATE OR REPLACE FUNCTION mizizi_private.admit_desk_reopening_job_v1(p_event_id uuid, p_event_sha256 text)
@@ -204,7 +204,7 @@ begin
  values('command:'||cr.id::text||':accepted',cr.id,j.id,'mizizi.case_research_v1',e.case_id,'mizizi.case_research_v1.accepted',
   jsonb_build_object('case_id',e.case_id,'workspace_id',e.workspace_id,'case_revision',e.expected_revision,'job_id',j.id,'command_receipt_id',cr.id));
  return query select e.case_id,e.workspace_id,e.case_id,e.expected_revision,cr.id,j.id,j.status,'created'::text;
-end $function$
+end $function$;
 
 -- Existing mizizi_private.desk_reopening_job_current_v1 guarded replacement.
 CREATE OR REPLACE FUNCTION mizizi_private.desk_reopening_job_current_v1(j platform_private.jobs, c mizizi_private.cases, cr platform_private.command_receipts)
@@ -236,7 +236,7 @@ begin
  if e.predecessor_ordinal=0 then return not exists(
   select 1 from mizizi_private.research_passes h where h.case_id=c.id);end if;
  return (select h.fingerprint from mizizi_private.research_passes h where h.case_id=c.id order by h.ordinal desc limit 1)=e.predecessor_fingerprint;
-end $function$
+end $function$;
 
 -- Existing mizizi_private.desk_reopening_pending_pass_v1 guarded replacement.
 CREATE OR REPLACE FUNCTION mizizi_private.desk_reopening_pending_pass_v1(p_job uuid, p_case uuid, p_body jsonb)
@@ -261,7 +261,7 @@ begin
  end if;
  return not(p_body ? 'reopenEvent') and exists(select 1 from mizizi_private.research_passes p
   where p.case_id=p_case and p.job_id=p_job and p.ordinal=e.predecessor_ordinal+1);
-end $function$
+end $function$;
 
 -- Existing public.mizizi_read_desk_reopening_event_v1 guarded replacement.
 CREATE OR REPLACE FUNCTION public.mizizi_read_desk_reopening_event_v1(p_scope jsonb)
@@ -281,7 +281,7 @@ begin
  if not found or exists(select 1 from mizizi_private.research_passes p where p.case_id=e.case_id and p.ordinal=e.predecessor_ordinal+1) then return null;end if;
  perform mizizi_private.assert_desk_journal_current_v1((c->>'jobId')::uuid,p_scope->>'workerId',e.case_id,null);
  return jsonb_build_object('sourceEventRef',e.event_id,'eventSha256',e.event_sha256,'predecessorFingerprint',e.predecessor_fingerprint,'question',e.question)||case when e.event_kind='terminal_requalification' then jsonb_build_object('reopeningMode','terminal_retry') else '{}'::jsonb end;
-end $function$
+end $function$;
 
 -- This migration never creates a grant or rewrites any existing case,
 -- terminal job, immutable research pass, command receipt or financial event.

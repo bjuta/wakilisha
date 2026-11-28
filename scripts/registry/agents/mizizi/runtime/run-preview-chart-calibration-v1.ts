@@ -211,7 +211,7 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
   if(mode==="reopen"){
    event=await exactFile(transitionPath,transitionSha) as ReviewedDeskReopeningReceiptV1;
    validateReviewedDeskReopeningReceiptV1(event);
-   if(event.caseId!==c.caseId||event.workspaceId!==m.workspaceId||event.expectedRevision!==candidate.revision+1)fail("REOPEN_SCOPE");
+   if(event.caseId!==c.caseId||event.workspaceId!==m.workspaceId||event.expectedRevision!==candidate.revision||candidate.state!=="in_progress"||candidate.stage!=="research")fail("REOPEN_SCOPE");
    await checkpoint(outputPrefix+".transition.json",event);
   }else if(mode==="execute"){
    const operatorRpc=await requireOperator(m);
