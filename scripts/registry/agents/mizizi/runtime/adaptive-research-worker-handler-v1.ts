@@ -242,8 +242,10 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     throw Error("MIZIZI_DESK_LOCAL_BROWSER_POLICY_REQUIRED");
    const factualNoteSubject=operational?{membershipSha256:job.chartContext.membershipSha256,observationSha256:job.chartContext.observationSha256}:undefined;
    let modelAuthority:ReturnType<typeof createDurableDeskModelAuthorityV1>;
+   let transientModelConsultation=false;
    const dispatcher=createDeskResearchDispatcherV1({
     rpc:input.rpc,scope,factualNoteSubject,braveApiKey:config.braveApiKey,discovery:config.discovery,
+    allowTransientModelConsultation:()=>transientModelConsultation,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,
@@ -275,13 +277,15 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     }
     return true;
    };
-   const createDeskPass=(factualNoteReadback?:DeskFactualNoteReadbackV1,writeNotebook=false)=>createCostRoutedDeskAnthropicPassV1({
+   const createDeskPass=(factualNoteReadback?:DeskFactualNoteReadbackV1,writeNotebook=false)=>{
+    transientModelConsultation=writeNotebook;
+    return createCostRoutedDeskAnthropicPassV1({
     scope,anthropic,enabledTools:eligibleTools,
     // Always consult existing async intent in operational mode, including
     // after a policy change. The SQL opt-in is default false.
     asyncOpeningBatch:factualNoteReadback||writeNotebook?undefined:batch,factualNoteReadback,writeNotebook,readModelInventory,
     assessRequirement:config.assessRequirement,...modelAuthority,...finance,executeTool:dispatcher.executeTool,
-    verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,discoveryHosts:dispatcher.discoveryHosts,now:input.now});
+    verifyToolReceipt:dispatcher.verifyToolReceipt,authorizeSource:dispatcher.authorizeSource,discoveryHosts:dispatcher.discoveryHosts,now:input.now});};
    const labels=job.chartContext.positions,first=labels[0];
    const query=first?.artist&&labels.every(p=>p.title===first.title&&p.artist===first.artist)?first.title+" "+first.artist:null;
    const compact=batch?createDeskRetainedBatchPassV1({rpc:input.rpc,scope,credential:anthropic,batch,dispatcher,

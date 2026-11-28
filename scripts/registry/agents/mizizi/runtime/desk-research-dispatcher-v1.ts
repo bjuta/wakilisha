@@ -14,7 +14,7 @@ import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {verifyInvestigationHistoryV1,verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
-import {serializeDeskToolResultV1,isDeskUnavailableOutcomeV1,type DeskAnthropicOptionsV1,type DeskToolCallV1,type DeskToolLeadV1,type DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
+import {serializeDeskToolResultV1,isDeskUnavailableOutcomeV1,validDeskTransientConsultationV1,deskConsultationRefV1,type DeskTransientConsultationV1,type DeskAnthropicOptionsV1,type DeskToolCallV1,type DeskToolLeadV1,type DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
 import {readDeskFactualNotesV1,factualNoteReferencesCurrentV1,type DeskFactualNoteSubjectV1} from "./desk-factual-note-readback-v1.ts";
 export {readDeskFactualNotesV1,type DeskFactualNoteV1} from "./desk-factual-note-readback-v1.ts";
@@ -76,6 +76,7 @@ type Options=Readonly<{
  /** Explicit standing authority only; availability independently restored from journal. */
  allowSameCaseRecall?:boolean;
  factualNoteSubject?:DeskFactualNoteSubjectV1;
+ allowTransientModelConsultation?:()=>boolean;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -271,6 +272,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(parsed?.receiptId!==id||!Array.isArray(parsed.leads)||!Array.isArray(parsed.sources)||
    (parsed.visual!==null&&(!parsed.visual||!UUID.test(parsed.visual.sourceId)||!SHA.test(parsed.visual.sha256)||parsed.visual.contentType!=="image/png"))||
    (parsed.unavailable!==undefined&&(!isDeskUnavailableOutcomeV1(parsed.unavailable)||parsed.leads.length||parsed.sources.length||parsed.visual!==null))||
+   (parsed.consultation!==undefined&&(!validDeskTransientConsultationV1(parsed.consultation)||parsed.consultation.text!==undefined||parsed.consultation.receiptId!==id||parsed.sources.length||parsed.visual!==null||parsed.unavailable!==undefined))||
    bodyOf(parsed)!==row.resultText)fail("CUSTODY_READBACK_UNCONFIRMED");
   return {row,result:parsed};
  }
@@ -297,6 +299,18 @@ export function createDeskResearchDispatcherV1(options:Options){
    privateResearchAllowed:true,externalModelProcessingAllowed:true,privateEvidenceRetentionAllowed:true};
   verifyInvestigationSourceV1(source,identity,now());
   return {source,excerpt:excerpt.trim().slice(0,4000).trim(),citation};
+ }
+ function makeConsultation(id:string,p:CustodyPolicy|null,receipt:{finalUrl:string;retrievedAt:string},locator:string,raw:string):DeskTransientConsultationV1|undefined{
+  // Ordinary access alone is not permission to disclose publisher text.
+  // This separate path uses independently reviewed model processing, while
+  // keeping the normalized text in memory only.
+  if(options.allowTransientModelConsultation?.()!==true||!p||p.excerptRetentionAllowed||!p.externalModelProcessingAllowed)return undefined;
+  const content=raw.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,4000).trim();
+  if(!content||locator==="no_text")return undefined;
+  const ref={receiptId:id,textSha256:hash(content),textBytes:Buffer.byteLength(content,"utf8"),
+   citation:receipt.finalUrl+"#"+locator,observedAt:receipt.retrievedAt,text:content};
+  if(!validDeskTransientConsultationV1(ref,true))fail("TRANSIENT_CONSULTATION_SHAPE");
+  return Object.freeze(ref);
  }
  async function append(callText:string,callSha256:string,result:DeskToolResultV1,
   p:{host:string;revision:number|null},provenance:Record<string,unknown>,bindings:readonly {id:string;url:string}[]){
@@ -424,9 +438,10 @@ export function createDeskResearchDispatcherV1(options:Options){
      await options.authorizeExamination(scope,examinationBinding)!==true)fail("LOCAL_EXAMINATION_DENIED");
     const excerpt=visual?"Visual derivative for examination; no textual claim is verified.":
      b.capture.visibleText.replace(/[\p{Cf}]/gu," ").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g," ").trim().slice(0,4000).trim();
-    const locator=visual?"browser_viewport:1":p&&excerpt&&p.excerptRetentionAllowed?"browser_visible_text":"no_text";
     const capturedAt=new Date(now()).toISOString();
     const source={sha256:b.capture.sha256,retrievedAt:capturedAt,finalUrl:url};
+    const consultation=!visual?makeConsultation(b.receiptId,p,source,"browser_visible_text",excerpt):undefined;
+    const locator=visual?"browser_viewport:1":p&&excerpt&&(p.excerptRetentionAllowed||consultation)?"browser_visible_text":"no_text";
     const metadata={parentReceiptId:parent.receiptId,finalUrl:url,sourceSha256:b.capture.sha256,
      projectionSha256:descriptor?.sha256??b.capture.visibleTextSha256,contentType:"text/html",retrievedAt:capturedAt,
      byteLength:b.capture.body.length,locator,detail:{localBrowser:{reservationId:session.reservationId,
@@ -435,6 +450,7 @@ export function createDeskResearchDispatcherV1(options:Options){
       actionBindings:b.actionBindings.map(x=>({id:x.id,action:x.action}))}};
     const result:DeskToolResultV1={receiptId:b.receiptId,leads:b.leads,
      sources:excerpt&&p?.excerptRetentionAllowed?[makeExcerpt(b.receiptId,p,source,locator,excerpt)]:[],
+     ...(consultation?{consultation}:{}),
      ...(descriptor&&b.capture.visual?{visual:{sourceId:b.receiptId,sha256:descriptor.sha256,
       contentType:"image/png" as const,body:Uint8Array.from(b.capture.visual.body)}}:{})};
     return append(JSON.stringify({scope:b.scope,call:b.call}),b.callSha256,result,p??{host:urlOf(url).hostname,revision:null},metadata,
@@ -568,8 +584,9 @@ export function createDeskResearchDispatcherV1(options:Options){
     const excerpt=interpreted.projection.segments.filter((seg:{text:string})=>seg.text.trim())
      .map((seg:{page:number;text:string})=>"Page "+seg.page+": "+seg.text).join("\n");
     const locator=excerpt?"pdf_pages:"+first+"-"+last:"no_text";
+    const consultation=makeConsultation(receiptId,p,baseReceipt,locator,excerpt);
     return append(callText,callSha256,{receiptId,leads:[],sources:excerpt&&p.excerptRetentionAllowed?
-     [makeExcerpt(receiptId,p,baseReceipt,locator,excerpt)]:[]},p,
+     [makeExcerpt(receiptId,p,baseReceipt,locator,excerpt)]:[],...(consultation?{consultation}:{})},p,
      {...provenance,projectionSha256:interpreted.projectionSha256,locator,detail:{pageStart:first,pageEnd:last}},[]);
    }
    if(call.name==="inspect_visual"){
@@ -620,12 +637,13 @@ export function createDeskResearchDispatcherV1(options:Options){
     }
     const segment=interpreted.projection.segments.find((seg:{text:string})=>seg.text.trim());
     const locator=segment?"article_text":"no_text";
+    const consultation=segment?makeConsultation(receiptId,p,captured,locator,segment.text):undefined;
     const meta={parentReceiptId:raw.receiptId,finalUrl:url,sourceSha256:captured.sha256,
      projectionSha256:interpreted.projectionSha256,contentType:captured.contentType,retrievedAt:captured.retrievedAt,
      byteLength:captured.byteLength,locator,detail:{reservationId:captured.reservationId,
       requestSha256:captured.requestSha256,requestText,visual:descriptor}};
     const result=await append(callText,callSha256,{receiptId,leads,sources:segment&&p.excerptRetentionAllowed?
-     [makeExcerpt(receiptId,p,captured,locator,segment.text)]:[]},p,meta,bindings);
+     [makeExcerpt(receiptId,p,captured,locator,segment.text)]:[],...(consultation?{consultation}:{})},p,meta,bindings);
     if(descriptor)remember(receiptId,captured,meta);
     return result;
    }
@@ -709,7 +727,8 @@ export function createDeskResearchDispatcherV1(options:Options){
    projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,
    retrievedAt:receipt.retrievedAt,byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator,
    documentPages,renderRequired};
-  const result=await append(callText,callSha256,{receiptId,leads,sources},p,meta,bindings);
+  const consultation=segment?makeConsultation(receiptId,p,receipt,locator,segment.text):undefined;
+  const result=await append(callText,callSha256,{receiptId,leads,sources,...(consultation?{consultation}:{})},p,meta,bindings);
   if(leads.some(l=>l.kind==="document"||l.kind==="render"))remember(receiptId,receipt,meta);
   return result;
   }finally{activeCallSha256=null;}
@@ -755,6 +774,7 @@ export function createDeskResearchDispatcherV1(options:Options){
  const verifyToolReceipt:DeskAnthropicOptionsV1["verifyToolReceipt"]=async(candidate,binding,result)=>{
   assertScope(candidate);
   if(result.visual&&(!(result.visual.body instanceof Uint8Array)||hash(result.visual.body)!==result.visual.sha256))return false;
+  if(result.consultation&&!validDeskTransientConsultationV1(result.consultation,true))return false;
   const read=await readReceipt(binding.receiptId);
   return !!read&&read.row.callSha256===binding.callSha256&&read.row.resultSha256===binding.resultSha256&&
    read.row.resultText===bodyOf(result);
@@ -798,6 +818,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(pass.deskToolReceipts!==undefined){
    if(!Array.isArray(pass.deskToolReceipts)||pass.deskToolReceipts.length>4)return false;
    const deps=new Set<string>(),depSources=new Set<string>(),unavailableCodes=new Set<string>();
+   const consultationRefs=[];
    for(const ref of pass.deskToolReceipts){
     if(!ref||!UUID.test(ref.receiptId)||deps.has(ref.receiptId))return false;
     const read=await readReceipt(ref.receiptId);
@@ -808,8 +829,10 @@ export function createDeskResearchDispatcherV1(options:Options){
      failedHosts?.add(read.result.unavailable.host);
     }
     for(const s of read.result.sources)depSources.add(s.source.sourceId);
+    if(read.result.consultation)consultationRefs.push(deskConsultationRefV1(read.result.consultation));
    }
    if(depSources.size!==seen.size||[...depSources].some(id=>!seen.has(id)))return false;
+   if(JSON.stringify(consultationRefs)!==JSON.stringify(pass.deskConsultationReceipts??[]))return false;
    if(pass.costUnits===0&&pass.interruptionCode&&!unavailableCodes.has(pass.interruptionCode))return false;
   }
   return true;

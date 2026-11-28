@@ -1197,7 +1197,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   pass:=${q(journalBodyFor(deps))}::jsonb||jsonb_build_object('findings',jsonb_build_array(jsonb_build_object(
    'statement','The archival programme is a provisional recording reference.','sourceIds',jsonb_build_array(${q(standingPageId)}),
    'interpretation','hypothesis','uncertainty',0.8,'reasoningSummary','This original note does not establish the recording identity.',
-   'fieldKey','subject_version','noteKind','attributed_claim','independentlyVerified',false,'verificationRef',null)));
+   'fieldKey','subject_version','noteKind','attributed_claim','consultationIds','[]'::jsonb,'independentlyVerified',false,'verificationRef',null)));
   bad:=jsonb_set(pass,'{findings,0,sourceIds}',jsonb_build_array(${q(staleId)}));
   begin
    t:=bad::text;

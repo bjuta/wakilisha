@@ -11,7 +11,7 @@ import {ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,type AnthropicInvestigationOptions
  from "./anthropic-investigation-analyst-v1.ts";
 import type {DeskSearchScopeV1} from "./desk-research-gateway-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
-import {NOTEBOOK_FIELDS_V1,NOTEBOOK_KINDS_V1,notebookClaimCurrentV1,type ResearchClaimV1} from "./adaptive-investigation-v1.ts";
+import {NOTEBOOK_FIELDS_V1,NOTEBOOK_KINDS_V1,notebookClaimCurrentV1,validDeskConsultationRefV1,type ResearchClaimV1,type DeskConsultationRefV1} from "./adaptive-investigation-v1.ts";
 import {readDeskFactualNotesV1,factualNoteContextV1,factualNoteReferencesV1,type DeskFactualNoteReadbackV1,type DeskFactualNoteSubjectV1} from "./desk-factual-note-readback-v1.ts";
 import type {DeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
 const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -37,11 +37,12 @@ const PROMPT=[
  "Cite only admitted source IDs. Return the structured research analysis, not private reasoning."
 ].join(" ");
 const NOTE_PROMPT=PROMPT+" Any factualNotes are unverified original research context, authored by MIZIZI or a human researcher, not original source excerpts or proof. Use them to guide research; do not cite note IDs as source IDs or treat note admission as factual verification.";
-const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use only actually examined source IDs, never quote publisher text as your note. A note is not independent factual verification.";
+const NOTEBOOK_INSTRUCTION=" Every hypothesis must also have a fieldKey and noteKind. The statement is your own concise original notebook entry (at most 1200 characters); distinguish direct observation, attributed claim and inference. Use sourceIds for retained evidence and consultationIds for transiently examined text. Either may be empty but at least one examined reference is required. A consultation ID is not a source ID. Never quote publisher text as your note. A note is not independent factual verification.";
 const NOTEBOOK_CLAIM_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items,
  properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.properties,
-  fieldKey:{type:"string",enum:NOTEBOOK_FIELDS_V1},noteKind:{type:"string",enum:NOTEBOOK_KINDS_V1}},
- required:[...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.required,"fieldKey","noteKind"]};
+  fieldKey:{type:"string",enum:NOTEBOOK_FIELDS_V1},noteKind:{type:"string",enum:NOTEBOOK_KINDS_V1},
+  consultationIds:{type:"array",items:{type:"string"}}},
+ required:[...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties.hypotheses.items.required,"fieldKey","noteKind","consultationIds"]};
 const NOTEBOOK_SCHEMA={...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1,
  properties:{...ANTHROPIC_RESEARCH_ANALYSIS_SCHEMA_V1.properties,
   hypotheses:{type:"array",items:NOTEBOOK_CLAIM_SCHEMA}}};
@@ -112,16 +113,28 @@ export function isDeskUnavailableOutcomeV1(v:unknown):v is DeskUnavailableOutcom
  return Object.keys(o).sort().join(",")==="code,host"&&isDeskAvailabilityFailureV1(o.code)&&
   typeof o.host==="string"&&/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(o.host);
 }
+export type DeskTransientConsultationV1=Readonly<DeskConsultationRefV1&{text?:string}>;
+export function deskConsultationRefV1(c:DeskTransientConsultationV1):DeskConsultationRefV1{
+ const {text:_text,...ref}=c;return ref;
+}
+export function validDeskTransientConsultationV1(c:unknown,requireText=false):c is DeskTransientConsultationV1{
+ if(!c||typeof c!=="object"||Array.isArray(c))return false;
+ const v=c as DeskTransientConsultationV1,ref=deskConsultationRefV1(v);
+ return validDeskConsultationRefV1(ref)&&(v.text===undefined?!requireText:
+  text(v.text,4000)&&Buffer.byteLength(v.text,"utf8")===v.textBytes&&hash(v.text)===v.textSha256);
+}
 export type DeskToolResultV1=Readonly<{
  receiptId:string;leads:readonly DeskToolLeadV1[];sources:readonly SourceExcerptV1[];
  unavailable?:DeskUnavailableOutcomeV1;
+ consultation?:DeskTransientConsultationV1;
  visual?:Readonly<{sourceId:string;body:Uint8Array;sha256:string;contentType:"image/png"}>;
 }>;
 export function serializeDeskToolResultV1(result:DeskToolResultV1):string{
  const visual=result.visual;
  return JSON.stringify({receiptId:result.receiptId,leads:result.leads,sources:result.sources,
   visual:visual?{sourceId:visual.sourceId,sha256:visual.sha256,contentType:visual.contentType}:null,
-  ...(result.unavailable?{unavailable:result.unavailable}:{})});
+  ...(result.unavailable?{unavailable:result.unavailable}:{}),
+  ...(result.consultation?{consultation:deskConsultationRefV1(result.consultation)}:{})});
 }
 type ToolReceiptBinding=Readonly<{callSha256:string;resultSha256:string;receiptId:string}>;
 type EnvelopeBinding=Readonly<{scope:DeskSearchScopeV1;question:string;model:string;round:number;
@@ -313,7 +326,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(!packet.notes.length||packet.bodySha256!==b.factualNoteReadbackSha256||
     JSON.stringify(question.factualNotes)!==JSON.stringify(factualNoteContextV1(packet)))return false;
   }else if(Object.hasOwn(question,"factualNotes"))return false;
-  const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>(),failedHosts=new Set<string>();
+  const leads=new Map<string,DeskToolLeadV1>(),sourceIds:string[]=[],consultationIds:string[]=[],ids=new Set<string>(),receiptIds=new Set<string>(),failedOperations=new Set<string>(),failedHosts=new Set<string>();
   const recovery={failedOperations,failedHosts,hosts};
   for(let i=0;i<b.toolReceipts.length;i++){
    const binding=b.toolReceipts[i];
@@ -330,7 +343,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(assistant.role!=="assistant"||!Array.isArray(assistant.content)||assistant.content.length!==1||
     user.role!=="user"||!Array.isArray(user.content)||user.content.length!==1)return false;
    const block=record(assistant.content[0]),call=canonicalTool(block.name,block.input,enabled,leads);
-   const choice=deskToolChoice(b.model,enabled,i+1,leads,sourceIds.length,recovery);
+   const choice=deskToolChoice(b.model,enabled,i+1,leads,sourceIds.length+consultationIds.length,recovery);
    if(failedOperations.has(call.name)||choice.type==="tool"&&call.name!==choice.name||
     ((call.name==="search_web"||call.name==="search_news")&&failedHosts.has(hosts?.[call.name]??"")))return false;
    const unavailable=result.unavailable;
@@ -349,11 +362,20 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(call.name==="recall_evidence"&&(visual||unavailable||!((typedLeads.length===0&&sources.length===1)||(typedLeads.length===1&&typedLeads[0].kind==="reference"&&sources.length===0))))return false;
    for(const lead of typedLeads){if(!UUID.test(lead.id)||leads.has(lead.id))return false;leads.set(lead.id,lead);}
    for(const s of sources){if(!UUID.test(s.source.sourceId)||sourceIds.includes(s.source.sourceId))return false;sourceIds.push(s.source.sourceId);}
+   const resultBlock=record(user.content[0]);
+   let consultation:DeskTransientConsultationV1|undefined;
+   if(result.consultation!==undefined){
+    if(!notebook||!validDeskTransientConsultationV1(result.consultation)||result.consultation.text!==undefined||
+     result.consultation.receiptId!==binding.receiptId||sources.length||visual||unavailable||!["read_page","read_document","render_page","browse_page"].includes(call.name)||
+     !Array.isArray(resultBlock.content)||resultBlock.content.length!==1)return false;
+    const supplied=record(JSON.parse(String(record(resultBlock.content[0]).text))).consultation;
+    if(!validDeskTransientConsultationV1(supplied,true)||JSON.stringify(deskConsultationRefV1(supplied))!==JSON.stringify(result.consultation))return false;
+    consultation=supplied;consultationIds.push(consultation.receiptId);
+   }
    const expected:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({leads:typedLeads,sources:sources.map(s=>({
     sourceId:s.source.sourceId,citation:s.citation,origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt
    })),...(visual?{visualSourceId:visual.sourceId,visualSha256:visual.sha256}:{}),
-    ...(unavailable?{unavailable}:{})})}];
-   const resultBlock=record(user.content[0]);
+    ...(unavailable?{unavailable}:{}),...(consultation?{consultation}:{})})}];
    if(visual){
     if(!Array.isArray(resultBlock.content)||resultBlock.content.length!==2)return false;
     const image=record(resultBlock.content[1]),data=record(image.source);
@@ -365,7 +387,7 @@ async function verifySerializedDeskEnvelopeV1(rpc:WorkerRpc,b:EnvelopeBinding,bo
    if(JSON.stringify(user)!==JSON.stringify({role:"user",content:[{type:"tool_result",tool_use_id:block.id,content:expected}]}))return false;
   }
   return JSON.stringify(sourceIds)===JSON.stringify(b.sourceIds)&&
-   JSON.stringify(parsed.tool_choice)===JSON.stringify(deskToolChoice(b.model,enabled,b.round,leads,sourceIds.length,recovery));
+   JSON.stringify(parsed.tool_choice)===JSON.stringify(deskToolChoice(b.model,enabled,b.round,leads,sourceIds.length+consultationIds.length,recovery));
  }catch{return false;}
 }
 /** Exact owner approval is additive to independent host inspection of
@@ -507,6 +529,8 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   const live=()=>{if(now()>=deadline)fail("DEADLINE");};
   const expires=(v:unknown)=>typeof v==="string"&&Date.parse(v)>now()&&Date.parse(v)<=lease;
   const sources=new Map<string,SourceExcerptV1>(),leads=new Map<string,DeskToolLeadV1>();
+  const consultations=new Map<string,DeskTransientConsultationV1>();
+  const consultationJournal=()=>consultations.size?{deskConsultationReceipts:Object.freeze([...consultations.values()].map(deskConsultationRefV1))}:{};
   const receipts:ToolReceiptBinding[]=[],toolResults:DeskToolResultV1[]=[],callHashes=new Set<string>(),toolIds=new Set<string>();
   let totalUnits=0,visualCount=0;
   const failedOperations=new Set<string>(),failedHosts=new Set<string>();
@@ -530,7 +554,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
   const interrupted=async(code:DeskAvailabilityFailureV1):Promise<PreparedDeskPassV1>=>{
    live();await checkSources();live();
    return {method:"interrupted",interruptionCode:code,
-    sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
+    sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...consultationJournal(),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
     analysis:{hypotheses:[],leads:[],passFinding:"Research interrupted by "+code+"; confirmed tool and source receipts preserved. Unresolved fields remain unresolved.",
      requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
     costUnits:totalUnits};
@@ -543,7 +567,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    // the distinct configured discovery operation on the qualified Haiku path.
    // This is scheduling only: existing authorization, budget, custody and
    // host fences still apply to the exact subsequent call.
-   const choice=deskToolChoice(model,enabled,round,leads,sources.size,recovery);
+   const choice=deskToolChoice(model,enabled,round,leads,sources.size+consultations.size,recovery);
    const body=JSON.stringify({model,max_tokens:MAX_OUTPUT,system,...ordinaryThinking(model),
     tools,tool_choice:choice,
     output_config:output,messages});
@@ -617,7 +641,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // A plan to search is not an executed investigation. Preserve metered
     // expenditure and fail closed rather than journal a source-free success.
     if(choice.type!=="auto"||(openingDiscovery(enabled)&&receipts.length===0))fail("RESEARCH_TOOL_REQUIRED");
-    if(lastUnavailable&&sources.size===0)return interrupted(lastUnavailable.code);
+    if(lastUnavailable&&sources.size===0&&consultations.size===0)return interrupted(lastUnavailable.code);
     if(blocks.length!==1||blocks[0].type!=="text"||typeof blocks[0].text!=="string")fail("FINAL_RESULT_INVALID");
     let parsed:Record<string,unknown>;try{parsed=record(JSON.parse(blocks[0].text));}catch{fail("FINAL_RESULT_INVALID");}
     if(Object.keys(parsed).length!==4||!Array.isArray(parsed.hypotheses)||!Array.isArray(parsed.leads)||
@@ -627,14 +651,14 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // not authority. The engine independently adjudicates the cited sources.
     for(const raw of parsed.hypotheses){
      const c=record(raw);
-     if(Object.keys(c).length!==(notebook?7:5)||!text(c.statement,notebook?1200:1800,8)||!text(c.reasoningSummary,2000,8)||
-      !Array.isArray(c.sourceIds)||c.sourceIds.length<1||c.sourceIds.length>20||
+     if(Object.keys(c).length!==(notebook?8:5)||!text(c.statement,notebook?1200:1800,8)||!text(c.reasoningSummary,2000,8)||
+      !Array.isArray(c.sourceIds)||(!notebook&&c.sourceIds.length<1)||c.sourceIds.length>20||
       c.sourceIds.some(id=>typeof id!=="string"||!sources.has(id))||
       !["hypothesis","supported","contradicted","unknown"].includes(String(c.interpretation))||
       typeof c.uncertainty!=="number"||!Number.isFinite(c.uncertainty)||c.uncertainty<0||c.uncertainty>1)
        fail("FINAL_CLAIM_INVALID");
      if(notebook&&(!Object.hasOwn(c,"fieldKey")||!Object.hasOwn(c,"noteKind")||
-      !notebookClaimCurrentV1(c as unknown as ResearchClaimV1,[...sources.values()].map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt})))))
+      !notebookClaimCurrentV1(c as unknown as ResearchClaimV1,[...sources.values()].map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt})),[...consultations.values()])))
       fail("FINAL_NOTEBOOK_CLAIM_INVALID");
     }
     for(const raw of parsed.leads){
@@ -648,7 +672,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     // The existing engine independently checks every source citation and
     // claim/lead bound before immutable pass persistence.
     await checkSources();live();
-    return {sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
+    return {sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...consultationJournal(),...(noteRefs?{factualNoteReferences:noteRefs}:{}),analysis:{...parsed,modelVersion:model,promptFingerprint} as unknown as ResearchAnalysisV1,costUnits:totalUnits};
    }
    if(payload.stop_reason!=="tool_use"||round===MAX_CALLS)fail("TOOL_ROUND_BOUND_OR_REFUSAL");
    // No hidden thinking replay, provider-server tools or parallel execution.
@@ -687,7 +711,7 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
     live();await checkSources();live();
     if(await options.authorizeTool(boundScope,call,callSha256)!==true)fail("TOOL_AUTHORITY_CHANGED");
     return {method:"interrupted",interruptionCode:code,
-     sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
+     sources:Object.freeze([...sources.values()]),deskToolReceipts:Object.freeze([...receipts]),...consultationJournal(),...(noteRefs?{factualNoteReferences:noteRefs}:{}),
      analysis:{hypotheses:[],leads:[],passFinding:"Research interrupted by "+code+"; prior confirmed tool and source receipts preserved. Unresolved fields remain unresolved.",
       requestedDisposition:"pause",modelVersion:"mizizi.interrupted_desk_method.v1",promptFingerprint},
      costUnits:totalUnits};
@@ -715,10 +739,13 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    const unavailable=raw.unavailable;
    if(unavailable!==undefined&&(!isDeskUnavailableOutcomeV1(unavailable)||!["search_web","search_news"].includes(call.name)||
     newLeads.length||newSources.length||raw.visual||options.discoveryHosts?.[call.name as "search_web"|"search_news"]!==unavailable.host))fail("UNAVAILABLE_OUTCOME_INVALID");
+   const consultation=raw.consultation;
+   if(consultation!==undefined&&(!notebook||!validDeskTransientConsultationV1(consultation,true)||consultation.receiptId!==raw.receiptId||
+    newSources.length||raw.visual||unavailable||!["read_page","read_document","render_page","browse_page"].includes(call.name)))fail("TRANSIENT_CONSULTATION_DENIED");
    const visual=safeVisual(raw.visual,newSources);
    if(visual&&(call.name!=="inspect_visual"||++visualCount>1))fail("VISUAL_BOUND");
    const result:DeskToolResultV1=Object.freeze({receiptId:raw.receiptId,leads:Object.freeze(newLeads),
-    sources:Object.freeze(newSources),...(visual?{visual}:{}),...(unavailable?{unavailable}:{})});
+    sources:Object.freeze(newSources),...(visual?{visual}:{}),...(unavailable?{unavailable}:{}),...(consultation?{consultation}: {})});
    const resultSha256=hash(serializeDeskToolResultV1(result));
    const receipt=Object.freeze({callSha256,resultSha256,receiptId:result.receiptId});
    if(await options.verifyToolReceipt(boundScope,receipt,result)!==true)fail("DURABLE_TOOL_RECEIPT_DENIED");
@@ -726,15 +753,16 @@ export function createDeskAnthropicPassV1(options:DeskAnthropicOptionsV1):DeskPa
    for(const s of newSources)if(await options.authorizeSource(identity,question,s)!==true)fail("SOURCE_DISCLOSURE_DENIED");
    live();
    newLeads.forEach(l=>leads.set(l.id,l));newSources.forEach(s=>sources.set(s.source.sourceId,s));receipts.push(receipt);toolResults.push(result);
+   if(consultation)consultations.set(consultation.receiptId,consultation);
    if(unavailable){
     lastUnavailable=unavailable;failedOperations.add(call.name);failedHosts.add(unavailable.host);
-    if(!sources.size&&!leads.size&&!alternateDiscovery())return interrupted(unavailable.code);
+    if(!sources.size&&!consultations.size&&!leads.size&&!alternateDiscovery())return interrupted(unavailable.code);
    }
    const resultContent:Array<Record<string,unknown>>=[{type:"text",text:JSON.stringify({
     leads:newLeads,sources:newSources.map(s=>({sourceId:s.source.sourceId,citation:s.citation,
      origin:s.source.originKey,lineage:s.source.lineageKey,excerpt:s.excerpt})),
     ...(visual?{visualSourceId:visual.sourceId,visualSha256:visual.sha256}:{}),
-    ...(unavailable?{unavailable}:{})
+    ...(unavailable?{unavailable}:{}),...(consultation?{consultation}:{})
    })}];
    if(visual)resultContent.push({type:"image",source:{type:"base64",media_type:"image/png",data:Buffer.from(visual.body).toString("base64")}});
    // Keep only the canonical tool block; assistant free text is not evidence.

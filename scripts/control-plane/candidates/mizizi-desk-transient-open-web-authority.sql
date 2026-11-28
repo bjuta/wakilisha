@@ -844,6 +844,7 @@ begin
     or ancestor.operational_revision is null or ancestor.parent_receipt_id is null
     or ancestor.result_text::jsonb->'sources' is distinct from '[]'::jsonb
     or ancestor.result_text::jsonb->'visual' is distinct from 'null'::jsonb
+    or ancestor.result_text::jsonb ? 'consultation'
     or ancestor.provenance->>'locator' is distinct from 'no_text'
     or (ancestor.operation='read_page' and exists(select 1 from jsonb_array_elements(ancestor.result_text::jsonb->'leads') v
       where v->>'kind' is distinct from 'reference' or v->>'label' is distinct from 'Public reference (unverified)'))
@@ -859,6 +860,7 @@ begin
     then return false;end if;
   elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from ancestor.policy_revision
    or (ancestor.source_id is not null and not p.excerpt_retention_allowed)
+   or (ancestor.result_text::jsonb ? 'consultation' and (p.excerpt_retention_allowed or not p.external_model_processing_allowed or ancestor.source_id is not null))
    or (ancestor.operation in ('render_page','browse_page') and not p.browser_render_allowed)
    or (ancestor.provenance->'detail' ? 'localBrowser' and (not p.browser_render_allowed or not mizizi_private.desk_local_browser_receipt_available_v1(ancestor,c)))
    or (ancestor.operation='inspect_visual' and not p.visual_processing_allowed)
@@ -900,7 +902,7 @@ begin
  or jsonb_typeof(call_body->'input') is distinct from 'object'
  or (select count(*) from jsonb_object_keys(x))<>2 or (select count(*) from jsonb_object_keys(call_body))<>2
  or (select count(*) from jsonb_object_keys(call_body->'input'))<>(case op when 'read_document' then 3 when 'inspect_visual' then 2 when 'browse_page' then 2 else 1 end)
- or (select count(*) from jsonb_object_keys(result))<>(case when result ? 'unavailable' then 5 else 4 end)
+ or (select count(*) from jsonb_object_keys(result))<>(4+(case when result ? 'unavailable' then 1 else 0 end)+(case when result ? 'consultation' then 1 else 0 end))
  or not(result ?& array['receiptId','leads','sources','visual'])
  or (op<>'inspect_visual' and result->'visual'<>'null'::jsonb)
  or (op='inspect_visual' and jsonb_typeof(result->'visual') is distinct from 'object')
@@ -919,7 +921,7 @@ begin
    or jsonb_typeof(result->'unavailable'->'code') is distinct from 'string'
    or jsonb_typeof(result->'unavailable'->'host') is distinct from 'string'
    or result->'leads' is distinct from '[]'::jsonb or result->'sources' is distinct from '[]'::jsonb
-   or result->'visual' is distinct from 'null'::jsonb or p_lead_bindings is distinct from '[]'::jsonb
+   or result->'visual' is distinct from 'null'::jsonb or result ? 'consultation' or p_lead_bindings is distinct from '[]'::jsonb
   then return null;end if;
  end if;
  rid:=(result->>'receiptId')::uuid;
@@ -936,7 +938,7 @@ begin
   and op in ('read_page','browse_page') and mizizi_private.desk_operational_policy_live_v1(o,c)
   and o.public_web_transient_allowed and p_host not in ('api.gdeltproject.org','api.tavily.com','api.search.brave.com'),false);
  if transient_receipt then
-  if result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
+  if result ? 'consultation' or result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
    or p_provenance->>'locator' is distinct from 'no_text'
    or (op='read_page' and (
     p_provenance->'documentPages' is distinct from 'null'::jsonb
@@ -954,6 +956,26 @@ begin
        when 'follow' then 'Follow public reference' when 'scroll_down' then 'Scroll down' end))))
    then return null;end if;
  elsif not mizizi_private.desk_custody_policy_live_v1(p) or p.revision is distinct from p_policy_revision then return null;end if;
+ if result ? 'consultation' then
+  -- No publisher expression in the durable result. The current external
+  -- processing permission is independent of the denied excerpt retention.
+  if o.revision is null or not o.public_web_transient_allowed or p.excerpt_retention_allowed or not p.external_model_processing_allowed
+   or op not in ('read_page','read_document','render_page','browse_page') or result ? 'unavailable'
+   or result->'sources' is distinct from '[]'::jsonb or result->'visual' is distinct from 'null'::jsonb
+   or jsonb_typeof(result->'consultation') is distinct from 'object'
+   or (select count(*) from jsonb_object_keys(result->'consultation'))<>5
+   or not(result->'consultation' ?& array['receiptId','textSha256','textBytes','citation','observedAt'])
+   or result->'consultation'->>'receiptId' is distinct from rid::text
+   or coalesce(result->'consultation'->>'textSha256','') !~ '^[a-f0-9]{64}$'
+   or jsonb_typeof(result->'consultation'->'textBytes') is distinct from 'number'
+   or coalesce(result->'consultation'->>'textBytes','') !~ '^[1-9][0-9]{0,4}$'
+   or (result->'consultation'->>'textBytes')::integer>16000
+   or coalesce(p_provenance->>'locator','no_text')='no_text'
+   or result->'consultation'->>'citation' is distinct from ((p_provenance->>'finalUrl')||'#'||(p_provenance->>'locator'))
+   or length(result->'consultation'->>'citation') not between 12 and 1000
+   or (result->'consultation'->>'observedAt')::timestamptz is distinct from (p_provenance->>'retrievedAt')::timestamptz
+  then return null;end if;
+ end if;
  if o.revision is not null and (not mizizi_private.desk_operational_policy_live_v1(o,c) or not(op=any(o.tool_names))
  or not exists(select 1 from mizizi_private.desk_operational_call_proofs_v1 q where q.job_id=(s->>'jobId')::uuid
   and q.lease_expires_at=(s->>'leaseExpiresAt')::timestamptz and q.call_sha256=p_call_sha256 and q.operation='tool_execute'
@@ -1545,31 +1567,40 @@ begin
  for f in select value from jsonb_array_elements(b->'findings') loop
   claim_index:=claim_index+1;
   if not(f ? 'fieldKey' or f ? 'noteKind') then continue;end if;
-  if jsonb_typeof(f) is distinct from 'object' or (select count(*) from jsonb_object_keys(f))<>9
+  if jsonb_typeof(f) is distinct from 'object' or (select count(*) from jsonb_object_keys(f))<>10
    or coalesce(f->>'fieldKey','') not in ('subject_version','release_date','performer','composition_credits','recording_production','label_distribution')
    or coalesce(f->>'noteKind','') not in ('direct_observation','attributed_claim','inference')
    or jsonb_typeof(f->'statement') is distinct from 'string' or length(f->>'statement') not between 8 and 1200
    or btrim(f->>'statement') is distinct from f->>'statement' or f->>'statement' ~ '[[:cntrl:]]'
-   or jsonb_typeof(f->'sourceIds') is distinct from 'array' or jsonb_array_length(f->'sourceIds') not between 1 and 12
-   or (select count(distinct v) from jsonb_array_elements_text(f->'sourceIds') v)<>jsonb_array_length(f->'sourceIds')
+   or jsonb_typeof(f->'sourceIds') is distinct from 'array' or jsonb_typeof(f->'consultationIds') is distinct from 'array'
+   or jsonb_array_length(f->'sourceIds'||f->'consultationIds') not between 1 and 12
+   or (select count(distinct v) from jsonb_array_elements_text(f->'sourceIds'||f->'consultationIds') v)<>jsonb_array_length(f->'sourceIds'||f->'consultationIds')
   then raise exception 'Agent notebook original note shape denied' using errcode='42501';end if;
   ids:=array[]::uuid[];n.source_locator:=null;n.observed_at:=null;
-  for ref in select value from jsonb_array_elements(f->'sourceIds') loop
+  for ref in select value from jsonb_array_elements(f->'sourceIds'||f->'consultationIds') loop
    if jsonb_typeof(ref) is distinct from 'string' or coalesce(ref#>>'{}','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
     then raise exception 'Agent notebook source identity denied' using errcode='42501';end if;
    sid:=(ref#>>'{}')::uuid;
-   select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+   select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid;
    if not found or r.job_id<>p_job_id or r.worker_id<>p_worker_id or r.lease_expires_at is distinct from (c->>'leaseExpiresAt')::timestamptz
     or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false)
     or not exists(select 1 from jsonb_array_elements(b->'deskToolReceipts') d where d->>'receiptId'=sid::text
      and d->>'callSha256'=r.call_sha256 and d->>'resultSha256'=r.result_sha256)
     then raise exception 'Agent notebook source custody denied' using errcode='42501';end if;
-   select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
-   if not found or src->'modelDisclosed' is distinct from 'true'::jsonb
-    or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
-    or (length(lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>=80
-     and strpos(lower(regexp_replace(btrim(src->>'excerpt'),'[[:space:]]+',' ','g')),lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>0)
-    then raise exception 'Agent notebook source or verbatim note denied' using errcode='42501';end if;
+   if f->'sourceIds' @> jsonb_build_array(sid::text) then
+    if r.source_id is distinct from sid then raise exception 'Agent notebook retained source denied' using errcode='42501';end if;
+    select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
+    if not found or src->'modelDisclosed' is distinct from 'true'::jsonb
+     or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
+     or (length(lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>=80
+      and strpos(lower(regexp_replace(btrim(src->>'excerpt'),'[[:space:]]+',' ','g')),lower(regexp_replace(btrim(f->>'statement'),'[[:space:]]+',' ','g')))>0)
+     then raise exception 'Agent notebook source or verbatim note denied' using errcode='42501';end if;
+   else
+    select value into src from jsonb_array_elements(b->'deskConsultationReceipts') where value->>'receiptId'=sid::text;
+    if not found or r.source_id is not null or src is distinct from r.result_text::jsonb->'consultation'
+     or f->'independentlyVerified' is distinct from 'false'::jsonb
+     then raise exception 'Agent notebook transient consultation denied' using errcode='42501';end if;
+   end if;
    if n.source_locator is null then n.source_locator:=src->>'citation';end if;
    n.observed_at:=greatest(n.observed_at,(src->>'observedAt')::timestamptz);
    ids:=array_append(ids,sid);
@@ -1859,25 +1890,33 @@ begin
  if not found then return null;end if;
  f:=b->'findings'->n.origin_claim_index;
  if f->>'statement' is distinct from n.note_text or f->>'fieldKey' is distinct from n.field_key
-  or f->>'noteKind' is distinct from n.note_kind or f->'sourceIds' is distinct from to_jsonb(n.source_receipt_ids)
+  or f->>'noteKind' is distinct from n.note_kind or (f->'sourceIds'||f->'consultationIds') is distinct from to_jsonb(n.source_receipt_ids)
  then return null;end if;
  if n.note_sha256 is distinct from encode(sha256(convert_to(jsonb_build_array(n.case_id,n.workspace_id,n.expected_revision,n.membership_sha256,
    n.observation_sha256,n.author_job_id,n.author_worker_id,n.origin_pass_fingerprint,n.origin_claim_index,n.source_receipt_ids,
    n.field_key,n.note_kind,n.consultation_method,n.source_locator,n.note_text)::text,'UTF8')),'hex') then return null;end if;
  foreach sid in array n.source_receipt_ids loop
-  select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+  select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid;
   if not found or r.job_id is distinct from n.author_job_id or r.worker_id is distinct from n.author_worker_id
    or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false)
    or not exists(select 1 from jsonb_array_elements(b->'deskToolReceipts') d where d->>'receiptId'=sid::text
     and d->>'callSha256'=r.call_sha256 and d->>'resultSha256'=r.result_sha256) then return null;end if;
-  select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
-  if not found or src->'modelDisclosed' is distinct from 'true'::jsonb or src->>'citation' is null
-   or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
-   or src->>'excerpt' is distinct from r.result_text::jsonb->'sources'->0->>'excerpt'
-   or src->>'citation' is distinct from r.result_text::jsonb->'sources'->0->>'citation' then return null;end if;
+  if f->'sourceIds' @> jsonb_build_array(sid::text) then
+   if r.source_id is distinct from sid then return null;end if;
+   select value into src from jsonb_array_elements(b->'sourceReceipts') where value->>'sourceId'=sid::text;
+   if not found or src->'modelDisclosed' is distinct from 'true'::jsonb or src->>'citation' is null
+    or src->>'excerpt' is null or src->>'excerpt'='Visual derivative for examination; no textual claim is verified.'
+    or src->>'excerpt' is distinct from r.result_text::jsonb->'sources'->0->>'excerpt'
+    or src->>'citation' is distinct from r.result_text::jsonb->'sources'->0->>'citation' then return null;end if;
+   expiry:=least(expiry,(r.result_text::jsonb->'sources'->0->'source'->>'expiresAt')::timestamptz);
+  else
+   select value into src from jsonb_array_elements(b->'deskConsultationReceipts') where value->>'receiptId'=sid::text;
+   if not found or r.source_id is not null or src is distinct from r.result_text::jsonb->'consultation' then return null;end if;
+   expiry:=least(expiry,(select cp.valid_until from mizizi_private.desk_custody_policy_versions_v1 cp
+    where cp.workspace_id=r.workspace_id and cp.host=r.host and cp.revision=r.policy_revision));
+  end if;
   locators:=locators||jsonb_build_array(src->>'citation');
   observed:=greatest(observed,(src->>'observedAt')::timestamptz);
-  expiry:=least(expiry,(r.result_text::jsonb->'sources'->0->'source'->>'expiresAt')::timestamptz);
  end loop;
  if n.source_locator is distinct from locators->>0 or n.observed_at is distinct from observed
   or expiry is null or expiry<=clock_timestamp() then return null;end if;
@@ -2003,5 +2042,241 @@ begin
   ids:=array_append(ids,nid);
  end loop;
  return true;
+end $function$
+
+
+-- Exact journal extension: descriptors are immutable dependencies, not excerpts.
+do $wk_consultation_journal_preimage$ begin
+ if pg_get_functiondef('mizizi_private.assert_desk_journal_current_v1(uuid,text,uuid,jsonb)'::regprocedure) is distinct from $wk_exact$CREATE OR REPLACE FUNCTION mizizi_private.assert_desk_journal_current_v1(p_job_id uuid, p_worker_id text, p_case_id uuid, p_pending jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;b jsonb;ref jsonb;r mizizi_private.desk_tool_receipts_v1;
+ s jsonb;a jsonb;seen uuid[];sid uuid;o mizizi_private.desk_operational_policy_versions_v1;deps uuid[];dep_sources uuid[];batch_bound boolean;
+begin
+ -- Same lock order as the existing custody RPCs: policy lock, then exact
+ -- job/case locks. Public chart RPCs take the policy lock before row locks.
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.read_leased_chart_research_context_v1(p_job_id,p_worker_id);
+ if c is null or c->>'caseId' is distinct from p_case_id::text then
+  raise exception 'Desk journal scope denied' using errcode='42501';end if;
+ if p_pending is not null and not mizizi_private.desk_reopening_pending_pass_v1(p_job_id,p_case_id,p_pending) then
+  raise exception 'Desk reopening event journal binding denied' using errcode='42501';end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if o.revision is not null and not mizizi_private.desk_operational_policy_live_v1(o,c) then
+  raise exception 'Desk operational policy revoked or expired' using errcode='42501';end if;
+ for b in
+  select p.body_text::jsonb from mizizi_private.research_passes p
+   where p.case_id=p_case_id
+  union all select p_pending where p_pending is not null
+ loop
+  if b->>'caseId' is distinct from c->>'caseId'
+   or b->>'workspaceId' is distinct from c->>'workspaceId'
+   or jsonb_typeof(b->'sourceReceipts') is distinct from 'array'
+   or jsonb_array_length(b->'sourceReceipts')>30 then
+   raise exception 'Desk journal source shape denied' using errcode='42501';end if;
+  if b ? 'factualNoteReferences' and not coalesce(mizizi_private.desk_factual_note_references_current_v1(c||jsonb_build_object('workerId',p_worker_id),b),false) then
+   raise exception 'Desk original factual note context denied' using errcode='42501';end if;
+  batch_bound:=false;
+  if b ? 'deskBatchReceipt' then
+   batch_bound:=mizizi_private.desk_retained_batch_journal_current_v1(c,b);
+   if not batch_bound then raise exception 'Desk batch journal binding denied' using errcode='42501';end if;
+  end if;
+  seen:=array[]::uuid[];
+  for ref in select value from jsonb_array_elements(b->'sourceReceipts')
+  loop
+   if jsonb_typeof(ref) is distinct from 'object'
+    or coalesce(ref->>'sourceId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+    or ref->'modelDisclosed' is distinct from 'true'::jsonb then
+    raise exception 'Desk journal source denied' using errcode='42501';end if;
+   sid:=(ref->>'sourceId')::uuid;
+   if sid=any(seen) then raise exception 'Desk journal duplicate source denied' using errcode='42501';end if;
+   seen:=array_append(seen,sid);
+   select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+   if not found or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false) then
+    raise exception 'Desk journal custody denied' using errcode='42501';end if;
+   s:=null;
+   select value into s from jsonb_array_elements(r.result_text::jsonb->'sources')
+    where value->'source'->>'sourceId'=sid::text;
+   a:=s->'source';
+   if s is null or a->>'caseId' is distinct from c->>'caseId'
+    or a->>'workspaceId' is distinct from c->>'workspaceId'
+    or ref->'originKey' is distinct from a->'originKey'
+    or ref->'lineageKey' is distinct from a->'lineageKey'
+    or ref->'payloadFingerprint' is distinct from a->'fingerprint'
+    or ref->'useBasis' is distinct from a->'useBasis'
+    or ref->'authorityRef' is distinct from a->'authorityRef'
+    or ref->'observedAt' is distinct from a->'observedAt'
+    or ref->'citation' is distinct from s->'citation'
+    or ref->'excerpt' is distinct from s->'excerpt'
+    or a->'privateResearchAllowed' is distinct from 'true'::jsonb
+    or a->'externalModelProcessingAllowed' is distinct from 'true'::jsonb
+    or a->'privateEvidenceRetentionAllowed' is distinct from 'true'::jsonb
+    or a->'revokedAt' is distinct from 'null'::jsonb
+    or coalesce((a->>'expiresAt')::timestamptz<=clock_timestamp(),true) then
+    raise exception 'Desk journal source projection denied' using errcode='42501';end if;
+  end loop;
+  if o.revision is not null or b ? 'deskToolReceipts' then
+   if jsonb_typeof(b->'deskToolReceipts') is distinct from 'array' or jsonb_array_length(b->'deskToolReceipts')>4 then
+    raise exception 'Desk journal dependency shape denied' using errcode='42501';end if;
+   deps:=array[]::uuid[];dep_sources:=array[]::uuid[];
+   for ref in select value from jsonb_array_elements(b->'deskToolReceipts') loop
+    if jsonb_typeof(ref) is distinct from 'object' or coalesce(ref->>'receiptId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+     then raise exception 'Desk journal dependency denied' using errcode='42501';end if;
+    sid:=(ref->>'receiptId')::uuid;
+    if sid=any(deps) then raise exception 'Duplicate desk dependency' using errcode='42501';end if;
+    select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid;
+    if not found or r.call_sha256 is distinct from ref->>'callSha256' or r.result_sha256 is distinct from ref->>'resultSha256'
+     or not mizizi_private.desk_custody_receipt_current_v1(r,c) then
+     raise exception 'Desk journal dependency custody denied' using errcode='42501';end if;
+    if o.revision is not null and p_pending is not null and b=p_pending and not batch_bound and
+     (r.job_id is distinct from p_job_id or r.worker_id is distinct from p_worker_id
+      or r.lease_expires_at is distinct from (c->>'leaseExpiresAt')::timestamptz) then
+     raise exception 'Desk journal pending dependency lease denied' using errcode='42501';end if;
+    if r.provenance->'detail' ? 'localBrowser' and not exists(
+     select 1 from mizizi_private.desk_resource_events_v1 e
+     where e.reservation_id=(r.provenance->'detail'->'localBrowser'->>'reservationId')::uuid
+      and e.state='close_acknowledged' and e.detail->>'sessionId'=r.provenance->'detail'->'localBrowser'->>'sessionId')
+    then raise exception 'Desk local browser cleanup unconfirmed' using errcode='42501';end if;
+    deps:=array_append(deps,sid);
+    if r.source_id is not null then dep_sources:=array_append(dep_sources,r.source_id);end if;
+   end loop;
+   if not(seen @> dep_sources and dep_sources @> seen) then
+    raise exception 'Desk journal dependency source set denied' using errcode='42501';end if;
+   if o.revision is not null and p_pending is not null and b=p_pending and exists(
+    select 1 from mizizi_private.desk_tool_receipts_v1 q where q.job_id=p_job_id
+     and q.lease_expires_at=(c->>'leaseExpiresAt')::timestamptz and not(q.id=any(deps))) then
+    raise exception 'Desk journal missing lease dependency' using errcode='42501';end if;
+  end if;
+ end loop;
+ if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
+  raise exception 'Desk journal lease expired' using errcode='55000';end if;
+end $function$
+$wk_exact$
+ then raise exception 'MIZIZI_CONSULTATION_JOURNAL_PREIMAGE_CHANGED';end if;
+end $wk_consultation_journal_preimage$;
+CREATE OR REPLACE FUNCTION mizizi_private.assert_desk_journal_current_v1(p_job_id uuid, p_worker_id text, p_case_id uuid, p_pending jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog'
+AS $function$
+declare c jsonb;b jsonb;ref jsonb;r mizizi_private.desk_tool_receipts_v1;
+ s jsonb;a jsonb;seen uuid[];sid uuid;o mizizi_private.desk_operational_policy_versions_v1;deps uuid[];dep_sources uuid[];batch_bound boolean;consultations jsonb;consultation_ids uuid[];finding jsonb;
+begin
+ -- Same lock order as the existing custody RPCs: policy lock, then exact
+ -- job/case locks. Public chart RPCs take the policy lock before row locks.
+ perform pg_advisory_xact_lock(214781521,61431);
+ c:=mizizi_private.read_leased_chart_research_context_v1(p_job_id,p_worker_id);
+ if c is null or c->>'caseId' is distinct from p_case_id::text then
+  raise exception 'Desk journal scope denied' using errcode='42501';end if;
+ if p_pending is not null and not mizizi_private.desk_reopening_pending_pass_v1(p_job_id,p_case_id,p_pending) then
+  raise exception 'Desk reopening event journal binding denied' using errcode='42501';end if;
+ o:=mizizi_private.current_desk_operational_policy_v1(c);
+ if o.revision is not null and not mizizi_private.desk_operational_policy_live_v1(o,c) then
+  raise exception 'Desk operational policy revoked or expired' using errcode='42501';end if;
+ for b in
+  select p.body_text::jsonb from mizizi_private.research_passes p
+   where p.case_id=p_case_id
+  union all select p_pending where p_pending is not null
+ loop
+  if b->>'caseId' is distinct from c->>'caseId'
+   or b->>'workspaceId' is distinct from c->>'workspaceId'
+   or jsonb_typeof(b->'sourceReceipts') is distinct from 'array'
+   or jsonb_array_length(b->'sourceReceipts')>30 then
+   raise exception 'Desk journal source shape denied' using errcode='42501';end if;
+  if b ? 'factualNoteReferences' and not coalesce(mizizi_private.desk_factual_note_references_current_v1(c||jsonb_build_object('workerId',p_worker_id),b),false) then
+   raise exception 'Desk original factual note context denied' using errcode='42501';end if;
+  batch_bound:=false;
+  if b ? 'deskBatchReceipt' then
+   batch_bound:=mizizi_private.desk_retained_batch_journal_current_v1(c,b);
+   if not batch_bound then raise exception 'Desk batch journal binding denied' using errcode='42501';end if;
+  end if;
+  consultations:='[]'::jsonb;consultation_ids:=array[]::uuid[];
+  seen:=array[]::uuid[];
+  for ref in select value from jsonb_array_elements(b->'sourceReceipts')
+  loop
+   if jsonb_typeof(ref) is distinct from 'object'
+    or coalesce(ref->>'sourceId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+    or ref->'modelDisclosed' is distinct from 'true'::jsonb then
+    raise exception 'Desk journal source denied' using errcode='42501';end if;
+   sid:=(ref->>'sourceId')::uuid;
+   if sid=any(seen) then raise exception 'Desk journal duplicate source denied' using errcode='42501';end if;
+   seen:=array_append(seen,sid);
+   select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid and source_id=sid;
+   if not found or not coalesce(mizizi_private.desk_custody_receipt_current_v1(r,c),false) then
+    raise exception 'Desk journal custody denied' using errcode='42501';end if;
+   s:=null;
+   select value into s from jsonb_array_elements(r.result_text::jsonb->'sources')
+    where value->'source'->>'sourceId'=sid::text;
+   a:=s->'source';
+   if s is null or a->>'caseId' is distinct from c->>'caseId'
+    or a->>'workspaceId' is distinct from c->>'workspaceId'
+    or ref->'originKey' is distinct from a->'originKey'
+    or ref->'lineageKey' is distinct from a->'lineageKey'
+    or ref->'payloadFingerprint' is distinct from a->'fingerprint'
+    or ref->'useBasis' is distinct from a->'useBasis'
+    or ref->'authorityRef' is distinct from a->'authorityRef'
+    or ref->'observedAt' is distinct from a->'observedAt'
+    or ref->'citation' is distinct from s->'citation'
+    or ref->'excerpt' is distinct from s->'excerpt'
+    or a->'privateResearchAllowed' is distinct from 'true'::jsonb
+    or a->'externalModelProcessingAllowed' is distinct from 'true'::jsonb
+    or a->'privateEvidenceRetentionAllowed' is distinct from 'true'::jsonb
+    or a->'revokedAt' is distinct from 'null'::jsonb
+    or coalesce((a->>'expiresAt')::timestamptz<=clock_timestamp(),true) then
+    raise exception 'Desk journal source projection denied' using errcode='42501';end if;
+  end loop;
+  if o.revision is not null or b ? 'deskToolReceipts' then
+   if jsonb_typeof(b->'deskToolReceipts') is distinct from 'array' or jsonb_array_length(b->'deskToolReceipts')>4 then
+    raise exception 'Desk journal dependency shape denied' using errcode='42501';end if;
+   deps:=array[]::uuid[];dep_sources:=array[]::uuid[];
+   for ref in select value from jsonb_array_elements(b->'deskToolReceipts') loop
+    if jsonb_typeof(ref) is distinct from 'object' or coalesce(ref->>'receiptId','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+     then raise exception 'Desk journal dependency denied' using errcode='42501';end if;
+    sid:=(ref->>'receiptId')::uuid;
+    if sid=any(deps) then raise exception 'Duplicate desk dependency' using errcode='42501';end if;
+    select * into r from mizizi_private.desk_tool_receipts_v1 where id=sid;
+    if not found or r.call_sha256 is distinct from ref->>'callSha256' or r.result_sha256 is distinct from ref->>'resultSha256'
+     or not mizizi_private.desk_custody_receipt_current_v1(r,c) then
+     raise exception 'Desk journal dependency custody denied' using errcode='42501';end if;
+    if o.revision is not null and p_pending is not null and b=p_pending and not batch_bound and
+     (r.job_id is distinct from p_job_id or r.worker_id is distinct from p_worker_id
+      or r.lease_expires_at is distinct from (c->>'leaseExpiresAt')::timestamptz) then
+     raise exception 'Desk journal pending dependency lease denied' using errcode='42501';end if;
+    if r.provenance->'detail' ? 'localBrowser' and not exists(
+     select 1 from mizizi_private.desk_resource_events_v1 e
+     where e.reservation_id=(r.provenance->'detail'->'localBrowser'->>'reservationId')::uuid
+      and e.state='close_acknowledged' and e.detail->>'sessionId'=r.provenance->'detail'->'localBrowser'->>'sessionId')
+    then raise exception 'Desk local browser cleanup unconfirmed' using errcode='42501';end if;
+    deps:=array_append(deps,sid);
+    if r.source_id is not null then dep_sources:=array_append(dep_sources,r.source_id);end if;
+    if r.result_text::jsonb ? 'consultation' then
+     consultations:=consultations||jsonb_build_array(r.result_text::jsonb->'consultation');
+     consultation_ids:=array_append(consultation_ids,r.id);
+    end if;
+   end loop;
+   if not(seen @> dep_sources and dep_sources @> seen) then
+    raise exception 'Desk journal dependency source set denied' using errcode='42501';end if;
+   if o.revision is not null and p_pending is not null and b=p_pending and exists(
+    select 1 from mizizi_private.desk_tool_receipts_v1 q where q.job_id=p_job_id
+     and q.lease_expires_at=(c->>'leaseExpiresAt')::timestamptz and not(q.id=any(deps))) then
+    raise exception 'Desk journal missing lease dependency' using errcode='42501';end if;
+  end if;
+  if coalesce(b->'deskConsultationReceipts','[]'::jsonb) is distinct from consultations then
+   raise exception 'Desk transient consultation dependency denied' using errcode='42501';end if;
+  for finding in select value from jsonb_array_elements(b->'findings') loop
+   if finding ? 'consultationIds' then
+    if jsonb_typeof(finding->'consultationIds') is distinct from 'array' or exists(
+     select 1 from jsonb_array_elements_text(finding->'consultationIds') v where not(v=any(consultation_ids::text[])))
+     or (jsonb_array_length(finding->'consultationIds')>0 and (finding->'independentlyVerified' is distinct from 'false'::jsonb or finding->>'verificationRef' is not null))
+    then raise exception 'Desk consultation cannot be an independent finding' using errcode='42501';end if;
+   end if;
+  end loop;
+ end loop;
+ if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
+  raise exception 'Desk journal lease expired' using errcode='55000';end if;
 end $function$
 

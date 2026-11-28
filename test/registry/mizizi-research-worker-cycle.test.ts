@@ -1942,7 +1942,7 @@ describe("MIZIZI cost-routed autonomous application tool research",()=>{
   }
  });
  it("writes source-bound original notebook classifications through the existing journal without asserting truth",async()=>{
-  const tagged={...conclusion,hypotheses:[{...conclusion.hypotheses[0],fieldKey:"performer",noteKind:"attributed_claim"}]};
+  const tagged={...conclusion,hypotheses:[{...conclusion.hypotheses[0],fieldKey:"performer",noteKind:"attributed_claim",consultationIds:[]}]};
   for(const variant of ["valid","invalid-field","invalid-kind","verbatim","missing"]){
    const h=fixture(),rows:InvestigationPassV1[]=[];
    const claim={...tagged.hypotheses[0]};

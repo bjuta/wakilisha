@@ -18,25 +18,48 @@ export type SourceAuthorityV1=Readonly<{
 export type SourceExcerptV1=Readonly<{source:SourceAuthorityV1;excerpt:string;citation:string}>;
 export const NOTEBOOK_FIELDS_V1=["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"] as const;
 export const NOTEBOOK_KINDS_V1=["direct_observation","attributed_claim","inference"] as const;
+/** Digest/locator-only record of text lawfully examined by the model but
+ * not retained as publisher expression or admitted as source evidence. */
+export type DeskConsultationRefV1=Readonly<{receiptId:string;textSha256:string;textBytes:number;citation:string;observedAt:string}>;
+export function validDeskConsultationRefV1(v:unknown):v is DeskConsultationRefV1{
+ if(!v||typeof v!=="object"||Array.isArray(v)||Object.keys(v).sort().join(",")!=="citation,observedAt,receiptId,textBytes,textSha256")return false;
+ const r=v as DeskConsultationRefV1;
+ return typeof r.receiptId==="string"&&UUID.test(r.receiptId)&&typeof r.textSha256==="string"&&SHA.test(r.textSha256)&&
+  Number.isSafeInteger(r.textBytes)&&r.textBytes>=1&&r.textBytes<=16000&&
+  typeof r.citation==="string"&&r.citation.startsWith("https://")&&r.citation.length>=12&&r.citation.length<=1000&&
+  typeof r.observedAt==="string"&&Number.isFinite(Date.parse(r.observedAt));
+}
 export type ResearchClaimV1=Readonly<{
  statement:string;sourceIds:readonly string[];
  interpretation:"hypothesis"|"supported"|"contradicted"|"unknown";
  uncertainty:number;reasoningSummary:string;
  /** Optional original agent notebook classification. Not evidence or independent verification. */
  fieldKey?:typeof NOTEBOOK_FIELDS_V1[number];noteKind?:typeof NOTEBOOK_KINDS_V1[number];
+ consultationIds?:readonly string[];
 }>;
-export function notebookClaimCurrentV1(claim:ResearchClaimV1,sources:readonly {sourceId:string;excerpt:string}[]):boolean{
- if(claim.fieldKey===undefined&&claim.noteKind===undefined)return true;
+export function notebookClaimCurrentV1(claim:ResearchClaimV1,sources:readonly {sourceId:string;excerpt:string}[],
+ consultations:readonly (DeskConsultationRefV1&{text?:string})[]=[]):boolean{
+ if(claim.fieldKey===undefined&&claim.noteKind===undefined)return claim.consultationIds===undefined;
  if(!NOTEBOOK_FIELDS_V1.includes(claim.fieldKey!)||!NOTEBOOK_KINDS_V1.includes(claim.noteKind!)||
   typeof claim.statement!=="string"||claim.statement.length<8||claim.statement.length>1200||
-  !Array.isArray(claim.sourceIds)||!claim.sourceIds.length||claim.sourceIds.length>12||new Set(claim.sourceIds).size!==claim.sourceIds.length)return false;
+  !Array.isArray(claim.sourceIds)||!Array.isArray(claim.consultationIds)||
+  claim.sourceIds.length+claim.consultationIds.length<1||claim.sourceIds.length+claim.consultationIds.length>12||
+  new Set([...claim.sourceIds,...claim.consultationIds]).size!==claim.sourceIds.length+claim.consultationIds.length)return false;
  const normalized=(v:string)=>v.trim().replace(/\s+/g," ").toLowerCase();
  const statement=normalized(claim.statement);
+ const original=(excerpt:string)=>!(statement.length>=80&&normalized(excerpt).includes(statement));
  return claim.sourceIds.every(id=>{
   const s=sources.find(x=>x.sourceId===id);
-  return !!s&&s.excerpt!=="Visual derivative for examination; no textual claim is verified."&&
-   !(statement.length>=80&&normalized(s.excerpt).includes(statement));
+  return !!s&&s.excerpt!=="Visual derivative for examination; no textual claim is verified."&&original(s.excerpt);
+ })&&claim.consultationIds.every(id=>{
+  const c=consultations.find(x=>x.receiptId===id);
+  return !!c&&(c.text===undefined||original(c.text));
  });
+}
+function consultationRefsCurrentV1(refs:unknown,deps:InvestigationPassV1["deskToolReceipts"]):refs is readonly DeskConsultationRefV1[]{
+ if(!Array.isArray(refs)||refs.length<1||refs.length>4||!Array.isArray(deps))return false;
+ return refs.every(validDeskConsultationRefV1)&&new Set(refs.map(r=>r.receiptId)).size===refs.length&&
+  refs.every(r=>deps.some(d=>d.receiptId===r.receiptId));
 }
 export type ResearchLeadV1=Readonly<{
  question:string;rationale:string;expectedInformationGain:number;
@@ -85,6 +108,7 @@ export type InvestigationPassV1=Readonly<{
   custodyFingerprint?:string;
  }>[];
  deskToolReceipts?:readonly Readonly<{receiptId:string;callSha256:string;resultSha256:string}>[];
+ deskConsultationReceipts?:readonly DeskConsultationRefV1[];
  /** Original human-note context, never a source excerpt or verified finding. */
  factualNoteReferences?:readonly DeskFactualNoteReferenceV1[];
  deskBatchReceipt?:DeskBatchReceiptV1;
@@ -119,6 +143,7 @@ export type PreparedDeskPassV1=Readonly<{
  method?:"discovery_only"|"interrupted";
  interruptionCode?:DeskAvailabilityFailureV1;
  deskToolReceipts?:InvestigationPassV1["deskToolReceipts"];
+ deskConsultationReceipts?:InvestigationPassV1["deskConsultationReceipts"];
  factualNoteReferences?:InvestigationPassV1["factualNoteReferences"];
  deskBatchReceipt?:DeskBatchReceiptV1;
 }>;
@@ -158,7 +183,9 @@ export function verifyInvestigationHistoryV1(id:InvestigationIdentityV1,history:
    throw new Error("MIZIZI_RESEARCH_HISTORY_CORRUPT_OR_CONFLICTED");
   if(pass.factualNoteReferences!==undefined&&!validFactualNoteReferencesV1(pass.factualNoteReferences))
    throw Error("MIZIZI_RESEARCH_NOTE_HISTORY_INVALID");
-  if(pass.findings.some(f=>!notebookClaimCurrentV1(f,pass.sourceReceipts)))
+  if(pass.deskConsultationReceipts!==undefined&&!consultationRefsCurrentV1(pass.deskConsultationReceipts,pass.deskToolReceipts))
+   throw Error("MIZIZI_RESEARCH_CONSULTATION_HISTORY_INVALID");
+  if(pass.findings.some(f=>!notebookClaimCurrentV1(f,pass.sourceReceipts,pass.deskConsultationReceipts)))
    throw Error("MIZIZI_RESEARCH_NOTEBOOK_HISTORY_INVALID");
   const event=pass.reopenEvent;
   if(event!==undefined){
@@ -291,6 +318,8 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    await input.prepareDeskPass(identity,question,snapshot):null;
   if(prepared?.factualNoteReferences!==undefined&&(!validFactualNoteReferencesV1(prepared.factualNoteReferences)||
    prepared.deskBatchReceipt!==undefined||prepared.method==="discovery_only"))throw Error("MIZIZI_RESEARCH_NOTE_CONTEXT_INVALID");
+  if(prepared?.deskConsultationReceipts!==undefined&&(!consultationRefsCurrentV1(prepared.deskConsultationReceipts,prepared.deskToolReceipts)||
+   prepared.deskBatchReceipt!==undefined||prepared.method==="discovery_only"))throw Error("MIZIZI_RESEARCH_CONSULTATION_CONTEXT_INVALID");
   const discoveryOnly=prepared?.method==="discovery_only";
   const interrupted=prepared?.method==="interrupted";
   if(interrupted?(!prepared||!isDeskAvailabilityFailureV1(prepared.interruptionCode)||
@@ -341,7 +370,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // could quote a privately retained witness or artifact.
   const analystHistory=history.map(p=>Object.freeze({...p,
    question:"Prior research question withheld from external processing.",
-   sourceReceipts:[],findings:[],proposedLeads:[],reopenEvent:undefined,factualNoteReferences:undefined,
+   sourceReceipts:[],findings:[],proposedLeads:[],reopenEvent:undefined,factualNoteReferences:undefined,deskConsultationReceipts:undefined,
    passFinding:"Unverified prior analysis withheld from external processing.",
    decision:{...p.decision,nextQuestion:null,
     rationale:"Prior method decision; previous claims are not evidence.",
@@ -360,7 +389,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   const priorRepeated=history.length>1&&!!prior&&prior.sourceReceipts.length>0&&
    prior.sourceReceipts.every(r=>
     earlier.has(r.lineageKey+"|"+r.originKey+"|"+r.payloadFingerprint));
-  const evidenceExhausted=sameEvidence&&priorRepeated;
+  const evidenceExhausted=sameEvidence&&priorRepeated&&!prepared?.deskConsultationReceipts?.length;
   // Mixed public and restricted packets are also human-only. The case
   // question may itself disclose a protected witness or investigation lead;
   // filtering excerpts alone cannot safely authorize sending that question.
@@ -372,7 +401,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
   // If rights changed before journal append, fail closed; never relabel it
   // human-only and falsely claim no model received the evidence.
   if(prepared&&humanOnly)throw new Error("MIZIZI_DESK_MODEL_AUTHORITY_REVOKED");
-  const noEvidence=sources.length===0;
+  const noEvidence=sources.length===0&&!prepared?.deskConsultationReceipts?.length;
   const noModel=humanOnly||evidenceExhausted||noEvidence;
   // Discovery may legitimately run without admitted evidence. Persist
   // the model's next questions (not unsupported cultural conclusions).
@@ -415,7 +444,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    if(claim.sourceIds.length>20||
       claim.sourceIds.some(ref=>!modelVisibleIds.has(ref.toLowerCase())))
     throw new TypeError("MIZIZI_RESEARCH_UNOBSERVED_EVIDENCE_CITATION");
-   if(!notebookClaimCurrentV1(claim,sources.map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt}))))
+   if(!notebookClaimCurrentV1(claim,sources.map(s=>({sourceId:s.source.sourceId,excerpt:s.excerpt})),prepared?.deskConsultationReceipts))
     throw Error("MIZIZI_RESEARCH_NOTEBOOK_CLAIM_INVALID");
    const refs=authorities.filter(a=>modelVisibleIds.has(a.sourceId.toLowerCase())&&
     claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
@@ -423,7 +452,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
    if(typeof independent?.verified!=="boolean"||
       (independent.verified&&!independent.verificationRef))
     throw new Error("MIZIZI_RESEARCH_INDEPENDENT_VERIFIER_INVALID");
-   const verified=independent.verified&&refs.length>0;
+   const verified=independent.verified&&refs.length>0&&!claim.consultationIds?.length;
    findings.push({...claim,sourceIds:[...claim.sourceIds],
     interpretation:claim.interpretation==="supported"&&!verified?"hypothesis":claim.interpretation,
     independentlyVerified:verified,
@@ -485,6 +514,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     excerpt:restrictedReceipt(a)?REDACTED:excerpt,
     modelDisclosed:modelVisibleIds.has(a.sourceId.toLowerCase())&&(!noModel||!!prepared)})),
    ...(prepared?.deskToolReceipts!==undefined?{deskToolReceipts:prepared.deskToolReceipts}:{}),
+   ...(prepared?.deskConsultationReceipts!==undefined?{deskConsultationReceipts:prepared.deskConsultationReceipts}:{}),
    ...(prepared?.factualNoteReferences!==undefined?{factualNoteReferences:prepared.factualNoteReferences}:{}),
    ...(prepared?.deskBatchReceipt!==undefined?{deskBatchReceipt:prepared.deskBatchReceipt}:{}),
    ...(activeReopen?{reopenEvent:{sourceEventRef:activeReopen.sourceEventRef,eventSha256:activeReopen.eventSha256,
