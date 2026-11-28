@@ -24,6 +24,33 @@ BEGIN
    OR to_regprocedure('public.mizizi_complete_case_research_job_v1(uuid,text,jsonb)') IS NULL
  THEN RAISE EXCEPTION 'STOP_CI_WORKER_EXACT_EMPTY_LOCAL_231_REQUIRED'; END IF;
 END $guard$;
+-- Synthetic owner-issued operation rule; no actual provider or publisher grant.
+DO $wk_operation_interpretation$
+DECLARE o mizizi_private.desk_operational_policy_versions_v1; m jsonb;
+BEGIN
+ o.enabled:=true;o.public_web_transient_allowed:=true;o.revision:=1;
+ o.credential_sha256:=repeat('a',64);o.valid_until:=clock_timestamp()+interval '1 minute';
+ m:=jsonb_build_object('operationInterpretation',jsonb_build_object('kind','native_html_declared_cc0_v1',
+  'standingRevision',1,'documentLicense','https://creativecommons.org/publicdomain/zero/1.0/'),
+  'contentType','text/html','locator','article_text','finalUrl','https://archive.org/details/fixture',
+  'sourceSha256',repeat('b',64),'projectionSha256',repeat('c',64),'documentPages',null,'renderRequired',false);
+ IF mizizi_private.desk_operation_interpretation_current_v1(o,m) THEN RAISE EXCEPTION 'operation interpretation default allowed';END IF;
+ o.operation_interpretation_rule:=jsonb_build_object('kind','native_html_declared_cc0_v1',
+  'sourceUseRef','fixture:independent-content-review','providerProcessingRef','fixture:independent-provider-review',
+  'credentialSha256',o.credential_sha256);
+ IF NOT mizizi_private.desk_operation_interpretation_current_v1(o,m)
+ OR mizizi_private.desk_operation_interpretation_current_v1(o,m-'operationInterpretation')
+ OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{operationInterpretation,standingRevision}','2'))
+ OR mizizi_private.desk_operation_interpretation_current_v1(o,jsonb_set(m,'{finalUrl}','"https://archive.org/details/fixture?q=private"'))
+ THEN RAISE EXCEPTION 'operation interpretation binding failed';END IF;
+ o.credential_sha256:=repeat('d',64);
+ IF mizizi_private.desk_operation_interpretation_current_v1(o,m) THEN RAISE EXCEPTION 'operation interpretation credential mismatch';END IF;
+ o.credential_sha256:=repeat('a',64);o.valid_until:=clock_timestamp()-interval '1 second';
+ IF mizizi_private.desk_operation_interpretation_current_v1(o,m) THEN RAISE EXCEPTION 'operation interpretation expired allowed';END IF;
+ IF has_function_privilege('service_role','mizizi_private.desk_operation_interpretation_current_v1(mizizi_private.desk_operational_policy_versions_v1,jsonb)','execute')
+ OR has_function_privilege('authenticated','mizizi_private.desk_operation_interpretation_current_v1(mizizi_private.desk_operational_policy_versions_v1,jsonb)','execute')
+ THEN RAISE EXCEPTION 'operation interpretation private ACL regression';END IF;
+END $wk_operation_interpretation$;
 SELECT id::text AS wk_workspace FROM mizizi_private.workspaces
  WHERE workspace_key='wakilisha-internal' AND status='active' \gset
 WITH n AS (SELECT substr(md5(gen_random_uuid()::text),1,12) AS key),

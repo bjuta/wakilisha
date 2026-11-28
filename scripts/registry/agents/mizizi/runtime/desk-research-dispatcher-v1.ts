@@ -322,12 +322,42 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(options.allowTransientModelConsultation?.()!==true||!p||p.excerptRetentionAllowed||!p.externalModelProcessingAllowed||
    !SHA.test(options.transientProviderCredentialSha256??"")||p.transientProviderCredentialSha256!==options.transientProviderCredentialSha256||
    !text(p.transientProviderProcessingRef,500,8))return undefined;
+  return consultationContent(id,receipt,locator,raw);
+ }
+ function consultationContent(id:string,receipt:{finalUrl:string;retrievedAt:string},locator:string,raw:string):DeskTransientConsultationV1|undefined{
   const content=raw.replace(/[\p{Cc}\p{Cf}]/gu," ").replace(/\s+/g," ").trim().slice(0,4000).trim();
   if(!content||locator==="no_text")return undefined;
   const ref={receiptId:id,textSha256:hash(content),textBytes:Buffer.byteLength(content,"utf8"),
    citation:receipt.finalUrl+"#"+locator,observedAt:receipt.retrievedAt,text:content};
   if(!validDeskTransientConsultationV1(ref,true))fail("TRANSIENT_CONSULTATION_SHAPE");
   return Object.freeze(ref);
+ }
+ // First operation class: native HTML, explicit document-level declaration,
+ // independently reviewed class eligibility AND actual provider handling.
+ // The agent cannot supply either the rule or the declaration. Not general
+ // permission for unlicensed publisher text or third-party content.
+ async function operationConsultation(receipt:NativeReceipt,projection:{documentLicense?:unknown;segments:readonly {locator:string;text:string}[]}){
+  if(options.allowTransientModelConsultation?.()!==true||options.requirePublicMethodEligibility!==true||
+   !SHA.test(options.transientProviderCredentialSha256??"")||
+   receipt.contentType!=="text/html"||urlOf(receipt.finalUrl).search||
+   projection.documentLicense!=="https://creativecommons.org/publicdomain/zero/1.0/")return null;
+  const segment=projection.segments.find(s=>s.locator==="article_text"&&typeof s.text==="string"&&s.text.trim());
+  if(!segment)return null;
+  const current=await rpc("mizizi_read_desk_operational_policy_v1",{p_scope:scope}) as {
+   revision:number;scope:DeskSearchScopeV1;credentialSha256:string;publicWebTransientAllowed:boolean;validUntil:string;
+   operationInterpretationRule?:{kind:string;sourceUseRef:string;providerProcessingRef:string;credentialSha256:string}|null
+  }|null;
+  const rule=current?.operationInterpretationRule,expiry=Date.parse(current?.validUntil??"");
+  if(!current||!current.scope||scopeKeys.some(k=>current.scope[k]!==scope[k])||
+   !Number.isSafeInteger(current.revision)||current.revision<1||current.publicWebTransientAllowed!==true||
+   current.credentialSha256!==options.transientProviderCredentialSha256||
+   !Number.isFinite(expiry)||expiry<=now()||expiry>Date.parse(scope.leaseExpiresAt)||
+   !rule||Object.keys(rule).length!==4||rule.kind!=="native_html_declared_cc0_v1"||
+   rule.credentialSha256!==current.credentialSha256||
+   !text(rule.sourceUseRef,500,8)||!text(rule.providerProcessingRef,500,8)||rule.sourceUseRef===rule.providerProcessingRef)return null;
+  const consultation=consultationContent(randomUUID(),receipt,"article_text",segment.text);
+  return consultation?{consultation,operationInterpretation:{kind:rule.kind,standingRevision:current.revision,
+   documentLicense:projection.documentLicense}}:null;
  }
  async function append(callText:string,callSha256:string,result:DeskToolResultV1,
   p:{host:string;revision:number|null},provenance:Record<string,unknown>,bindings:readonly {id:string;url:string}[]){
@@ -713,15 +743,17 @@ export function createDeskResearchDispatcherV1(options:Options){
    fail("SOURCE_PROJECTION_UNCONFIRMED");
   const projection=interpreted.projection;
   if(!p){
-   // The server must independently admit a current session-bound access
-   // receipt. No page text, anchor text, visual, document cache or source ID
-   // may be retained/disclosed by this path.
+   // Generic navigation is the fallback. Independently approved operation
+   // eligibility permits bounded memory-only text, never a retained source.
    const refs=leadsFrom(projection.links.filter((l:{url:string})=>!l.url.includes("?"))
     .map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));
-   return append(callText,callSha256,{receiptId:randomUUID(),leads:refs.leads,sources:[]},
+   const permitted=await operationConsultation(receipt,projection);
+   return append(callText,callSha256,{receiptId:permitted?.consultation.receiptId??randomUUID(),leads:refs.leads,sources:[],
+     ...(permitted?{consultation:permitted.consultation}:{})},
     {host,revision:null},{requestedUrl:receipt.requestedUrl,finalUrl:receipt.finalUrl,sourceSha256:receipt.sha256,
      projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,
-     byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:"no_text",documentPages:null,renderRequired:false},refs.bindings);
+     byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:permitted?"article_text":"no_text",documentPages:null,renderRequired:false,
+     ...(permitted?{operationInterpretation:permitted.operationInterpretation}:{})},refs.bindings);
   }
   const refs=leadsFrom(p.excerptRetentionAllowed?projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})):
    projection.links.filter((l:{url:string})=>!l.url.includes("?")).map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));

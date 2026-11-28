@@ -2362,6 +2362,8 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return ok({operation,bindingSha256:hash(String(args.p_binding_text)),urlSha256:hash(binding.url),
      policyRef:"fixture:access:"+operation,validUntil:expiry,allowed:true});
    }
+   if(fn==="mizizi_read_desk_operational_policy_v1")return ok({scope,revision:1,credentialSha256:hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"])),publicWebTransientAllowed:true,validUntil:expiry,
+    operationInterpretationRule:disabled.has("operation_rule")?{kind:"native_html_declared_cc0_v1",sourceUseRef:"fixture:independent-content-review",providerProcessingRef:"fixture:independent-provider-review",credentialSha256:disabled.has("wrong_operation_credential")?"f".repeat(64):hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]))}:null});
    if(fn==="mizizi_read_desk_custody_policy_v1"){
     const host=String(args.p_host);
     return ok(disabled.has(host)||disabled.has("fixture_unknown_host")&&host==="archive.org"?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
@@ -2930,6 +2932,35 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(await open.dispatch.verifyToolReceipt(scope,{receiptId:consulted.receiptId,
    callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},consulted)).toBe(true);
  });
+ it.each(["allowed","no_rule","wrong_credential","no_declaration","body_link","conflict"] as const)("requires a reviewed operation rule as well as exact native document eligibility (%s)",async mode=>{
+  const cc="https://creativecommons.org/publicdomain/zero/1.0/",licence='<link rel="license" href="'+cc+'">';
+  const header=mode==="no_declaration"||mode==="body_link"?"":licence+(mode==="conflict"?'<link rel="license" href="https://creativecommons.org/licenses/by-nc/4.0/">':"");
+  const passage="The programme attributes this recording to an ensemble, but the named producer is uncertain. ".repeat(8);
+  const html='<html><head><title>Archive fixture</title>'+header+'</head><body><article><p>'+passage+'</p>'+(mode==="body_link"?'<a rel="license" href="'+cc+'">Rights signal</a>':"")+'</article></body></html>';
+  const credential=hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]));
+  const h=fixture(new TextEncoder().encode(html),"text/html",{allowTransientModelConsultation:()=>true,
+   transientProviderCredentialSha256:credential,requirePublicMethodEligibility:true},true);
+  h.disabled.add("fixture_unknown_host");
+  if(mode!=="no_rule")h.disabled.add("operation_rule");
+  if(mode==="wrong_credential")h.disabled.add("wrong_operation_credential");
+  const found=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
+  const got=await h.execute(call("read_page",{lead_id:found.leads[0].id}));
+  expect(got.sources).toEqual([]);
+  const appended=h.calls.filter(c=>c.fn==="mizizi_record_desk_tool_receipt_v1").at(-1)!;
+  expect(appended.args.p_policy_revision).toBeNull();
+  expect(JSON.stringify(appended.args)).not.toContain(passage.trim());
+  if(mode==="allowed"){
+   expect(got.consultation?.text).toContain("The programme attributes");
+   expect(appended.args.p_provenance).toMatchObject({locator:"article_text",operationInterpretation:{
+    kind:"native_html_declared_cc0_v1",standingRevision:1,documentLicense:cc}});
+   expect(JSON.parse(String(appended.args.p_result_text)).consultation).not.toHaveProperty("text");
+   expect(await h.dispatch.verifyToolReceipt(scope,{receiptId:got.receiptId,
+    callSha256:String(appended.args.p_call_sha256),resultSha256:String(appended.args.p_result_sha256)},got)).toBe(true);
+  }else{
+   expect(got.consultation).toBeUndefined();
+   expect(appended.args.p_provenance).not.toHaveProperty("operationInterpretation");
+  }
+ },20000);
 });
 
 

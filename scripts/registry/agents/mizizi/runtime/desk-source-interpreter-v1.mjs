@@ -40,6 +40,13 @@ async function parseHtml(body,url){
  try{
   const doc=dom.window.document;
   if(doc.querySelectorAll("*").length>MAX_DOM_NODES)fail("DOM_BUDGET");
+  // Source-level declaration, not proof of rights. Only a reviewed standing
+  // rule may authorize reliance on this signal. No relative or body links.
+  const licenceNodes=[...doc.querySelectorAll("[rel]")].filter(n=>
+   (n.getAttribute("rel")??"").toLowerCase().split(/\s+/).includes("license"));
+  const licence=licenceNodes.length===1&&licenceNodes[0].tagName==="LINK"&&
+   licenceNodes[0].parentElement===doc.head&&licenceNodes[0].getAttribute("href")==="https://creativecommons.org/publicdomain/zero/1.0/"?
+   "https://creativecommons.org/publicdomain/zero/1.0/":null;
   doc.querySelectorAll("script,style,template,noscript,iframe,object,embed,form,base,link,[hidden],[aria-hidden='true']").forEach(n=>n.remove());
   const links=[],seen=new Set();let linksTruncated=false;
   for(const a of doc.querySelectorAll("a[href]")){
@@ -57,7 +64,7 @@ async function parseHtml(body,url){
     extractionMethod:"readability_no_article",sourceTextAbsent:false};
   }
   const passage=bounded(article.textContent,MAX_TEXT);
-  return {kind:"html",title:label(article.title)||fallbackTitle,author:label(article.byline),
+  return {kind:"html",...(licence?{documentLicense:licence}:{}),title:label(article.title)||fallbackTitle,author:label(article.byline),
    publishedLabel:label(article.publishedTime,120),publisher:label(article.siteName),
    segments:[{locator:"article_text",page:null,...passage}],links,linksTruncated,
    documentPages:null,needsVisualReview:false,partial:passage.truncated||linksTruncated,
