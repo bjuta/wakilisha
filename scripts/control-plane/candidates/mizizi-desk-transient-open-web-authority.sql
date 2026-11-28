@@ -1737,7 +1737,7 @@ begin
  end if;
  return query select v_case_id,v_ordinal,p_fingerprint,'created'::text;
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.admin_mizizi_review_factual_note_v1(p_note_id uuid, p_note_sha256 text, p_expected_review_revision integer, p_decision text, p_model_processing_allowed boolean, p_review_ref text, p_valid_until timestamp with time zone, p_acknowledgement text)
  RETURNS jsonb
@@ -1776,8 +1776,9 @@ begin
   if not found or c.revision<>n.expected_revision or c.case_state<>'in_progress' or c.current_stage<>'research'
   then raise exception 'Stale note case' using errcode='PT409';end if;
   perform mizizi_private.assert_chart_candidate_current_v1(n.case_id,n.workspace_id,null);
- elsif prev.revision is null or prev.decision<>'admitted' then
-  raise exception 'No admitted note to revoke' using errcode='55000';
+ elsif (prev.revision is null and n.author_job_id is null)
+  or (prev.revision is not null and prev.decision<>'admitted') then
+  raise exception 'No admitted or currently reusable agent note to revoke' using errcode='55000';
  end if;
  d.note_id:=n.note_id;d.revision:=p_expected_review_revision+1;d.reviewer_id:=actor;d.note_sha256:=n.note_sha256;
  d.decision:=p_decision;d.model_processing_allowed:=p_model_processing_allowed;d.review_ref:=p_review_ref;
@@ -1786,7 +1787,7 @@ begin
  return jsonb_build_object('contract','mizizi.factual_note_review.v1','noteId',n.note_id,'noteSha256',n.note_sha256,
   'reviewRevision',d.revision,'decision',d.decision,'reviewerId',actor,'modelProcessingAllowed',d.model_processing_allowed,
   'verified',false,'jobsDispatched',0);
-end $function$
+end $function$;
 
 -- Note recall shares the current custody and immutable journal authority.
 -- The original pass is independently re-read; agent identity is a job, not
@@ -1933,6 +1934,7 @@ declare c jsonb;n mizizi_private.desk_factual_notes_v1;d mizizi_private.desk_fac
  items jsonb:='[]'::jsonb;body text;expiry timestamptz;agent jsonb;agent_fields jsonb;
  o mizizi_private.desk_operational_policy_versions_v1;has_review boolean;
 begin
+ if coalesce(auth.role(),'')<>'service_role' then raise exception 'Service-role required' using errcode='42501';end if;
  perform pg_advisory_xact_lock(214781521,61431);
  c:=mizizi_private.desk_custody_context_v1(p_scope);
  if c is null then return null;end if;
@@ -1994,7 +1996,7 @@ begin
   'scope',p_scope,'membershipSha256',c->>'membershipSha256','observationSha256',c->>'observationSha256',
   'notes',items)::text;
  return jsonb_build_object('bodyText',body,'bodySha256',encode(sha256(convert_to(body,'UTF8')),'hex'));
-end $function$
+end $function$;
 
 revoke all on function mizizi_private.desk_factual_note_packet_v1(jsonb,uuid[]) from public,anon,authenticated,service_role,mizizi_executor;
 create or replace function public.mizizi_read_desk_factual_notes_v1(p_scope jsonb)
@@ -2042,7 +2044,7 @@ begin
   ids:=array_append(ids,nid);
  end loop;
  return true;
-end $function$
+end $function$;
 
 
 -- Exact journal extension: descriptors are immutable dependencies, not excerpts.
@@ -2282,4 +2284,4 @@ begin
  end loop;
  if (c->>'leaseExpiresAt')::timestamptz<=clock_timestamp() then
   raise exception 'Desk journal lease expired' using errcode='55000';end if;
-end $function$
+end $function$;

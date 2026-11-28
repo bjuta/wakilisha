@@ -1219,6 +1219,21 @@ export async function verifyCharts2RealJwtRegistryV1({
    then raise exception 'STOP_AGENT_NOTE_READBACK';end if;
   packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
   if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>1 then raise exception 'STOP_AGENT_NOTE_TARGETED_READ';end if;
+  -- A steward can revoke an agent's initially reusable, unreviewed context
+  -- directly. No human review/admission is invented just to revoke it.
+  set local role authenticated;
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub',${q(second.id)},true);
+  perform set_config('request.jwt.claims',${q(JSON.stringify({role:"authenticated",sub:second.id}))},true);
+  if (public.admin_mizizi_review_factual_note_v1((agent->>'noteId')::uuid,agent->>'noteSha256',0,
+   'revoked',false,'fixture:independent-agent-note-revocation',now()+interval '2 minutes',
+   'I revoke this exact factual note admission.')->>'reviewRevision') is distinct from '1'
+  then raise exception 'STOP_AGENT_NOTE_DIRECT_REVOCATION';end if;
+  set local role service_role;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
+  if jsonb_array_length((packet->>'bodyText')::jsonb->'notes')<>0 then raise exception 'STOP_AGENT_NOTE_REVOKED_READ';end if;
   raise exception 'Fixture rollback' using errcode='ZX001';
  exception when sqlstate 'ZX001' then null;end;
  raise notice 'WK_AUTH_MIZIZI_AGENT_NOTE_ATOMIC_APPEND_REPLAY_RECALL=PASS';
