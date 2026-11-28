@@ -42,11 +42,17 @@ function documentProcessingRestricted(doc){
  });
 }
 // Browser observation bytes remain local; use the same negative-signal check.
-export async function deskRenderedProcessingRestrictedV1(body,url){
- if(!(body instanceof Uint8Array)||body.length<1||body.length>MAX_BYTES)return true;
+export async function deskRenderedProcessingRestrictedV1(body,url,remainingMs=MAX_MS){
+ if(!(body instanceof Uint8Array)||body.length<1||body.length>MAX_BYTES||!Number.isFinite(remainingMs)||remainingMs<=0)return true;
+ try{
+  const result=await runWorker({mode:"restriction_check",body,finalUrl:url},Math.min(MAX_MS,remainingMs));
+  return result?.processingRestricted!==false;
+ }catch{return true;}
+}
+async function inspectDocumentRestrictions(body,url){
  const {JSDOM}=await import("jsdom");
  const dom=new JSDOM(new TextDecoder("utf-8",{fatal:true}).decode(body),{url,contentType:"text/html"});
- try{return dom.window.document.querySelectorAll("*").length>MAX_DOM_NODES||documentProcessingRestricted(dom.window.document);}
+ try{return {processingRestricted:dom.window.document.querySelectorAll("*").length>MAX_DOM_NODES||documentProcessingRestricted(dom.window.document)};}
  finally{dom.window.close();}
 }
 async function parseHtml(body,url){
@@ -156,6 +162,7 @@ async function renderPdfPage(body,pageNumber){
  }finally{await task.destroy();}
 }
 async function interpret({body,contentType,finalUrl,pageStart,pageEnd,mode}){
+ if(mode==="restriction_check")return inspectDocumentRestrictions(body,finalUrl);
  if(mode==="pdf_visual")return renderPdfPage(body,pageStart);
  if(contentType==="application/pdf")return parsePdf(body,pageStart,pageEnd);
  if(contentType==="text/html"||contentType==="application/xhtml+xml")return parseHtml(body,finalUrl);

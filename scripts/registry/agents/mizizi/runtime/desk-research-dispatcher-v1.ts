@@ -456,7 +456,7 @@ export function createDeskResearchDispatcherV1(options:Options){
     assertScope(candidate);
     const p=await policy(urlOf(url).hostname);
     return (p?p.visualProcessingAllowed===true&&p.excerptRetentionAllowed:
-     !!await operationRule("browser_visual",url)&&!await deskRenderedProcessingRestrictedV1(capture.body,url))&&
+     !!await operationRule("browser_visual",url)&&!await deskRenderedProcessingRestrictedV1(capture.body,url,Date.parse(scope.leaseExpiresAt)-now()))&&
      await localConfig.authorizeAccess(scope,url,"browser_visual")===true;
    },
    admitObservation:async(b:{
@@ -476,7 +476,7 @@ export function createDeskResearchDispatcherV1(options:Options){
     const url=urlOf(b.capture.finalUrl).href,p=await policy(urlOf(url).hostname);
     const visual=b.action==="visual";
     if(p&&p.browserRenderAllowed!==true)fail("SOURCE_CUSTODY_DENIED");
-    const restricted=!p&&await deskRenderedProcessingRestrictedV1(b.capture.body,url);
+    const restricted=!p&&await deskRenderedProcessingRestrictedV1(b.capture.body,url,Date.parse(scope.leaseExpiresAt)-now());
     const visualRule=!p&&!restricted?await operationRule("browser_visual",url):null;
     if(visual&&!p&&!visualRule)fail("SOURCE_CUSTODY_DENIED");
     if(!p?.excerptRetentionAllowed){
