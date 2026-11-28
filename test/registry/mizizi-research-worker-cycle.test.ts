@@ -3395,6 +3395,35 @@ describe("MIZIZI independent recording-field adjudication",()=>{
   expect(()=>score({...review,lastFingerprint:h("other")})).toThrow("SCOPE");
   expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,evidence:[{...span,spanSha256:h("forged")}]}:f)})).toThrow("EVIDENCE_BINDING");
   expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,finding:{...f.finding,statementSha256:h("different claim")}}:f)})).toThrow("CLAIM_BINDING");
+  // A lawful transient consultation is a journal reference, never proof.
+  // The evaluator must independently reconsult an original source and
+  // submit a separately controlled original factual observation.
+  const descriptor={receiptId:RECEIPT,textSha256:h("unretained publisher text"),textBytes:24,
+   citation:"https://archive.org/details/fixture#article_text",observedAt:new Date(500).toISOString()};
+  const dependency={receiptId:RECEIPT,callSha256:h("exact tool call"),resultSha256:h("exact receipt result")};
+  const transientBody={...body,sourceReceipts:[],deskConsultationReceipts:[descriptor],deskToolReceipts:[dependency],
+   findings:[{...body.findings[0],sourceIds:[],fieldKey:"performer" as const,noteKind:"attributed_claim" as const,consultationIds:[RECEIPT]}]};
+  const transientPass={...transientBody,fingerprint:h(JSON.stringify(transientBody))};
+  const observation={sourceLocator:"https://archive.org/details/independent-fixture",observedAt:new Date(1500).toISOString(),
+   method:"manual_public_consultation",authorityRef:"fixture:independent-permitted-method",originKey:"fixture:independent-origin",
+   lineageKey:"fixture:independent-lineage",originalFactualNote:"The separately inspected programme names the performer."};
+  const reviewedConsultation={...descriptor,callSha256:dependency.callSha256,resultSha256:dependency.resultSha256};
+  const tf=fields.map(f=>f.field==="performer"?{...f,evidence:[],finding:{...f.finding,passFingerprint:transientPass.fingerprint},
+   reviewedConsultations:[reviewedConsultation],independentObservations:[observation]}:f);
+  const tr={...review,lastFingerprint:transientPass.fingerprint,fields:tf};
+  const transientScore=(packet:unknown)=>{const reviewText=JSON.stringify(packet);return adjudicateRecordingFieldsV1({identity,history:[transientPass],
+   subjectVersionSha256:h("version"),rubricSha256:h("rubric"),reviewText,reviewSha256:h(reviewText),now:3000});};
+  expect(transientScore(tr)).toMatchObject({correct:1,incorrect:0,recordingFullyCorrect:false,reviewedCoverage:1/6});
+  const tp=prepareRecordingFieldReviewV1({identity,history:[transientPass],subjectVersionSha256:h("version"),rubricSha256:h("rubric")});
+  expect(tp.candidates[0]).toMatchObject({evidence:[],fieldKey:"performer",reviewedConsultations:[reviewedConsultation],independentObservations:[],independentObservationRequired:true});
+  expect(JSON.stringify(tp)).not.toContain("unretained publisher text");
+  const patch=(v:Record<string,unknown>)=>({...tr,fields:tf.map(f=>f.field==="performer"?{...f,...v}:f)});
+  expect(()=>transientScore(patch({independentObservations:[]}))).toThrow("CONSULTATION_REVIEW_REQUIRED");
+  expect(()=>transientScore(patch({reviewedConsultations:[{...reviewedConsultation,textSha256:h("forged")}]}))).toThrow("CONSULTATION_BINDING");
+  expect(()=>transientScore(patch({reviewedConsultations:[{...reviewedConsultation,resultSha256:h("forged")}]}))).toThrow("CONSULTATION_BINDING");
+  expect(()=>transientScore(patch({independentObservations:[{...observation,observedAt:new Date(0).toISOString()}]}))).toThrow("INDEPENDENT_OBSERVATION");
+  expect(()=>transientScore(patch({independentObservations:[{...observation,sourceLocator:"https://archive.org/details/fixture?token=secret"}]}))).toThrow("INDEPENDENT_OBSERVATION");
+  expect(()=>score({...review,fields:fields.map(f=>f.field==="performer"?{...f,independentObservations:[observation]}:f)})).toThrow("UNBOUND_CONSULTATION_REVIEW");
  });
 });
 

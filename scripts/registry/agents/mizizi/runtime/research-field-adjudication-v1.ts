@@ -13,9 +13,18 @@ const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 export const RECORDING_RESEARCH_FIELDS_V1=["subject_version","release_date","performer","composition_credits","recording_production","label_distribution"] as const;
 type Field=typeof RECORDING_RESEARCH_FIELDS_V1[number];
 type ReviewEvidence=Readonly<{sourceId:string;payloadFingerprint:string;lineageKey:string;excerptSha256:string;spanStart:number;spanLength:number;spanSha256:string}>;
+/** Evaluator-only original observation, not a source excerpt, model claim,
+ * or automatic source grant. The independently controlled review packet
+ * attests permitted consultation; its digest authenticates bytes, not rights,
+ * truth or the reviewer. Do not retain publisher expression here. */
+type IndependentObservation=Readonly<{sourceLocator:string;observedAt:string;method:"manual_public_consultation"|"manual_first_party_consultation";
+ authorityRef:string;originKey:string;lineageKey:string;originalFactualNote:string}>;
+type ReviewedConsultation=Readonly<{receiptId:string;textSha256:string;textBytes:number;citation:string;observedAt:string;callSha256:string;resultSha256:string}>;
 type FieldReview=Readonly<{field:Field;disposition:"correct"|"incorrect"|"unresolved"|"unreviewable";reviewRef:string;
  finding?:Readonly<{passFingerprint:string;claimIndex:number;statementSha256:string}>;
- evidence:readonly ReviewEvidence[];rationale:string}>;
+ evidence:readonly ReviewEvidence[];rationale:string;
+ reviewedConsultations?:readonly ReviewedConsultation[];
+ independentObservations?:readonly IndependentObservation[]}>;
 export type IndependentRecordingReviewV1=Readonly<{
  contract:"mizizi.recording_field_review.v1";caseId:string;workspaceId:string;subjectVersionSha256:string;
  rubricSha256:string;lastFingerprint:string|null;reviewerRef:string;reviewedAt:string;fields:readonly FieldReview[];
@@ -50,12 +59,12 @@ export function adjudicateRecordingFieldsV1(input:Readonly<{
   !Array.isArray(review.fields)||review.fields.length!==RECORDING_RESEARCH_FIELDS_V1.length)fail("SCOPE");
  const byField=new Map<Field,FieldReview>(),claimed=new Set<string>();
  for(const f of review.fields){
-  if(!shape(f,["field","disposition","reviewRef","evidence","rationale",...(f?.finding!==undefined?["finding"]:[])])||
+  if(!shape(f,["field","disposition","reviewRef","evidence","rationale",...(f?.finding!==undefined?["finding"]:[]),...(f?.reviewedConsultations!==undefined?["reviewedConsultations"]:[]),...(f?.independentObservations!==undefined?["independentObservations"]:[])])||
    !RECORDING_RESEARCH_FIELDS_V1.includes(f.field)||byField.has(f.field)||
    !["correct","incorrect","unresolved","unreviewable"].includes(f.disposition)||!text(f.reviewRef,500)||!text(f.rationale)||
    !Array.isArray(f.evidence)||f.evidence.length>20)fail("FIELD");
   const accepted=f.disposition==="correct"||f.disposition==="incorrect";
-  if(accepted&&(!f.finding||!f.evidence.length)||!accepted&&f.finding!==undefined)fail("CLAIM_REQUIRED");
+  if(accepted&&!f.finding||!accepted&&(f.finding!==undefined||f.reviewedConsultations!==undefined||f.independentObservations!==undefined))fail("CLAIM_REQUIRED");
   const pass=f.finding?history.find(p=>p.fingerprint===f.finding!.passFingerprint):undefined;
   const claim=pass&&f.finding&&Number.isSafeInteger(f.finding.claimIndex)&&f.finding.claimIndex>=0?pass.findings[f.finding.claimIndex]:undefined;
   if(f.finding&&(!shape(f.finding,["passFingerprint","claimIndex","statementSha256"])||!claim||
@@ -75,6 +84,51 @@ export function adjudicateRecordingFieldsV1(input:Readonly<{
    ids.add(e.sourceId);lineages.add(e.lineageKey);
   }
   if(accepted&&claim&&claim.sourceIds.some(id=>!ids.has(id)))fail("UNREVIEWED_CITATION");
+  const consultationIds=claim?.consultationIds??[];
+  if(consultationIds.length){
+   // A transient digest does not prove a fact, the consulted bytes are
+   // absent, and neither an agent note nor its review is factual evidence.
+   // Require exact journal bindings AND a separately attested original
+   // observation in the independently controlled review packet.
+   if(!accepted||claim?.fieldKey!==f.field||claim.independentlyVerified!==false||claim.verificationRef!==null||
+    !Array.isArray(f.reviewedConsultations)||f.reviewedConsultations.length!==consultationIds.length||
+    !Array.isArray(f.independentObservations)||f.independentObservations.length<1||f.independentObservations.length>20)fail("CONSULTATION_REVIEW_REQUIRED");
+   const seenConsultations=new Set<string>();
+   for(const c of f.reviewedConsultations!){
+    if(!shape(c,["receiptId","textSha256","textBytes","citation","observedAt","callSha256","resultSha256"])||
+     !consultationIds.includes(c.receiptId)||seenConsultations.has(c.receiptId))fail("CONSULTATION_BINDING");
+    const original=pass?.deskConsultationReceipts?.find(x=>x.receiptId===c.receiptId);
+    const dep=pass?.deskToolReceipts?.find(x=>x.receiptId===c.receiptId);
+    if(!original||!dep||c.textSha256!==original.textSha256||c.textBytes!==original.textBytes||
+     c.citation!==original.citation||c.observedAt!==original.observedAt||
+     c.callSha256!==dep.callSha256||c.resultSha256!==dep.resultSha256||
+     !SHA.test(c.callSha256)||!SHA.test(c.resultSha256))fail("CONSULTATION_BINDING");
+    seenConsultations.add(c.receiptId);
+   }
+   const seenObservations=new Set<string>();
+   for(const observation of f.independentObservations!){
+    if(!shape(observation,["sourceLocator","observedAt","method","authorityRef","originKey","lineageKey","originalFactualNote"])||
+     !text(observation.sourceLocator,1000)||!text(observation.originalFactualNote,1200)||
+     !text(observation.authorityRef,500)||!text(observation.originKey,500)||!text(observation.lineageKey,500)||
+     !["manual_public_consultation","manual_first_party_consultation"].includes(observation.method)||
+     !Number.isFinite(Date.parse(observation.observedAt))||
+     Date.parse(observation.observedAt)<Date.parse(pass!.recordedAt)||
+     Date.parse(observation.observedAt)>Date.parse(review.reviewedAt))fail("INDEPENDENT_OBSERVATION");
+    // Only public HTTPS locators without credentials or query parameters;
+    // this is a reference, never a network request or permission to fetch.
+    let url:URL;
+    try{url=new URL(observation.sourceLocator);}catch{fail("INDEPENDENT_OBSERVATION");}
+    if(url!.protocol!=="https:"||url!.username||url!.password||url!.port||url!.search||
+     url!.hostname.indexOf(".")<0||url!.hostname.endsWith(".")||
+     /(?:^|\.)(localhost|local|internal|test|invalid|example|onion|home|lan|arpa)$/i.test(url!.hostname)||
+     /^[0-9.]+$/.test(url!.hostname)||url!.hostname.includes(":")||
+     url!.href!==observation.sourceLocator||seenObservations.has(observation.sourceLocator))fail("INDEPENDENT_OBSERVATION");
+    seenObservations.add(observation.sourceLocator);
+   }
+  }else{
+   if(f.reviewedConsultations!==undefined||f.independentObservations!==undefined)fail("UNBOUND_CONSULTATION_REVIEW");
+   if(accepted&&!f.evidence.length)fail("CLAIM_REQUIRED");
+  }
   byField.set(f.field,Object.freeze({...f,evidence:Object.freeze([...f.evidence])}));
  }
  const fields=RECORDING_RESEARCH_FIELDS_V1.map(field=>byField.get(field)!);
@@ -83,7 +137,7 @@ export function adjudicateRecordingFieldsV1(input:Readonly<{
  return Object.freeze({contract:"mizizi.recording_field_score.v1" as const,caseId:identity.caseId,workspaceId:identity.workspaceId,
   subjectVersionSha256:input.subjectVersionSha256,rubricSha256:input.rubricSha256,lastFingerprint:last,reviewSha256:input.reviewSha256,
   fields:Object.freeze(fields.map(f=>Object.freeze({field:f.field,disposition:f.disposition,reviewRef:f.reviewRef,
-   reviewedLineages:new Set(f.evidence.map(e=>e.lineageKey)).size}))),
+   reviewedLineages:new Set([...f.evidence.map(e=>e.lineageKey),...(f.independentObservations??[]).map(e=>e.lineageKey)]).size}))),
   correct,incorrect,unresolved,unreviewable,precision:correct+incorrect?correct/(correct+incorrect):null,
   reviewedCoverage:(correct+incorrect)/fields.length,recordingFullyCorrect:correct===fields.length,
   journalCostUnits:history.reduce((sum,p)=>{if(!Number.isSafeInteger(p.costUnits)||p.costUnits<0)fail("COST");return sum+p.costUnits;},0)});
@@ -222,8 +276,16 @@ export function prepareRecordingFieldReviewV1(input:Readonly<{
     payloadFingerprint:source.payloadFingerprint,lineageKey:source.lineageKey,excerptSha256:hash(source.excerpt),
     spanStart:0,spanLength:source.excerpt.length,spanSha256:hash(source.excerpt)}};
   });
+  const consultations=claim.consultationIds?.map(id=>{
+   const c=pass.deskConsultationReceipts?.find(r=>r.receiptId===id);
+   const dep=pass.deskToolReceipts?.find(r=>r.receiptId===id);
+   if(!c||!dep||!SHA.test(dep.callSha256)||!SHA.test(dep.resultSha256))fail("PREPARATION_CONSULTATION");
+   return {...c,callSha256:dep.callSha256,resultSha256:dep.resultSha256};
+  });
   return {finding:{passFingerprint:pass.fingerprint,claimIndex,statementSha256:hash(claim.statement)},
-   statement:claim.statement,interpretation:claim.interpretation,evidence};
+   statement:claim.statement,interpretation:claim.interpretation,evidence,
+   ...(consultations?.length?{fieldKey:claim.fieldKey,reviewedConsultations:consultations,independentObservations:[],
+    independentObservationRequired:true}: {})};
  }));
  return {contract:"mizizi.recording_field_review_preparation.v1" as const,caseId:identity.caseId,workspaceId:identity.workspaceId,
   subjectVersionSha256:input.subjectVersionSha256,rubricSha256:input.rubricSha256,lastFingerprint:history.at(-1)?.fingerprint??null,
