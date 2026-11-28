@@ -33,10 +33,10 @@ type CustodyPolicy=Readonly<{
  externalModelProcessingAllowed:true;browserRenderAllowed?:boolean;visualProcessingAllowed?:boolean;validUntil:string;
  transientProviderCredentialSha256?:string|null;transientProviderProcessingRef?:string|null;
 }>;
-type SourceInterpretationScopeV1=Readonly<{scope:DeskSearchScopeV1;url:string;
+export type SourceInterpretationScopeV1=Readonly<{scope:DeskSearchScopeV1;url:string;
  method:"native_text"|"browser_text"|"pdf_visual"|"browser_visual";standingRevision:number;
  sourceUseRef:string;providerProcessingRef:string;credentialSha256:string}>;
-type SourceInterpretationReviewV1=SourceInterpretationScopeV1&Readonly<{
+export type SourceInterpretationReviewV1=SourceInterpretationScopeV1&Readonly<{
  allowed:true;reviewRef:string;reviewedAt:string;validUntil:string}>;
 type StoredReceipt=Readonly<{receiptId:string;callSha256:string;resultSha256:string;resultText:string;provenance:unknown}>;
 type StoredLead=Readonly<{id:string;url:string;kind:DeskToolLeadV1["kind"];label:string;receiptId:string}>;

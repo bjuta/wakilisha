@@ -18,6 +18,8 @@ import {createAnthropicInvestigationAnalystV1, type AnthropicInvestigationOption
  from "./anthropic-investigation-analyst-v1.ts";
 import {createCostRoutedDeskAnthropicPassV1,createDurableDeskModelAuthorityV1} from "./desk-anthropic-tool-loop-v1.ts";
 import {createDeskResearchDispatcherV1,type DeskLocalBrowserHostV1} from "./desk-research-dispatcher-v1.ts";
+import {qualifyDeskOperationSourceReviewV1,type DeskOperationReviewsV1}
+ from "./desk-operation-source-review-v1.ts";
 import {readDeskFactualNotesV1,type DeskFactualNoteReadbackV1} from "./desk-factual-note-readback-v1.ts";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
 import {createDeskAsyncOpeningBatchV1} from "./desk-async-batch-v1.ts";
@@ -370,7 +372,8 @@ type OperationalNativeDeskPolicyV1=Readonly<{
  questionSha256s:readonly string[];toolNames:readonly string[];maxRounds:number;maxRequestBytes:number;
  adaptiveFollowupsAllowed:boolean;publicQueryTerms:readonly string[];sharedNativeAutoAllowed?:boolean;
  publicWebTransientAllowed?:boolean;
- operationInterpretationRule?:{operations:readonly string[]}|null;
+ operationInterpretationRule?:{kind:string;operations:readonly string[];
+  sourceUseRef:string;providerProcessingRef:string;credentialSha256:string}|null;
  accessRules:readonly Readonly<{host:string;pathPrefix:string;custodyRevision:number;operations:readonly string[]}>[];
  validUntil:string;
 }>;
@@ -386,6 +389,14 @@ async function readOperationalNativeDeskPolicyV1(rpc:WorkerRpc,scope:DeskSearchS
   !Array.isArray(p.questionSha256s)||p.questionSha256s.length<1||p.questionSha256s.length>8||p.questionSha256s.some(q=>!sha.test(q))||
   (p.sharedNativeAutoAllowed!==undefined&&typeof p.sharedNativeAutoAllowed!=="boolean")||
   (p.publicWebTransientAllowed!==undefined&&typeof p.publicWebTransientAllowed!=="boolean")||
+  (p.operationInterpretationRule!=null&&(
+   p.operationInterpretationRule.kind!=="bounded_public_research_v1"||
+   !Array.isArray(p.operationInterpretationRule.operations)||
+   p.operationInterpretationRule.operations.length<1||
+   p.operationInterpretationRule.operations.some(x=>!["native_text","browser_text","pdf_visual","browser_visual"].includes(x))||
+   typeof p.operationInterpretationRule.sourceUseRef!=="string"||
+   typeof p.operationInterpretationRule.providerProcessingRef!=="string"||
+   p.operationInterpretationRule.credentialSha256!==p.credentialSha256))||
   typeof p.adaptiveFollowupsAllowed!=="boolean"||!Array.isArray(p.publicQueryTerms)||
   p.publicQueryTerms.length>32||new Set(p.publicQueryTerms).size!==p.publicQueryTerms.length||
   p.publicQueryTerms.some(t=>typeof t!=="string"||t.length<1||t.length>80||t.trim()!==t||/[\p{Cc}\p{Cf}]/u.test(t))||
@@ -407,9 +418,10 @@ export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
   readModelInventory:DurableDeskConfigurationV1["readModelInventory"];
   assessRequirement:DurableDeskConfigurationV1["assessRequirement"];
   localBrowser?:DeskLocalBrowserHostV1;
+  interpretationReviews?:DeskOperationReviewsV1;
  }
 >){
- const {credentials,readModelInventory,assessRequirement,localBrowser,...worker}=input;
+ const {credentials,readModelInventory,assessRequirement,localBrowser,interpretationReviews,...worker}=input;
  const now=input.now??Date.now;
  // The owner policy and existing monetary/entitlement ledgers remain
  // independent of the worker. Local browser activation additionally needs
@@ -475,6 +487,10 @@ export function runOperationalDeskResearchWorkerCycleV1(input:Readonly<
      const p=await fresh(candidate);
      return p&&allowedUrl(p,url,"native_acquire")?{policyRef:"desk-operational:"+p.revision,
       validUntil:p.validUntil,acquisitionAllowed:true as const,zeroIncrementalSpendAllowed:true as const}:null;
+    },
+    authorizeInterpretation:async(binding)=>{
+     const p=await fresh(binding.scope);
+     return qualifyDeskOperationSourceReviewV1(interpretationReviews,binding,p,now());
     },
     authorizeExamination:async(candidate,binding)=>{
      const p=await fresh(candidate);

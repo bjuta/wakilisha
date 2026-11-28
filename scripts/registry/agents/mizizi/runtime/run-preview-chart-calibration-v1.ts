@@ -16,6 +16,7 @@ import {discoverAnthropicResearchModelV1} from "./anthropic-investigation-analys
 import {createDockerDeskBrowserHostV1} from "./desk-docker-browser-host-v1.mjs";
 import {qualifyDeskPublicDiscoveryProviderV1,type DeskDiscoveryConfigurationV1} from "./desk-research-gateway-v1.ts";
 import {selectCostEffectiveDeskModelV1,type DeskModelCandidateV1} from "./desk-anthropic-tool-loop-v1.ts";
+import type {DeskOperationReviewsV1} from "./desk-operation-source-review-v1.ts";
 import type {WorkerRpc} from "./research-worker-cycle-v1.ts";
 import {admitReviewedDeskReopeningViaTrustedGatewayV1,validateReviewedDeskReopeningReceiptV1,type ReviewedDeskReopeningReceiptV1} from "./shared-job-adapter.ts";
 
@@ -49,6 +50,7 @@ type Manifest=Readonly<{
  case?:Readonly<{caseId:string;membershipSha256:string;admissionSha256:string;question:string;
   policyReviewRef:string;sourceReviewRef:string;financeReviewRef:string;runtimeReviewRef:string;
   model:DeskModelCandidateV1;credentialSha256:string;nativeAccountFingerprint:string;
+  interpretationReviews?:DeskOperationReviewsV1;
   maximumCostMicrousd:number;costBudgetUnits:number;maxTotalPasses:number;
   executorHost:string;executorPort:number;discovery?:DeskDiscoveryConfigurationV1;
   browser?:Readonly<{imageId:string;accountFingerprint:string;qualificationRef:string;validUntil:string;captureVisual:boolean}>;
@@ -87,6 +89,15 @@ export async function readPreviewCalibrationManifestV1(path:string,digest:string
     !SHA.test(c.browser.accountFingerprint)||!text(c.browser.qualificationRef)||
     !live(c.browser.validUntil)||Date.parse(c.browser.validUntil)>Date.parse(m.validUntil)||
     typeof c.browser.captureVisual!=="boolean"))fail("BROWSER_REVIEW_REQUIRED");
+  if(c.interpretationReviews&&(
+   c.interpretationReviews.sourceUse?.contract!=="mizizi.desk_reviewed_source_use_v1"||
+   c.interpretationReviews.sourceUse?.reviewRef!==c.sourceReviewRef||
+   c.interpretationReviews.providerHandling?.contract!=="mizizi.desk_reviewed_provider_handling_v1"||
+   c.interpretationReviews.providerHandling?.provider!=="anthropic"||
+   c.interpretationReviews.providerHandling?.retentionMode!=="standard_30_day"||
+   c.interpretationReviews.providerHandling?.retentionDays!==30||
+   c.interpretationReviews.providerHandling?.credentialSha256!==c.credentialSha256))
+   fail("INDEPENDENT_REVIEW_BINDING");
   if(c.discovery)for(const [op,provider] of Object.entries(c.discovery)){
    if(op!=="search_web"&&op!=="search_news")fail("DISCOVERY_SCOPE");
    qualifyDeskPublicDiscoveryProviderV1(provider,op);
@@ -225,7 +236,7 @@ export async function runPreviewCalibrationCommandV1(args:readonly string[]){
    registryClient:service,preflight:async r=>live(m.validUntil)&&r.caseId===c.caseId&&r.workspaceId===m.workspaceId&&
     r.caseRevision===expectedRevision,
    runtime:{credentials:{anthropic:{apiKey,workspaceId},nativeAccountFingerprint:c.nativeAccountFingerprint,discovery:c.discovery},
-    localBrowser,readModelInventory,assessRequirement:async()=>({tier:"routine",needsVision:browser?.captureVisual===true,
+    localBrowser,interpretationReviews:c.interpretationReviews,readModelInventory,assessRequirement:async()=>({tier:"routine",needsVision:browser?.captureVisual===true,
      inputTokenCeiling:c.model.maxInputTokens,maximumCostMicrousd:c.maximumCostMicrousd,assessmentRef:c.runtimeReviewRef}),
     openingQuestion:async j=>{if(j.caseId!==c.caseId||j.workspaceId!==m.workspaceId||
      j.chartContext?.membershipSha256!==c.membershipSha256)fail("QUESTION_SCOPE");return c.question;},

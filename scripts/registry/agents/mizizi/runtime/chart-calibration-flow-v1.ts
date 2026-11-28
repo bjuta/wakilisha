@@ -154,7 +154,7 @@ export async function runChartCalibrationJobV1(input:Readonly<{
  registryClient:ChartResearchScopeV1["registryClient"];
  preflight:(receipt:TrustedResearchJobReceiptV1)=>Promise<boolean>;
  runtime:Pick<WorkerOptions,"credentials"|"readModelInventory"|"assessRequirement"|"localBrowser"|
-  "openingQuestion"|"verifyFinding"|"maxTotalPasses"|"costBudgetUnits"|"leaseSeconds">;
+  "interpretationReviews"|"openingQuestion"|"verifyFinding"|"maxTotalPasses"|"costBudgetUnits"|"leaseSeconds">;
 }>){
  const r=input.receipt;
  if(!r||r.caseId!==r.resourceId||![r.caseId,r.workspaceId,r.jobId,r.commandReceiptId].every(x=>UUID.test(x))||
@@ -170,6 +170,7 @@ export async function runChartCalibrationJobV1(input:Readonly<{
    registryClient:input.registryClient},
   credentials:runtime.credentials,readModelInventory:runtime.readModelInventory,
   assessRequirement:runtime.assessRequirement,localBrowser:runtime.localBrowser,
+  interpretationReviews:runtime.interpretationReviews,
   openingQuestion:runtime.openingQuestion,verifyFinding:runtime.verifyFinding,
   maxTotalPasses:runtime.maxTotalPasses,costBudgetUnits:runtime.costBudgetUnits,leaseSeconds:runtime.leaseSeconds,
  });

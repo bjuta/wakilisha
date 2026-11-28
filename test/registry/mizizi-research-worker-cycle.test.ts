@@ -2,6 +2,7 @@ import {discoverMusicBrainzCoreCohortV1,discoverQualifiedMusicBrainzCoreCohortV1
 import {runDeskDiscoveryOnlyPassV1} from "../../scripts/registry/agents/mizizi/runtime/desk-discovery-only-pass-v1";
 import {guardDeskResearchPassStoreV1} from "../../scripts/registry/agents/mizizi/runtime/leased-research-pass-store-v1";
 import {createDeskResearchDispatcherV1,readDeskFactualNotesV1} from "../../scripts/registry/agents/mizizi/runtime/desk-research-dispatcher-v1";
+import {deskReviewDigestV1,qualifyDeskOperationSourceReviewV1,type DeskOperationReviewsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-operation-source-review-v1";
 import {createDeskResourceBudgetV1} from "../../scripts/registry/agents/mizizi/runtime/desk-resource-budget-v1";
 import {createDurableDeskModelAuthorityV1,createCostRoutedDeskAnthropicPassV1,selectCostEffectiveDeskModelV1,type DeskModelCandidateV1,type DeskAnthropicOptionsV1} from "../../scripts/registry/agents/mizizi/runtime/desk-anthropic-tool-loop-v1";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1} from "../../scripts/registry/agents/mizizi/runtime/desk-browser-reader-v1.mjs";
@@ -2998,6 +2999,73 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
  },45000);
 });
 
+
+describe("MIZIZI independent source-class and provider-handling authority",()=>{
+ const stamp=(ms:number)=>new Date(ms).toISOString();
+ const scope={jobId:JOB,caseId:CASE,workspaceId:WORKSPACE,workerId:"mizizi-chart:"+EVENT,
+  expectedRevision:2,leaseExpiresAt:stamp(NOW+300000)};
+ const credential="e".repeat(64);
+ const reviews:DeskOperationReviewsV1={
+  sourceUse:{contract:"mizizi.desk_reviewed_source_use_v1",
+   reviewRef:"review:separate-policy-issuer",reviewedBy:"external:qualified-steward",
+   reviewedAt:stamp(NOW-2000),validUntil:stamp(NOW+600000),
+   routes:[{host:"en.wikipedia.org",pathPrefix:"/wiki/",methods:["native_text","browser_text"],
+    contentClass:"licensed_original_text",rightsRef:"rights:cc-by-sa-original-text",
+    termsRef:"https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use"}]},
+  providerHandling:{contract:"mizizi.desk_reviewed_provider_handling_v1",provider:"anthropic",
+   retentionMode:"standard_30_day",retentionDays:30,credentialSha256:credential,
+   reviewRef:"review:separate-provider-issuer",reviewedBy:"external:qualified-steward",
+   reviewedAt:stamp(NOW-1000),validUntil:stamp(NOW+600000),
+   termsRef:"https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data"}};
+ const sourceUseRef="desk-source-review:sha256:"+deskReviewDigestV1(reviews.sourceUse);
+ const providerProcessingRef="desk-provider-review:sha256:"+deskReviewDigestV1(reviews.providerHandling);
+ const binding={scope,url:"https://en.wikipedia.org/wiki/Dai_Dai",method:"native_text" as const,
+  standingRevision:3,sourceUseRef,providerProcessingRef,credentialSha256:credential};
+ const policy={scope,revision:3,credentialSha256:credential,validUntil:stamp(NOW+600000),
+  operationInterpretationRule:{kind:"bounded_public_research_v1",sourceUseRef,providerProcessingRef,
+   credentialSha256:credential,operations:["native_text","browser_text"]}};
+ const read=(b:typeof binding|any=binding,p:typeof policy|any=policy,r:DeskOperationReviewsV1|any=reviews,now=NOW)=>
+  qualifyDeskOperationSourceReviewV1(r,b,p,now);
+ it("accepts independently digest-bound original text across reviewed URLs but not images",()=>{
+  expect(read()).toMatchObject({allowed:true,url:binding.url,reviewRef:reviews.sourceUse.reviewRef,
+   validUntil:scope.leaseExpiresAt});
+  expect(read({...binding,url:"https://en.wikipedia.org/wiki/Music"})).toMatchObject({allowed:true});
+  expect(read({...binding,method:"browser_text"})).toMatchObject({allowed:true});
+  expect(read({...binding,method:"browser_visual"})).toBeNull();
+  expect(read({...binding,url:"https://en.wikipedia.org/wiki/Dai_Dai?mode=1"})).toBeNull();
+  expect(read({...binding,url:"https://en.wikipedia.org/wiki/Dai_Dai%2fsecret"})).toBeNull();
+  expect(read({...binding,url:"https://en.wikipedia.org/w/index.php"})).toBeNull();
+  expect(read({...binding,url:"https://unreviewed.example.net/wiki/Dai_Dai"})).toBeNull();
+ });
+ it("separately rejects mismatched policy, actor, provider and source evidence",()=>{
+  expect(read(binding,{...policy,operationInterpretationRule:null})).toBeNull();
+  expect(read({...binding,standingRevision:4})).toBeNull();
+  expect(read({...binding,scope:{...scope,caseId:"99999999-9999-4999-8999-999999999999"}})).toBeNull();
+  expect(read({...binding,credentialSha256:"f".repeat(64)})).toBeNull();
+  expect(read({...binding,sourceUseRef:"desk-source-review:sha256:"+"0".repeat(64)})).toBeNull();
+  expect(read({...binding,providerProcessingRef:"desk-provider-review:sha256:"+"0".repeat(64)})).toBeNull();
+  expect(read(binding,policy,{...reviews,sourceUse:{...reviews.sourceUse,
+   routes:[{...reviews.sourceUse.routes[0],rightsRef:"rights:unreviewed-substitution"}]}})).toBeNull();
+  expect(read(binding,policy,{...reviews,providerHandling:{...reviews.providerHandling,
+   retentionDays:0}})).toBeNull();
+  expect(read(binding,policy,{...reviews,providerHandling:{...reviews.providerHandling,
+   credentialSha256:"f".repeat(64)}})).toBeNull();
+  expect(read(binding,policy,{...reviews,sourceUse:{...reviews.sourceUse,
+   routes:[...reviews.sourceUse.routes,...reviews.sourceUse.routes]}})).toBeNull();
+ });
+ it("expires and revokes independently, including before the lease ends",()=>{
+  expect(read(binding,policy,{...reviews,sourceUse:{...reviews.sourceUse,
+   validUntil:stamp(NOW+3000)}})).toBeNull();
+  expect(read(binding,policy,{...reviews,providerHandling:{...reviews.providerHandling,
+   validUntil:stamp(NOW-1)}})).toBeNull();
+  expect(read(binding,{...policy,validUntil:stamp(NOW-1)})).toBeNull();
+  expect(read(binding,policy,reviews,NOW+300001)).toBeNull();
+  expect(read(binding,null)).toBeNull();
+  expect(read(binding,policy,null)).toBeNull();
+  const reordered=Object.fromEntries(Object.entries(reviews.sourceUse).reverse());
+  expect(deskReviewDigestV1(reordered)).toBe(deskReviewDigestV1(reviews.sourceUse));
+ });
+});
 
 describe("MusicBrainz core CC0 offline cohort discovery",()=>{
  const mbidA="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
