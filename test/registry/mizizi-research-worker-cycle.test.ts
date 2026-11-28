@@ -2329,7 +2329,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation"|"requirePublicMethodEligibility"|"transientProviderCredentialSha256">={},useTavily=false){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation"|"requirePublicMethodEligibility"|"transientProviderCredentialSha256"|"authorizeInterpretation">={},useTavily=false){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
@@ -2935,10 +2935,26 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
  it("applies one reviewed operation rule to ordinary unregistered pages, PDF text and visual receipts, with negative signals and no publisher content retained",async()=>{
   const passage="The programme attributes this recording to an ensemble, but the named producer is uncertain. ".repeat(8);
   const credential=hash(JSON.stringify(["mizizi:anthropic:credential:v1",null,"fixture-only-key"]));
-  const opts={allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:credential,requirePublicMethodEligibility:true};
-  for(const mode of ["allowed","no_rule","wrong_credential","no_native_text","restricted_meta","restricted_header"]){
+  const reviewedOptions=(mode="allowed")=>({
+   allowTransientModelConsultation:()=>true,transientProviderCredentialSha256:credential,
+   requirePublicMethodEligibility:true,
+   ...(mode==="no_review"?{}:{authorizeInterpretation:async(binding:Parameters<NonNullable<Parameters<typeof createDeskResearchDispatcherV1>[0]["authorizeInterpretation"]>>[0])=>({
+    ...binding,allowed:true as const,reviewRef:"fixture:separately-reviewed-source-method",
+    reviewedAt:new Date(NOW-1000).toISOString(),validUntil:mode==="expired_review"?new Date(NOW-1000).toISOString():expiry,
+    ...(mode==="wrong_review_url"?{url:"https://unreviewed.example.org/article"}:{}),
+    ...(mode==="wrong_review_method"?{method:"browser_text" as const}:{}),
+    ...(mode==="wrong_review_source"?{sourceUseRef:"fixture:unreviewed-source"}:{}),
+    ...(mode==="wrong_review_provider"?{providerProcessingRef:"fixture:unreviewed-provider"}:{}),
+    ...(mode==="wrong_review_credential"?{credentialSha256:"e".repeat(64)}:{}),
+    ...(mode==="wrong_review_revision"?{standingRevision:2}:{}),
+    ...(mode==="wrong_review_case"?{scope:{...binding.scope,caseId:"99999999-9999-4999-8999-999999999999"}}:{})
+   })})
+  });
+  for(const mode of ["allowed","no_rule","wrong_credential","no_native_text","restricted_meta","restricted_header",
+   "no_review","wrong_review_url","wrong_review_method","wrong_review_source","wrong_review_provider",
+   "wrong_review_credential","wrong_review_revision","wrong_review_case","expired_review"]){
    const html='<html><head><title>Archive fixture</title>'+(mode==="restricted_meta"?'<meta name="robots" content="noai, nosnippet">':'')+'</head><body><article><p>'+passage+'</p></article></body></html>';
-   const h=fixture(new TextEncoder().encode(html),"text/html",opts,true);
+   const h=fixture(new TextEncoder().encode(html),"text/html",reviewedOptions(mode),true);
    h.disabled.add("fixture_unknown_host");
    if(mode!=="no_rule")h.disabled.add("operation_rule");
    if(mode!=="allowed")h.disabled.add(mode==="wrong_credential"?"wrong_operation_credential":mode);
@@ -2960,7 +2976,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     expect(appended.args.p_provenance).not.toHaveProperty("operationInterpretation");
    }
   }
-  const h=fixture(pdfFixture(),"application/pdf",opts,true);
+  const h=fixture(pdfFixture(),"application/pdf",reviewedOptions(),true);
   h.disabled.add("fixture_unknown_host");h.disabled.add("operation_rule");
   const discovery=await h.execute(call("search_web",{query:"Nairobi recording archive"}));
   const initial=await h.execute(call("read_page",{lead_id:discovery.leads[0].id}));

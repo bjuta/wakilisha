@@ -188,7 +188,7 @@ export function runCostRoutedDeskResearchWorkerCycleV1(input:Readonly<
 
 export type DurableDeskConfigurationV1=Readonly<
  Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],
- "braveApiKey"|"discovery"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"browser"|"localBrowser">&
+ "braveApiKey"|"discovery"|"nativeAccountFingerprint"|"authorizeAcquisition"|"authorizeExamination"|"authorizeInterpretation"|"browser"|"localBrowser">&
  Pick<Parameters<typeof createCostRoutedDeskAnthropicPassV1>[0],
  "anthropic"|"readModelInventory"|"assessRequirement"|"authorizeEnvelope"|"authorizeTool">
 >;
@@ -248,6 +248,7 @@ export function runDurableDeskResearchWorkerCycleV1(input:Readonly<{
     allowTransientModelConsultation:()=>transientModelConsultation,
     transientProviderCredentialSha256:operational?.credentialSha256,
     requirePublicMethodEligibility:operational?.publicWebTransientAllowed===true,
+    authorizeInterpretation:config.authorizeInterpretation,
     nativeAccountFingerprint:config.nativeAccountFingerprint,
     authorizeAcquisition:config.authorizeAcquisition,authorizeExamination:config.authorizeExamination,
     browser:config.browser,localBrowser:config.localBrowser,

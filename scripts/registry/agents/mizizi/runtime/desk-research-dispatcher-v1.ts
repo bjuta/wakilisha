@@ -33,6 +33,11 @@ type CustodyPolicy=Readonly<{
  externalModelProcessingAllowed:true;browserRenderAllowed?:boolean;visualProcessingAllowed?:boolean;validUntil:string;
  transientProviderCredentialSha256?:string|null;transientProviderProcessingRef?:string|null;
 }>;
+type SourceInterpretationScopeV1=Readonly<{scope:DeskSearchScopeV1;url:string;
+ method:"native_text"|"browser_text"|"pdf_visual"|"browser_visual";standingRevision:number;
+ sourceUseRef:string;providerProcessingRef:string;credentialSha256:string}>;
+type SourceInterpretationReviewV1=SourceInterpretationScopeV1&Readonly<{
+ allowed:true;reviewRef:string;reviewedAt:string;validUntil:string}>;
 type StoredReceipt=Readonly<{receiptId:string;callSha256:string;resultSha256:string;resultText:string;provenance:unknown}>;
 type StoredLead=Readonly<{id:string;url:string;kind:DeskToolLeadV1["kind"];label:string;receiptId:string}>;
 type BrowserOptions=Readonly<{
@@ -80,6 +85,11 @@ type Options=Readonly<{
  allowTransientModelConsultation?:()=>boolean;
  transientProviderCredentialSha256?:string;
  requirePublicMethodEligibility?:boolean;
+ /** Trusted independent policy issuer verifies this source URL/method falls
+  * within the reviewed source-use basis and actual 30-day provider handling.
+  * A standing textual reference is not sufficient. Missing callback denies.
+  * Issuance can be automated for an already approved bounded source class. */
+ authorizeInterpretation?:(binding:SourceInterpretationScopeV1)=>Promise<SourceInterpretationReviewV1|null>;
  now?:()=>number;
 }>;
 function urlOf(value:unknown):URL{
@@ -340,7 +350,7 @@ export function createDeskResearchDispatcherV1(options:Options){
  async function operationRule(method:string,url:string){
   if(options.allowTransientModelConsultation?.()!==true||options.requirePublicMethodEligibility!==true||
    !SHA.test(options.transientProviderCredentialSha256??""))return null;
-  urlOf(url);
+  const canonical=urlOf(url).href;
   const current=await rpc("mizizi_read_desk_operational_policy_v1",{p_scope:scope}) as {
    revision:number;scope:DeskSearchScopeV1;credentialSha256:string;publicWebTransientAllowed:boolean;validUntil:string;
    operationInterpretationRule?:{kind:string;sourceUseRef:string;providerProcessingRef:string;credentialSha256:string;operations:string[]}|null
@@ -357,6 +367,27 @@ export function createDeskResearchDispatcherV1(options:Options){
    new Set(rule.operations).size!==rule.operations.length||
    rule.operations.some(op=>!["native_text","browser_text","pdf_visual","browser_visual"].includes(op))||
    !rule.operations.includes(method))return null;
+  // Source-use and provider-handling reviews are independent of standing
+  // permissions and of the absence of machine-readable source restrictions.
+  if(typeof options.authorizeInterpretation!=="function")return null;
+  const binding:SourceInterpretationScopeV1={scope,url:canonical,
+   method:method as SourceInterpretationScopeV1["method"],standingRevision:current.revision,
+   sourceUseRef:rule.sourceUseRef,providerProcessingRef:rule.providerProcessingRef,
+   credentialSha256:current.credentialSha256};
+  const review=await options.authorizeInterpretation(Object.freeze(binding));
+  live();
+  const reviewed=Date.parse(review?.reviewedAt??""),until=Date.parse(review?.validUntil??"");
+  if(!review||review.allowed!==true||!review.scope||
+   scopeKeys.some(k=>review.scope[k]!==scope[k])||
+   review.url!==canonical||review.method!==method||
+   review.standingRevision!==current.revision||
+   review.sourceUseRef!==rule.sourceUseRef||
+   review.providerProcessingRef!==rule.providerProcessingRef||
+   review.credentialSha256!==current.credentialSha256||
+   !text(review.reviewRef,500,8)||
+   review.reviewRef===rule.sourceUseRef||review.reviewRef===rule.providerProcessingRef||
+   !Number.isFinite(reviewed)||reviewed>now()||
+   !Number.isFinite(until)||until<=now()||until>expiry)return null;
   return {kind:rule.kind,standingRevision:current.revision,method,restrictionCheck:"no_known_directive"};
  }
  async function operationConsultation(id:string,method:string,receipt:{finalUrl:string;retrievedAt:string},locator:string,raw:string,restricted:boolean){
