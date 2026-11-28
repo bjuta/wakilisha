@@ -448,7 +448,7 @@ export async function runAdaptiveInvestigationV1(input:Readonly<{
     throw Error("MIZIZI_RESEARCH_NOTEBOOK_CLAIM_INVALID");
    const refs=authorities.filter(a=>modelVisibleIds.has(a.sourceId.toLowerCase())&&
     claim.sourceIds.some(id=>id.toLowerCase()===a.sourceId.toLowerCase()));
-   const independent=await verifyFinding(claim,Object.freeze(refs));
+   const independent=claim.consultationIds?.length?{verified:false,verificationRef:null}:await verifyFinding(claim,Object.freeze(refs));
    if(typeof independent?.verified!=="boolean"||
       (independent.verified&&!independent.verificationRef))
     throw new Error("MIZIZI_RESEARCH_INDEPENDENT_VERIFIER_INVALID");

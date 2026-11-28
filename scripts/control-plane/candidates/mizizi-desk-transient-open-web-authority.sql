@@ -1573,11 +1573,11 @@ begin
    or jsonb_typeof(f->'statement') is distinct from 'string' or length(f->>'statement') not between 8 and 1200
    or btrim(f->>'statement') is distinct from f->>'statement' or f->>'statement' ~ '[[:cntrl:]]'
    or jsonb_typeof(f->'sourceIds') is distinct from 'array' or jsonb_typeof(f->'consultationIds') is distinct from 'array'
-   or jsonb_array_length(f->'sourceIds'||f->'consultationIds') not between 1 and 12
-   or (select count(distinct v) from jsonb_array_elements_text(f->'sourceIds'||f->'consultationIds') v)<>jsonb_array_length(f->'sourceIds'||f->'consultationIds')
+   or jsonb_array_length((f->'sourceIds')||(f->'consultationIds')) not between 1 and 12
+   or (select count(distinct v) from jsonb_array_elements_text((f->'sourceIds')||(f->'consultationIds')) v)<>jsonb_array_length((f->'sourceIds')||(f->'consultationIds'))
   then raise exception 'Agent notebook original note shape denied' using errcode='42501';end if;
   ids:=array[]::uuid[];n.source_locator:=null;n.observed_at:=null;
-  for ref in select value from jsonb_array_elements(f->'sourceIds'||f->'consultationIds') loop
+  for ref in select value from jsonb_array_elements((f->'sourceIds')||(f->'consultationIds')) loop
    if jsonb_typeof(ref) is distinct from 'string' or coalesce(ref#>>'{}','') !~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
     then raise exception 'Agent notebook source identity denied' using errcode='42501';end if;
    sid:=(ref#>>'{}')::uuid;
@@ -1890,7 +1890,7 @@ begin
  if not found then return null;end if;
  f:=b->'findings'->n.origin_claim_index;
  if f->>'statement' is distinct from n.note_text or f->>'fieldKey' is distinct from n.field_key
-  or f->>'noteKind' is distinct from n.note_kind or (f->'sourceIds'||f->'consultationIds') is distinct from to_jsonb(n.source_receipt_ids)
+  or f->>'noteKind' is distinct from n.note_kind or ((f->'sourceIds')||(f->'consultationIds')) is distinct from to_jsonb(n.source_receipt_ids)
  then return null;end if;
  if n.note_sha256 is distinct from encode(sha256(convert_to(jsonb_build_array(n.case_id,n.workspace_id,n.expected_revision,n.membership_sha256,
    n.observation_sha256,n.author_job_id,n.author_worker_id,n.origin_pass_fingerprint,n.origin_claim_index,n.source_receipt_ids,
@@ -2268,10 +2268,14 @@ begin
   if coalesce(b->'deskConsultationReceipts','[]'::jsonb) is distinct from consultations then
    raise exception 'Desk transient consultation dependency denied' using errcode='42501';end if;
   for finding in select value from jsonb_array_elements(b->'findings') loop
+   if exists(select 1 from jsonb_array_elements_text(finding->'sourceIds') v where v=any(consultation_ids::text[])) then
+    raise exception 'Desk consultation is not retained evidence' using errcode='42501';end if;
    if finding ? 'consultationIds' then
     if jsonb_typeof(finding->'consultationIds') is distinct from 'array' or exists(
      select 1 from jsonb_array_elements_text(finding->'consultationIds') v where not(v=any(consultation_ids::text[])))
-     or (jsonb_array_length(finding->'consultationIds')>0 and (finding->'independentlyVerified' is distinct from 'false'::jsonb or finding->>'verificationRef' is not null))
+     or (jsonb_array_length(finding->'consultationIds')>0 and
+      (not(finding ? 'fieldKey' and finding ? 'noteKind') or finding->>'interpretation'='supported'
+       or finding->'independentlyVerified' is distinct from 'false'::jsonb or finding->>'verificationRef' is not null))
     then raise exception 'Desk consultation cannot be an independent finding' using errcode='42501';end if;
    end if;
   end loop;

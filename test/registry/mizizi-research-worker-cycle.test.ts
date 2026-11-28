@@ -2291,7 +2291,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   return new TextEncoder().encode(pdf);
  }
  const call=(name:"search_web"|"read_page"|"read_document"|"inspect_visual"|"render_page",input:Record<string,string|number>)=>({name,input});
- function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch">={},useTavily=false){
+ function fixture(body=textBytes,mime="text/plain",browserOptions:Pick<Parameters<typeof createDeskResearchDispatcherV1>[0],"browser"|"browserTestSeams"|"sharedNativeReuse"|"sharedNativeSearch"|"allowTransientModelConsultation">={},useTavily=false){
   const calls:Array<{fn:string;args:Record<string,unknown>}>=[];
   const receipts=new Map<string,Record<string,unknown>>(),leadRows=new Map<string,Record<string,unknown>>();
   const disabled=new Set<string>();
@@ -2320,7 +2320,7 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
     return ok(disabled.has(host)||disabled.has("fixture_unknown_host")&&host==="archive.org"?null:{host,revision:1,sourceFamily:host==="api.search.brave.com"?"brave_discovery":"public_web",
      authorityRef:"contract:reviewed-rights",originKey:host==="www.loc.gov"?"library:original-origin":"archive:original-origin",lineageKey:host==="www.loc.gov"?"library:independent-lineage":"archive:common-lineage",
      useBasis:"documented_contract",privateResearchAllowed:true,metadataRetentionAllowed:true,
-     excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host),externalModelProcessingAllowed:true,
+     excerptRetentionAllowed:!["api.search.brave.com","api.tavily.com"].includes(host)&&!(disabled.has("fixture_transient_disclosure")&&host==="archive.org"),externalModelProcessingAllowed:true,
      browserRenderAllowed:host!=="api.search.brave.com",visualProcessingAllowed:host!=="api.search.brave.com",validUntil:expiry});
    }
    if(fn==="mizizi_authorize_desk_search_v1")return ok({requestSha256:args.p_request_sha256,
@@ -2628,6 +2628,56 @@ describe("MIZIZI composed durable search and native-source dispatcher",()=>{
   expect(passes[0].deskToolReceipts).toHaveLength(3);expect(passes[0].sourceReceipts).toHaveLength(2);
   expect(new Set(passes[0].sourceReceipts.map(s=>s.lineageKey)).size).toBe(2);
   expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false}]);expect(verify).toHaveBeenCalledTimes(1);
+ },20000);
+ it("examines permitted non-retainable text in memory, journals only metadata and an unverified original note",async()=>{
+  const h=fixture(textBytes,"text/plain",{allowTransientModelConsultation:()=>true},true);
+  h.disabled.add("fixture_transient_disclosure");
+  const question="What does the archival programme report about the recording?";
+  const identity={caseId:CASE,workspaceId:WORKSPACE,openingQuestion:question};
+  const model="claude-haiku-5-5",passes:InvestigationPassV1[]=[];
+  const authority=createDurableDeskModelAuthorityV1({rpc:h.rpc,scope,now:()=>NOW,
+   authorizeEnvelope:async b=>({requestSha256:b.requestSha256,policyRef:"fixture:host-envelope",validUntil:expiry,modelDisclosureAllowed:true}),
+   authorizeTool:async()=>true});
+  let round=0;
+  const transport=vi.fn(async(_url:string,init:RequestInit)=>{
+   const body=JSON.parse(String(init.body));round++;
+   const result=(value:unknown)=>new Response(JSON.stringify({model,usage:{input_tokens:500,output_tokens:100},...value as object}),{headers:{"content-type":"application/json"}});
+   const tool=(name:string,input:unknown)=>result({stop_reason:"tool_use",content:[{type:"tool_use",id:"toolu_"+round,name,input}]});
+   if(round===1)return tool("search_web",{query:"Nairobi recording archive"});
+   const latest=JSON.parse(body.messages.at(-1).content[0].content[0].text);
+   if(round===2)return tool("read_page",{lead_id:latest.leads[0].id});
+   expect(latest.sources).toEqual([]);
+   expect(latest.consultation.text).toBe(new TextDecoder().decode(textBytes));
+   const stored=h.receipts.get(latest.consultation.receiptId)!;
+   expect(JSON.parse(String(stored.resultText)).consultation).not.toHaveProperty("text");
+   return result({stop_reason:"end_turn",content:[{type:"text",text:JSON.stringify({hypotheses:[{
+    statement:"The programme provides an attributed performer claim, not independently established identity.",
+    sourceIds:[],consultationIds:[latest.consultation.receiptId],fieldKey:"performer",noteKind:"attributed_claim",
+    interpretation:"supported",uncertainty:.7,reasoningSummary:"The text is a single source report."}],
+    leads:[],passFinding:"Performer identity remains unverified.",requestedDisposition:"conclude"})}]});
+  });
+  const prepareDeskPass=createCostRoutedDeskAnthropicPassV1({scope,writeNotebook:true,
+   anthropic:{apiKey:"fixture-only-key",transport:transport as unknown as typeof fetch},
+   enabledTools:["search_web","read_page"],readModelInventory:async()=>[{model,family:"haiku",active:true,toolUse:true,
+    structuredOutput:true,vision:false,ordinaryToolTranscript:true,qualityGateRef:"fixture:quality",pricingRef:"fixture:price",
+    maxInputTokens:5000,maxOutputTokens:2500,worstCaseInputMicrousdPerMillion:100000,worstCaseOutputMicrousdPerMillion:500000,validUntil:expiry}],
+   assessRequirement:async()=>({tier:"routine",needsVision:false,inputTokenCeiling:5000,maximumCostMicrousd:8000,assessmentRef:"fixture:assessment"}),
+   ...authority,quote:async b=>({requestSha256:b.requestSha256,pricingRef:"fixture:price",maxInputTokens:5000,maxOutputTokens:2500,maximumCostMicrousd:2000,validUntil:expiry}),
+   reserve:async(b,q)=>({reservationId:[JOB,CASE,RECEIPT][b.round-1],requestSha256:b.requestSha256,pricingRef:q.pricingRef,maximumCostMicrousd:q.maximumCostMicrousd,validUntil:expiry}),
+   consume:async()=>true,recordModelEvent:async()=>{},
+   executeTool:h.dispatch.executeTool,verifyToolReceipt:h.dispatch.verifyToolReceipt,authorizeSource:h.dispatch.authorizeSource,now:()=>NOW});
+  const store=guardDeskResearchPassStoreV1({read:async()=>[...passes],append:async(_id,_ordinal,_prior,pass)=>{passes.push(pass);}},h.dispatch.verifyJournalPass);
+  const verify=vi.fn(async()=>({verified:true,verificationRef:"fixture:should-not-run"}));
+  const result=await runAdaptiveInvestigationV1({identity,store,prepareDeskPass,
+   readSources:async()=>{throw Error("LEGACY_READER");},analyze:async()=>{throw Error("LEGACY_MODEL");},
+   authorizeModelProcessing:h.dispatch.authorizeModelProcessing,verifyFinding:verify,maxNewPasses:1,maxTotalPasses:1,costBudgetUnits:20,now:()=>NOW});
+  expect(result).toMatchObject({passesAdded:1,disposition:"paused"});
+  expect(transport).toHaveBeenCalledTimes(3);expect(verify).not.toHaveBeenCalled();
+  expect(passes[0].sourceReceipts).toEqual([]);
+  expect(passes[0].deskConsultationReceipts).toHaveLength(1);
+  expect(passes[0].findings).toMatchObject([{interpretation:"hypothesis",independentlyVerified:false,fieldKey:"performer",noteKind:"attributed_claim"}]);
+  expect(JSON.stringify(passes)).not.toContain(new TextDecoder().decode(textBytes));
+  expect(JSON.stringify([...h.receipts.values()])).not.toContain(new TextDecoder().decode(textBytes));
  },20000);
  it("uses indexed retained discovery before any provider search and then reuses the exact source receipt",async()=>{
   const h=fixture(textBytes,"text/plain",{sharedNativeSearch:true,sharedNativeReuse:true});

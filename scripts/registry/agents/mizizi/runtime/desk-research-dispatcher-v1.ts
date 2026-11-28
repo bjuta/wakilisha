@@ -13,7 +13,7 @@ import {createDeskNativeReaderV1,createDeskBrowserResourceReaderV1,type DeskBrow
 import {createDeskSourceInterpreterV1,createDeskPdfVisualReaderV1} from "./desk-source-interpreter-v1.mjs";
 import {createCloudflareBrowserTransportV1,createDeskBrowserReaderV1,createDurableLocalDeskBrowserV1} from "./desk-browser-reader-v1.mjs";
 import {createDeskResourceBudgetV1} from "./desk-resource-budget-v1.ts";
-import {verifyInvestigationHistoryV1,verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1} from "./adaptive-investigation-v1.ts";
+import {verifyInvestigationHistoryV1,verifyInvestigationSourceV1,type SourceAuthorityV1,type SourceExcerptV1,type InvestigationPassV1,type DeskConsultationRefV1} from "./adaptive-investigation-v1.ts";
 import {serializeDeskToolResultV1,isDeskUnavailableOutcomeV1,validDeskTransientConsultationV1,deskConsultationRefV1,type DeskTransientConsultationV1,type DeskAnthropicOptionsV1,type DeskToolCallV1,type DeskToolLeadV1,type DeskToolResultV1} from "./desk-anthropic-tool-loop-v1.ts";
 import type {WorkerRpc,ResearchSourceVerifierV1} from "./research-worker-cycle-v1.ts";
 import {readDeskFactualNotesV1,factualNoteReferencesCurrentV1,type DeskFactualNoteSubjectV1} from "./desk-factual-note-readback-v1.ts";
@@ -705,7 +705,8 @@ export function createDeskResearchDispatcherV1(options:Options){
      projectionSha256:interpreted.projectionSha256,contentType:receipt.contentType,retrievedAt:receipt.retrievedAt,
      byteLength:receipt.byteLength,hopSha256:receipt.hopSha256,locator:"no_text",documentPages:null,renderRequired:false},refs.bindings);
   }
-  const refs=leadsFrom(projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})));
+  const refs=leadsFrom(p.excerptRetentionAllowed?projection.links.map((l:{url:string;label:string|null})=>({url:l.url,label:l.label})):
+   projection.links.filter((l:{url:string})=>!l.url.includes("?")).map((l:{url:string})=>({url:l.url,label:"Public reference (unverified)"})));
   const leads=[...refs.leads],bindings=[...refs.bindings];
   const receiptId=randomUUID(),sources:SourceExcerptV1[]=[];
   const segment=projection.segments.find((seg:{text:string})=>typeof seg.text==="string"&&seg.text.trim());
@@ -818,7 +819,7 @@ export function createDeskResearchDispatcherV1(options:Options){
   if(pass.deskToolReceipts!==undefined){
    if(!Array.isArray(pass.deskToolReceipts)||pass.deskToolReceipts.length>4)return false;
    const deps=new Set<string>(),depSources=new Set<string>(),unavailableCodes=new Set<string>();
-   const consultationRefs=[];
+   const consultationRefs:DeskConsultationRefV1[]=[];
    for(const ref of pass.deskToolReceipts){
     if(!ref||!UUID.test(ref.receiptId)||deps.has(ref.receiptId))return false;
     const read=await readReceipt(ref.receiptId);
