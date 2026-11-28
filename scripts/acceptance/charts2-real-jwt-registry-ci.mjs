@@ -1222,6 +1222,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  -- Exercise the new content-bearing null-custody path before the original
  -- standing fixture. The enclosing subtransaction rolls back every effect.
  do $operation_interpretation$ declare packet jsonb;agent jsonb;outcome text;begin
+ begin
   reset role;
   ${operationPolicy(2,1,operationRule)};
   set local role service_role;
@@ -1230,19 +1231,30 @@ export async function verifyCharts2RealJwtRegistryV1({
   if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->'operationInterpretationRule') is distinct from ${j(operationRule)}
    or public.mizizi_read_desk_custody_policy_v1(${j(scope)},${q(operationHost)}) is not null
    then raise exception 'STOP_OPERATION_STANDING_RULE';end if;
+  raise notice 'WK_AUTH_OPERATION_RULE_BINDING=PASS';
+  -- RPCs create dependent proofs. Use sequential statements, never assume
+  -- PostgreSQL evaluates Boolean operands in source order.
   if (${authority("tool_execute",searchCall)}->>'allowed') is distinct from 'true'
-   or (${append(operationSearch)}->>'outcome') is distinct from 'created'
-   or (${authority("tool_execute",operationCall)}->>'allowed') is distinct from 'true'
-   or (${operationNative}->>'allowed') is distinct from 'true'
-   or (${operationExamine}->>'allowed') is distinct from 'true'
-   then raise exception 'STOP_OPERATION_ACCESS_PROOFS';end if;
+   then raise exception 'STOP_OPERATION_SEARCH_TOOL';end if;
+  if (${append(operationSearch)}->>'outcome') is distinct from 'created'
+   then raise exception 'STOP_OPERATION_SEARCH_RECEIPT';end if;
+  if (${authority("tool_execute",operationCall)}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_READ_TOOL';end if;
+  if (${operationNative}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_NATIVE_ACCESS';end if;
+  if (${operationExamine}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_TEXT_ACCESS';end if;
+  raise notice 'WK_AUTH_OPERATION_ACCESS_PROOFS=PASS';
   if ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,standingRevision:1}}})} is not null
    or ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,restrictionCheck:"restricted"}}})} is not null
    then raise exception 'STOP_OPERATION_FORGED_RULE_OR_RESTRICTION';end if;
   if (${append(operationPage)}->>'outcome') is distinct from 'created'
-   or (${read(operationPageId)}->>'resultSha256') is distinct from ${q(operationPage.p_result_sha256)}
-   or (${authority("model_disclose",envelope(3,[],operationDeps))}->>'allowed') is distinct from 'true'
-   then raise exception 'STOP_OPERATION_RECEIPT_OR_MODEL_GRANT';end if;
+   then raise exception 'STOP_OPERATION_RECEIPT_ADMISSION';end if;
+  if (${read(operationPageId)}->>'resultSha256') is distinct from ${q(operationPage.p_result_sha256)}
+   then raise exception 'STOP_OPERATION_RECEIPT_READBACK';end if;
+  if (${authority("model_disclose",envelope(3,[],operationDeps))}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_MODEL_GRANT';end if;
+  raise notice 'WK_AUTH_OPERATION_RECEIPT_MODEL_BINDING=PASS';
   select r.outcome into strict outcome from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,
    ${q(activeWorker)},${q(operationPass)},${q(hash(operationPass))},null) r;
   if outcome is distinct from 'created' then raise exception 'STOP_OPERATION_NOTE_APPEND';end if;
@@ -1252,6 +1264,7 @@ export async function verifyCharts2RealJwtRegistryV1({
   if agent is null or agent->>'authorJobId' is distinct from ${q(job.job_id)}
    or agent->'verified' is distinct from 'false'::jsonb
    then raise exception 'STOP_OPERATION_NOTE_READBACK';end if;
+  raise notice 'WK_AUTH_OPERATION_NOTE_READBACK=PASS';
   reset role;
   ${operationPolicy(3,2,null)};
   set local role service_role;
@@ -1259,11 +1272,14 @@ export async function verifyCharts2RealJwtRegistryV1({
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   if ${read(operationPageId)} is not null then raise exception 'STOP_OPERATION_REVOKED_RECEIPT';end if;
   packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
-  if exists(select 1 from jsonb_array_elements((packet->>'bodyText')::jsonb->'notes'))
+  if packet is null or jsonb_array_length((packet->>'bodyText')::jsonb->'notes') is distinct from 0
    then raise exception 'STOP_OPERATION_REVOKED_NOTE';end if;
-  raise exception 'Rollback operation interpretation fixture' using errcode='ZX003';
- exception when sqlstate 'ZX003' then null;end $operation_interpretation$;
+  raise exception 'ROLLBACK_OPERATION_INTERPRETATION_FIXTURE' using errcode='ZX003';
+ exception when sqlstate 'ZX003' then
+  if sqlerrm<>'ROLLBACK_OPERATION_INTERPRETATION_FIXTURE' then raise;end if;
+ end;
  raise notice 'WK_AUTH_MIZIZI_OPERATION_INTERPRETATION_NOTE_REVOKE=PASS';
+ end $operation_interpretation$;
  do $standing$ begin
  if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->>'revision') is distinct from '1'
  or (${authority("model_disclose",envelope(1,[],[]))}->>'allowed') is distinct from 'true'
