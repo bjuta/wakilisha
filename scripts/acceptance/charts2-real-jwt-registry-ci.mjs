@@ -957,7 +957,7 @@ export async function verifyCharts2RealJwtRegistryV1({
  };
  const append=args=>"public.mizizi_record_desk_tool_receipt_v1("+[
   q(args.p_call_text),q(args.p_call_sha256),q(args.p_result_text),q(args.p_result_sha256),
-  q(args.p_host),args.p_policy_revision,j(args.p_provenance),j(args.p_lead_bindings)].join(",")+")";
+  q(args.p_host),args.p_policy_revision??"null",j(args.p_provenance),j(args.p_lead_bindings)].join(",")+")";
  const read=id=>"public.mizizi_read_desk_tool_receipt_v1("+j(scope)+","+q(id)+"::uuid)";
  const question="Fixture exact public research question",questionHash=hash(question),credential="d".repeat(64);
  const nextQuestion="Which original release establishes the recording credits?",nextQuestionHash=hash(nextQuestion);
@@ -1043,6 +1043,43 @@ export async function verifyCharts2RealJwtRegistryV1({
  const continuationFingerprint=hash(journalBodyFor(deps)),continuationSql=(scopeSql,fingerprint)=>
   "public."+continuationName+"("+scopeSql+","+q(fingerprint)+")";
  const journalRead="public.mizizi_read_research_passes_v1("+q(job.job_id)+"::uuid,"+q(activeWorker)+")";
+ // One unknown publisher, synthetic document and independent standing
+ // rule. Reuse the exact consumed resources inside the rollback subtest.
+ const operationHost="www.loc.gov",operationUrl="https://www.loc.gov/item/fixture",
+  operationSearchId=randomUUID(),operationLeadId=randomUUID(),operationPageId=randomUUID();
+ const operationKind="native_html_declared_cc0_v1",operationLicense="https://creativecommons.org/publicdomain/zero/1.0/";
+ const operationRule={kind:operationKind,sourceUseRef:"fixture:independent-source-use-review",
+  providerProcessingRef:"fixture:independent-provider-handling-review",credentialSha256:credential};
+ const operationSearch=binding("search_web",{query:context.positions[0].title},
+  {receiptId:operationSearchId,leads:[{id:operationLeadId,kind:"reference",label:"Fixture public archive"}],sources:[],visual:null},
+  searchHost,searchArgs.p_provenance,[{id:operationLeadId,url:operationUrl}]);
+ const operationText="A fictional archive attributes this recording to an ensemble.";
+ const operationRef={receiptId:operationPageId,textSha256:hash(operationText),
+  textBytes:Buffer.byteLength(operationText),citation:operationUrl+"#article_text",observedAt};
+ const operationMeta={requestedUrl:operationUrl,finalUrl:operationUrl,sourceSha256:sourceHash,
+  projectionSha256:hash("synthetic operation projection"),contentType:"text/html",retrievedAt:observedAt,
+  byteLength:128,hopSha256:[hopHash],locator:"article_text",documentPages:null,renderRequired:false,
+  operationInterpretation:{kind:operationKind,standingRevision:2,documentLicense:operationLicense}};
+ const operationPage=binding("read_page",{lead_id:operationLeadId},
+  {receiptId:operationPageId,leads:[],sources:[],visual:null,consultation:operationRef},operationHost,operationMeta,[],null);
+ const operationCall=JSON.parse(operationPage.p_call_text);
+ const operationNative=access("native_acquire",{url:operationUrl,descriptor:{},callSha256:operationPage.p_call_sha256,hopSha256:hopHash});
+ const operationExamine=access("native_text",{url:operationUrl,descriptor:{finalUrl:operationUrl,sha256:sourceHash,
+  representation:"native_response_bytes",pageStart:1,pageEnd:10},callSha256:operationPage.p_call_sha256});
+ const operationDeps=[operationSearch,operationPage].map(a=>({receiptId:JSON.parse(a.p_result_text).receiptId,
+  callSha256:a.p_call_sha256,resultSha256:a.p_result_sha256}));
+ const operationPass=JSON.stringify({...JSON.parse(journalBodyFor(operationDeps)),sourceReceipts:[],
+  deskConsultationReceipts:[operationRef],findings:[{statement:"The consulted archive makes an ensemble attribution.",
+   sourceIds:[],consultationIds:[operationPageId],interpretation:"hypothesis",uncertainty:.8,
+   reasoningSummary:"Single unverified original-source claim.",fieldKey:"subject_version",noteKind:"attributed_claim",
+   independentlyVerified:false,verificationRef:null}],decision:{action:"pause",nextQuestion:null}});
+ const operationPolicy=(revision,previous,rule)=>"insert into mizizi_private.desk_operational_policy_versions_v1("+
+  "workspace_id,case_id,revision,expected_revision,membership_sha256,observation_sha256,enabled,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,"+
+  "max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms,shared_native_auto_allowed,public_retained_batch_allowed,public_web_transient_allowed,operation_interpretation_rule) "+
+  "select workspace_id,case_id,"+revision+",expected_revision,membership_sha256,observation_sha256,true,authority_ref,credential_sha256,model_ids,question_sha256s,tool_names,"+
+  "max_rounds,max_request_bytes,access_rules,valid_until,adaptive_followups_allowed,public_query_terms,shared_native_auto_allowed,public_retained_batch_allowed,true,"+
+  (rule?j(rule):"null")+" from mizizi_private.desk_operational_policy_versions_v1 where workspace_id="+q(ws)+"::uuid and case_id="+q(pairedId)+"::uuid and revision="+previous;
+
  const rules=[{host,pathPrefix:"/details/",custodyRevision:1,operations:["native_acquire","native_text","browser_render","browser_request","browser_text","browser_visual"]}];
  const localAccount=hash("fixture local capacity"),localSessionId=randomUUID(),localReadName="mizizi_read_desk_local_browser_session_v1";
  const localRequestHash=hash("fixture exact local browser request"),browserHop=hash("fixture exact local browser resource");
@@ -1182,6 +1219,51 @@ export async function verifyCharts2RealJwtRegistryV1({
  exception when sqlstate 'ZX001' then null;end;
  raise notice 'WK_AUTH_MIZIZI_NOTE_CONTEXT_MODEL_AND_JOURNAL=PASS';
  end $note_context$;
+ -- Exercise the new content-bearing null-custody path before the original
+ -- standing fixture. The enclosing subtransaction rolls back every effect.
+ do $operation_interpretation$ declare packet jsonb;agent jsonb;outcome text;begin
+  reset role;
+  ${operationPolicy(2,1,operationRule)};
+  set local role service_role;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->'operationInterpretationRule') is distinct from ${j(operationRule)}
+   or public.mizizi_read_desk_custody_policy_v1(${j(scope)},${q(operationHost)}) is not null
+   then raise exception 'STOP_OPERATION_STANDING_RULE';end if;
+  if (${authority("tool_execute",searchCall)}->>'allowed') is distinct from 'true'
+   or (${append(operationSearch)}->>'outcome') is distinct from 'created'
+   or (${authority("tool_execute",operationCall)}->>'allowed') is distinct from 'true'
+   or (${operationNative}->>'allowed') is distinct from 'true'
+   or (${operationExamine}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_ACCESS_PROOFS';end if;
+  if ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,standingRevision:1}}})} is not null
+   or ${append({...operationPage,p_provenance:{...operationMeta,operationInterpretation:{...operationMeta.operationInterpretation,documentLicense:"https://creativecommons.org/licenses/by-nc/4.0/"}}})} is not null
+   then raise exception 'STOP_OPERATION_FORGED_RULE_OR_LICENSE';end if;
+  if (${append(operationPage)}->>'outcome') is distinct from 'created'
+   or (${read(operationPageId)}->>'resultSha256') is distinct from ${q(operationPage.p_result_sha256)}
+   or (${authority("model_disclose",envelope(3,[],operationDeps))}->>'allowed') is distinct from 'true'
+   then raise exception 'STOP_OPERATION_RECEIPT_OR_MODEL_GRANT';end if;
+  select r.outcome into strict outcome from public.mizizi_append_research_pass_v1(${q(job.job_id)}::uuid,
+   ${q(activeWorker)},${q(operationPass)},${q(hash(operationPass))},null) r;
+  if outcome is distinct from 'created' then raise exception 'STOP_OPERATION_NOTE_APPEND';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)});
+  select v into agent from jsonb_array_elements((packet->>'bodyText')::jsonb->'notes') v
+   where v->'sourceReceiptIds'=jsonb_build_array(${q(operationPageId)});
+  if agent is null or agent->>'authorJobId' is distinct from ${q(job.job_id)}
+   or agent->'verified' is distinct from 'false'::jsonb
+   then raise exception 'STOP_OPERATION_NOTE_READBACK';end if;
+  reset role;
+  ${operationPolicy(3,2,null)};
+  set local role service_role;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  if ${read(operationPageId)} is not null then raise exception 'STOP_OPERATION_REVOKED_RECEIPT';end if;
+  packet:=public.mizizi_read_desk_factual_notes_v1(${j(scope)},array[(agent->>'noteId')::uuid]);
+  if exists(select 1 from jsonb_array_elements((packet->>'bodyText')::jsonb->'notes'))
+   then raise exception 'STOP_OPERATION_REVOKED_NOTE';end if;
+  raise exception 'Rollback operation interpretation fixture' using errcode='ZX003';
+ exception when sqlstate 'ZX003' then null;end $operation_interpretation$;
+ raise notice 'WK_AUTH_MIZIZI_OPERATION_INTERPRETATION_NOTE_REVOKE=PASS';
  do $standing$ begin
  if (public.mizizi_read_desk_operational_policy_v1(${j(scope)})->>'revision') is distinct from '1'
  or (${authority("model_disclose",envelope(1,[],[]))}->>'allowed') is distinct from 'true'
